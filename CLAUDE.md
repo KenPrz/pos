@@ -60,7 +60,7 @@ Postgres version.
 
 ```bash
 cd backend && ./vendor/bin/pest         # needs Postgres up (creates/uses pos_test)
-cd frontend/web && npx tsc -b --force && npm run build
+cd frontend/web && npm test && npx tsc -b --force && npm run build
 ```
 
 The test database is created once:
@@ -83,7 +83,11 @@ If one fails, the code broke a documented rule — change the code, not the rule
 Full reasoning lives in the docs; these are the ones that cause real damage.
 
 - **Money is integer cents** (`bigint` / PHP `int`). Never a float, in any layer, ever.
-  Wire format is an integer with a `_cents` suffix. → `docs/01-architecture.md`
+  Wire format is an integer with a `_cents` suffix. Use `App\Domain\Money\Money` — it has
+  no float constructor, deliberately. → `docs/01-architecture.md`
+- **All rounding goes through `Money::fraction()`.** Tax, discounts, and fractional
+  quantities are all fractions of an amount, so there is one place a cent can be created
+  or destroyed. Don't add a second.
 - **Quantities are strings** on the wire (`"0.500"`). `numeric(12,3)` does not survive
   IEEE-754, and JS `number` is IEEE-754. → `docs/03-api.md`
 - **One system action = one route = one controller = one Action class.** Actions take an
@@ -110,5 +114,8 @@ Full reasoning lives in the docs; these are the ones that cause real damage.
 action (controller → action → resource) so the first endpoint sets the shape every later
 one copies.
 
-Next: **M1 — money primitives** (`docs/06-roadmap.md`). Pure integer functions, no I/O,
-written before the schema because everything else computes on them.
+**M1 complete** — money primitives in `app/Domain/Money/` and `frontend/web/src/lib/money.ts`.
+Pure integer functions, no I/O, no container.
+
+Next: **M2 — schema + auth** (`docs/06-roadmap.md`). Do the spatie uuid migration edits
+first (`docs/05-rbac.md` lists them); they're the likeliest thing to eat an afternoon.

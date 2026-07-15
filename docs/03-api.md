@@ -72,7 +72,7 @@ One envelope (`01-architecture.md`):
 | 403 | `requires_supervisor`, `wrong_location` |
 | 404 | `not_found` |
 | 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused` |
-| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `modifier_group_required` |
+| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `modifier_group_required`, `insufficient_tender` |
 | 429 | `too_many_pin_attempts` |
 
 `code` is stable forever once shipped; clients branch on it. `message` is for humans and
@@ -244,6 +244,12 @@ POST /api/v1/orders/{id}/payments                # Idempotency-Key REQUIRED, If-
 
 Change is computed **server-side, in integers**. The client displays what it's told; it
 never does the subtraction itself.
+
+`amount_cents` and `tendered_cents` are separate fields, and the distinction is
+load-bearing: on a $50 bill, handing over $60 is not a $60 payment — it is $50 applied and
+$10 change. Tendering *less* than the amount applied is `422 insufficient_tender`, which
+is a different thing from underpaying the order (that's just a partial payment, and the
+order stays open).
 
 `external_card`:
 

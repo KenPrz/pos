@@ -95,4 +95,9 @@ jobs:
 
       - run: npx oxlint src
 
+      # The money primitives are tested on both sides of the wire. If the two parsers
+      # ever disagree, a price typed in the back office is not the price rung up.
+      - name: Vitest
+        run: npm run test
+
       - run: npm run build

@@ -41,7 +41,8 @@ expensive bugs live, and they are the foundation everything else computes on.
 - Tax: exclusive and inclusive extraction, per-line, half-up.
 - Percent and fixed discounts.
 - Change calculation.
-- Split allocation with deterministic remainder (1000 / 3 → 333, 333, 334).
+- Split allocation with deterministic remainder (1000 / 3 → 334, 333, 333; earliest
+  absorbs).
 - `Cents` branded type + formatter on the frontend.
 
 **Done when:** the unit suite is green, including the penny-allocation property test
@@ -49,6 +50,27 @@ asserting parts always sum to the whole.
 
 **Why first:** every later milestone calls this code. A rounding bug found here costs an
 afternoon; found after go-live it costs a reconciliation.
+
+**Status: complete.** `app/Domain/Money/` — `Money`, `Quantity`, `TaxRate`, `Discount`,
+`Tender` — plus `frontend/web/src/lib/money.ts`. 132 backend tests, 29 frontend.
+
+Decisions taken while building, worth knowing before M3 calls this code:
+
+- **One rounding primitive.** `Money::fraction(n, d)` rounds half away from zero, and
+  tax, discounts and fractional quantities are all expressed through it. One place a cent
+  can be created or destroyed; one place to test.
+- **`Money::parse()` exists but no float constructor does.** Admins type prices, so a
+  string parser is necessary; it uses string arithmetic, and rejects a third decimal
+  rather than rounding it, because silently discarding a digit is losing money quietly.
+- **Discounts clamp to the base.** A $10 discount on a $5 item takes $5, never −$5.
+  Unclamped, a "generous" discount turns a sale into a payout — a fraud surface, not a
+  rounding detail.
+- **`Tender` separates applied from tendered**, which is why `insufficient_tender` (422)
+  now exists in `03-api.md`. Tendering less than the amount applied is impossible;
+  *underpaying the order* is just a partial payment and perfectly legal.
+- **Overflow fails with a reason.** PHP promotes integer overflow to float — the exact
+  thing this code exists to prevent. Unreachable with real money ($10M at 100% is four
+  orders of magnitude below `PHP_INT_MAX`), but guarded rather than assumed.
 
 ## M2 — Schema + auth
 

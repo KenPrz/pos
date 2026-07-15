@@ -90,6 +90,9 @@ happens — are resolved there, because both depend on that structure.
 The rule from `00-overview.md`, made concrete, because this is where POS systems get
 quietly and expensively wrong.
 
+Implemented in `app/Domain/Money/` (`Money`, `Quantity`, `TaxRate`, `Discount`, `Tender`)
+and mirrored on the client in `frontend/web/src/lib/money.ts`.
+
 - Every monetary amount is a **`bigint` of minor units** (cents). `1234` is $12.34.
 - The currency is fixed per business at setup. It is *not* a column on every row —
   storing it 40 times invites 40 chances to disagree.
@@ -122,9 +125,13 @@ defensible and visibly wrong on paper, and "the receipt is wrong" is a conversat
 cashier should have to win.
 
 The remaining hazard is **penny allocation** when splitting a bill: three ways on 1000
-cents is 333, 333, 334. The split logic distributes the remainder deterministically
-(earliest tender absorbs it) and asserts the parts sum to the whole. This is a unit test
-we write before the feature, not after.
+cents is 334, 333, 333 — the earliest part absorbs the remainder. The rule itself is
+arbitrary; that it is deterministic and totals exactly is not. Never split by dividing and
+rounding each share, which invents or destroys pennies.
+
+Implemented as `Money::allocate()` / `allocateByRatios()`, with a property test asserting
+the parts always sum to the whole across every amount and split — written before the
+feature that needed it, not after.
 
 ### Tax-inclusive vs tax-exclusive
 
