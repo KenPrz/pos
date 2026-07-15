@@ -1,0 +1,30 @@
+# Environment / secrets — never commit
+.env
+.env.*
+!.env.example
+
+# PHP
+/backend/vendor/
+/backend/storage/*.key
+/backend/storage/framework/cache/*
+/backend/storage/framework/sessions/*
+/backend/storage/framework/views/*
+/backend/storage/logs/*
+/backend/.phpunit.result.cache
+/backend/public/build/
+/backend/public/hot
+
+# Node
+node_modules/
+/frontend/dist/
+/frontend/.vite/
+*.tsbuildinfo
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Local infra state
+/infra/pgdata/

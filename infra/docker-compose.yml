@@ -1,0 +1,33 @@
+name: pos
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: pos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pos}
+      POSTGRES_USER: ${POSTGRES_USER:-pos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos}
+      # Deterministic collation. Left to the host locale, index ordering can differ
+      # between machines and a glibc upgrade can silently corrupt text indexes.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Postgres 18+ wants a single mount at /var/lib/postgresql, NOT .../data.
+      # The data lands in a subdirectory, which lets `pg_upgrade --link` run without
+      # crossing a mount boundary. Mounting .../data here makes the container
+      # restart-loop on first boot.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      # Depends on the DB accepting queries, not just the port being open —
+      # pg_isready returns true during recovery, before it can serve anything.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos} -d ${POSTGRES_DB:-pos} -q && psql -U ${POSTGRES_USER:-pos} -d ${POSTGRES_DB:-pos} -qtAc 'select 1' >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  pgdata:

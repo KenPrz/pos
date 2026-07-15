@@ -1,0 +1,321 @@
+# API
+
+REST/JSON under `/api/v1`. Laravel 13 + Sanctum 4.3.
+
+## Ground rules
+
+- Money is **integer cents** in JSON: `{"total_cents": 1234}`. Never a string, never a
+  float, never pre-formatted. The `_cents` suffix is mandatory on every monetary field —
+  it makes a unit error visible in code review instead of in a customer's total.
+- Quantities are **strings**: `{"qty": "0.500"}`. `numeric(12,3)` does not survive a
+  round-trip through IEEE-754, and JS `number` is IEEE-754. This is the one place we
+  accept string-typed numerics, and it's deliberate.
+- Timestamps are ISO-8601 with offset.
+- IDs are UUIDv7 strings.
+- **The client never sends a total.** It sends intent ("add 2 of this variant"); the
+  server computes and returns the money. A client-supplied total is a price-tampering
+  vector and a source of drift, and there is no case where we need one.
+
+## Auth
+
+Two layers, per `01-architecture.md`.
+
+```
+POST /api/v1/registers/enroll        # admin-only, one time per device
+  → { register_id, device_token }    # long-lived; store in the device keychain
+```
+
+Every subsequent request carries `Authorization: Bearer <device_token>`.
+
+```
+POST /api/v1/staff/login             # device token + PIN
+  { "pin": "1234" }
+  → { staff_token, user: { id, name, role }, expires_at }
+```
+
+Requests that act on behalf of a person send **both**:
+
+```
+Authorization: Bearer <device_token>
+X-Staff-Token: <staff_token>
+```
+
+The device token alone can read the catalog and list open orders — a terminal showing the
+menu before anyone clocks in is normal. It cannot touch money.
+
+```
+POST /api/v1/staff/logout
+```
+
+PIN attempts are rate-limited per register: 5 failures → 60s lockout, logged to
+`audit_log`. The PIN keyspace is small, so this limiter is load-bearing rather than
+decorative.
+
+## Errors
+
+One envelope (`01-architecture.md`):
+
+```json
+{
+  "error": {
+    "code": "insufficient_stock",
+    "message": "Only 2 units of SKU-1234 remain.",
+    "details": { "variant_id": "0199...", "requested": 5, "available": 2 }
+  }
+}
+```
+
+| HTTP | `code` examples |
+| --- | --- |
+| 400 | `validation_failed` |
+| 401 | `invalid_device_token`, `invalid_pin`, `staff_session_expired` |
+| 403 | `requires_supervisor`, `wrong_location` |
+| 404 | `not_found` |
+| 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused` |
+| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `modifier_group_required` |
+| 429 | `too_many_pin_attempts` |
+
+`code` is stable forever once shipped; clients branch on it. `message` is for humans and
+may change freely.
+
+## Idempotency
+
+`Idempotency-Key: <uuidv4>` — optional on most mutations, **required** on
+`/payments`, `/refunds`, and `/shifts/close`. Semantics in `01-architecture.md`:
+replay with a matching body returns the stored response without re-executing; replay with
+a different body is `409 idempotency_key_reused`.
+
+## Optimistic locking
+
+Mutating an order requires the version you read:
+
+```
+PATCH /api/v1/orders/{id}/lines/{lineId}
+If-Match: 7
+```
+
+Stale version → `409 order_version_conflict` with the current state in `details`, so the
+client can refetch and reapply without a second round-trip. Every successful order
+mutation returns the incremented `version`.
+
+---
+
+## Catalog (read-mostly, device token sufficient)
+
+```
+GET /api/v1/catalog?location_id=&updated_since=
+  → { categories[], products[], variants[], modifier_groups[], modifiers[], tax_rates[] }
+```
+
+**One denormalized payload, not five REST resources.** A register needs the whole menu to
+render, and five round-trips on a cold start is five chances to half-load a menu.
+`updated_since` makes the warm path a small delta.
+
+Prices in this payload are already **resolved for the requested location**
+(`variant_location_prices` applied), so the register never implements price resolution.
+Pricing logic living in exactly one place is worth the denormalization.
+
+```
+GET /api/v1/catalog/lookup?barcode=012345678905&location_id=
+  → { variant }                  # 404 not_found
+```
+
+The scanner path. Separate and narrow because it's the hottest read in retail and must
+stay a single indexed lookup.
+
+Back-office CRUD (`admin` role) is conventional and omitted for brevity:
+`GET|POST|PATCH|DELETE /api/v1/products`, `/variants`, `/categories`, `/modifier-groups`,
+`/tax-rates`, `/discounts`, `/users`, `/locations`, `/registers`.
+
+## Shifts
+
+```
+POST /api/v1/shifts/open
+  { "opening_float_cents": 20000 }
+  → { shift }                    # 409 shift_already_open
+
+GET  /api/v1/shifts/current
+  → { shift, expected_cash_cents, sales_summary }
+
+POST /api/v1/shifts/{id}/cash-movements
+  { "kind": "payout", "amount_cents": 1500, "reason": "Window cleaner" }
+  → { cash_movement }            # supervisor
+
+POST /api/v1/shifts/{id}/close    # Idempotency-Key required
+  { "counted_cash_cents": 48750, "note": "" }
+  → { shift, expected_cash_cents, variance_cents, requires_approval }
+```
+
+Close **never rejects a variance** — it records it (see the cash accountability section
+of `02-data-model.md`). If `|variance|` exceeds the threshold,
+`requires_approval: true` comes back and a supervisor confirms via:
+
+```
+POST /api/v1/shifts/{id}/approve-variance    # supervisor
+```
+
+The shift is already closed by then. Approval is an audit event, not a gate — blocking the
+close is how you end up with terminals unplugged mid-count and no data at all.
+
+Closing a shift with open orders → `409` listing them in `details`. Those orders must be
+closed or transferred first; a tab cannot outlive the drawer that's accountable for it.
+
+## Orders
+
+The lifecycle both retail and food service travel, at different speeds
+(`00-overview.md`).
+
+```
+POST /api/v1/orders
+  { "table_ref": "12", "customer_id": null }     # both optional
+  → { order }                                    # status: open, version: 0
+```
+
+Retail opens this implicitly on first scan; the cashier never sees it. Food service opens
+it explicitly and names a table. Same endpoint, same row.
+
+```
+GET  /api/v1/orders?status=open&location_id=     # the tab list / floor view
+GET  /api/v1/orders/{id}
+```
+
+### Lines
+
+```
+POST   /api/v1/orders/{id}/lines                 # If-Match
+  { "variant_id": "...", "qty": "1", "modifiers": ["<modifier_id>", ...] }
+  → { order, line }
+
+PATCH  /api/v1/orders/{id}/lines/{lineId}        # If-Match
+  { "qty": "3" }
+
+DELETE /api/v1/orders/{id}/lines/{lineId}        # If-Match — voids, never deletes
+  { "reason": "Customer changed mind" }
+```
+
+Adding a line does all of this **in one transaction**: resolve the location price, snapshot
+name/SKU/price/tax-rate onto the line, validate modifier group `min_select`/`max_select`,
+lock and decrement stock if tracked, recompute order totals, bump `version`.
+
+The whole order comes back on every line mutation. It's slightly more bytes than
+returning the line alone, and it means the register's totals are **incapable** of drifting
+from the server's — there is no client-side total to be stale.
+
+`DELETE` voids (`voided_at`), per `02-data-model.md`. Removing an already-sent line
+requires `supervisor`.
+
+### Discounts
+
+```
+POST   /api/v1/orders/{id}/discounts             # If-Match, usually supervisor
+  { "discount_id": "...", "order_line_id": null, "reason": "Manager comp" }
+DELETE /api/v1/orders/{id}/discounts/{discountId}
+```
+
+Sending `order_line_id: null` makes it order-level. The server resolves percent → cents
+and stores the resolved amount.
+
+### Closing
+
+```
+POST /api/v1/orders/{id}/void                    # If-Match, supervisor
+  { "reason": "Walkout" }
+  → { order }                                    # restocks tracked lines
+```
+
+An order closes **automatically** when captured payments reach `total_cents` — there is no
+"close" endpoint, because a manual close would be a second, disagreeing definition of
+"paid in full."
+
+```
+POST /api/v1/orders/{id}/reopen                  # supervisor
+```
+
+For food service: a customer orders another round after settling. Audited.
+
+## Payments
+
+```
+POST /api/v1/orders/{id}/payments                # Idempotency-Key REQUIRED, If-Match
+  { "driver": "cash", "amount_cents": 5000, "tendered_cents": 6000 }
+  → { payment: { status: "captured", change_cents: 1000 },
+      order:   { paid_cents: 5000, status: "closed", version: 8 } }
+```
+
+Change is computed **server-side, in integers**. The client displays what it's told; it
+never does the subtraction itself.
+
+`external_card`:
+
+```json
+{ "driver": "external_card", "amount_cents": 5000, "reference": "auth 004321" }
+```
+
+Recorded as `captured` immediately — we're a ledger for it, not a processor
+(`01-architecture.md`).
+
+Splitting is just several payments; the order closes when they sum to the total. Under-
+paying leaves it open. Over-paying is `422 payment_exceeds_balance` — for cash, the
+overage is *change*, not a payment, which is exactly why `tendered_cents` and
+`amount_cents` are different fields.
+
+```
+POST /api/v1/payments/{id}/void                  # supervisor; before shift close only
+```
+
+A future async driver (Stripe Terminal) returns `status: "pending"` from this same
+endpoint and settles via webhook + `GET /api/v1/payments/{id}`. The shape does not change
+— that's the point of `authorize`/`capture` in the driver contract.
+
+## Refunds
+
+```
+POST /api/v1/refunds                             # Idempotency-Key required, supervisor
+  {
+    "original_order_id": "...",
+    "driver": "cash",
+    "reason": "Faulty",
+    "lines": [ { "original_order_line_id": "...", "qty": "1", "restock": true } ]
+  }
+  → { refund }
+```
+
+Amounts are **derived from the original lines**, never sent by the client — a
+client-specified refund amount is an open till. Validated inside the transaction against
+prior refunds on each line (`422 refund_exceeds_original`). `driver: "external_card"` is
+rejected: that money never came through us.
+
+The original order is never modified.
+
+## Reports
+
+```
+GET /api/v1/reports/z?shift_id=          # Z-report: the drawer close summary
+GET /api/v1/reports/sales?location_id=&from=&to=&group_by=day|category|user
+GET /api/v1/reports/stock?location_id=&low_only=true
+GET /api/v1/reports/audit?entity_type=&entity_id=&user_id=&from=&to=
+```
+
+All date filtering is on `business_date` (`02-data-model.md`), so a report means the same
+thing regardless of the timezone of whoever runs it.
+
+## Receipts
+
+```
+GET /api/v1/orders/{id}/receipt          # → structured JSON, rendered client-side
+```
+
+Built **entirely from snapshot columns** — never joined to the live catalog. Reprinting a
+receipt from 2024 next year must produce identical bytes, which is the whole reason those
+columns exist.
+
+## Rate limits
+
+| Scope | Limit |
+| --- | --- |
+| PIN attempts | 5 / 60s per register |
+| Catalog full sync | 10 / min per register |
+| Everything else | 300 / min per device token |
+
+Deliberately loose: a busy lunch rush is not an attack, and a POS that rate-limits a
+queue of real customers has failed at being a POS.

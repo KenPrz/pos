@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Pest + Postgres)
+    runs-on: ubuntu-latest
+
+    # Real Postgres, never SQLite. We depend on partial unique indexes,
+    # SELECT ... FOR UPDATE, jsonb and uuidv7() — SQLite silently lacks all of them, so a
+    # green SQLite suite would mislead about our concurrency invariants.
+    # See docs/01-architecture.md.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: pos_test
+          POSTGRES_USER: pos
+          POSTGRES_PASSWORD: pos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pos -d pos_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: pdo_pgsql, pgsql, mbstring, bcmath, intl
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      - run: cp .env.example .env && php artisan key:generate
+
+      - name: Migrate
+        run: php artisan migrate --force
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_DATABASE: pos_test
+          DB_USERNAME: pos
+          DB_PASSWORD: pos
+
+      # Includes tests/Arch — the conventions in docs/04-backend-conventions.md are
+      # enforced here rather than in review.
+      - name: Pest
+        run: ./vendor/bin/pest --ci
+
+  frontend:
+    name: Frontend (tsc + build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend/web
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/web/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -b --force
+
+      - run: npx oxlint src
+
+      - run: npm run build
