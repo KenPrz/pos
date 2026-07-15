@@ -117,5 +117,23 @@ one copies.
 **M1 complete** — money primitives in `app/Domain/Money/` and `frontend/web/src/lib/money.ts`.
 Pure integer functions, no I/O, no container.
 
-Next: **M2 — schema + auth** (`docs/06-roadmap.md`). Do the spatie uuid migration edits
-first (`docs/05-rbac.md` lists them); they're the likeliest thing to eat an afternoon.
+**M2 complete** — full schema (40 tables), register enrolment, PIN login, per-location
+RBAC. Seed with `php artisan migrate:fresh --seed`; it prints development PINs.
+
+Next: **M3 — the vertical slice** (`docs/06-roadmap.md`). Scan a barcode, ring up an item,
+pay cash, get change, reconcile the drawer. It's the milestone that proves the
+architecture while changing it is still cheap.
+
+### Gotchas that will cost you an afternoon
+
+- **Never read role assignments through spatie's `roles()` relation.** It applies
+  `wherePivot(location_id, currentTeam)`, so it silently answers "roles at the location
+  I'm already standing at" rather than "roles". Query `model_has_roles` directly. This
+  has bitten twice.
+- **The permission team context must be set before any `can()` or role load.** A stale or
+  absent context returns *silently wrong* answers, never an error. `EnsureStaffSession`
+  does it from the register; anything running outside that middleware must do it itself.
+- **Admin is `users.is_admin`, not a role** — spatie's teams cannot express an assignment
+  spanning locations. See `docs/05-rbac.md`.
+- **A constraint violation aborts the whole Postgres transaction.** With `RefreshDatabase`,
+  a test can provoke one violation and nothing after it.

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Exceptions\ApiErrorEnvelope;
+use App\Http\Middleware\EnsureDeviceToken;
+use App\Http\Middleware\EnsureStaffSession;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,7 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'device' => EnsureDeviceToken::class,
+            'staff' => EnsureStaffSession::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

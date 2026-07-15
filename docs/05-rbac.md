@@ -41,8 +41,56 @@ that location; a separate pivot would be a second, disagreeing source of truth. 
 locations does Maria work at?" is `select distinct location_id from model_has_roles where
 model_id = ?`.
 
-`admin` is global — assigned with a null team key — because back-office administration
-isn't a per-store concept.
+`admin` is **not a spatie role at all** — see the correction below.
+
+### Correction: admin cannot be a team-scoped role
+
+This document originally claimed admin would be "global, assigned with a null team key".
+**That was wrong**, and building it proved so. The claim was flagged here as needing an
+assertion rather than trust; it needed one, and failed it.
+
+Reading `HasRoles::roles()` in the installed package:
+
+```php
+->wherePivot($teamsKey, getPermissionsTeamId())               // pivot MUST equal current team
+->where(fn ($q) => $q->whereNull($teamField)->orWhere(...))   // role DEFINITION may be null
+```
+
+A null team key makes a role **definition** shared across teams. It does not make an
+**assignment** span them: `model_has_roles.location_id` is part of that table's primary
+key, so it is `NOT NULL`, and every assignment pins to exactly one location. Assigning a
+global role with no team context fails outright:
+
+```
+null value in column "location_id" of relation "model_has_roles" violates not-null constraint
+```
+
+So there are only two honest options, and neither is a global role:
+
+1. **Assign admin at every location.** Then opening a store silently locks every admin
+   out until someone provisions it — a footgun with no error message.
+2. **Take admin out of spatie.** A `users.is_admin` flag, granted via `Gate::before`.
+
+We do (2). It is also what spatie's own documentation recommends for a super-admin:
+
+```php
+// AppServiceProvider::boot()
+Gate::before(fn (User $user): ?bool => $user->is_admin ? true : null);
+```
+
+Returning `null` rather than `false` is essential — `false` denies everyone else outright
+instead of letting the normal checks run.
+
+**This does not resurrect the `role` column we deliberately removed.** That column was
+removed because `role === 'supervisor'` forces call sites to ask *who someone is* and
+infer what they may do. Call sites still ask `can('order.void')`; the flag only
+short-circuits the gate. The one capability that is genuinely global is the one that
+cannot be modelled per-location — which is a coherent line, not an exception.
+
+Consequence worth knowing: `catalog.manage`, `user.manage`, `location.manage`,
+`register.enroll` and `audit.view` are granted by **no role**. That is correct — only
+admins do those things, and admins bypass. The permission names still exist because the
+endpoints still name what they require.
 
 ## Verified integration notes
 
@@ -55,13 +103,24 @@ by reading the installed package source, not the docs.
 | Stub column | Ships as | Must become | Because |
 | --- | --- | --- | --- |
 | `roles.location_id` | `unsignedBigInteger` nullable | `uuid` nullable | `locations.id` is `uuidv7()` |
-| `model_has_roles.location_id` | `unsignedBigInteger default '1'` | `uuid`, **no default** | `default '1'` is meaningless for a uuid |
-| `model_has_permissions.location_id` | `unsignedBigInteger default '1'` | `uuid`, **no default** | same |
-| `model_has_roles.model_id` | `unsignedBigInteger` | `uuid` | `users.id` is `uuidv7()` |
+| `model_has_roles.location_id` | `unsignedBigInteger` | `uuid` | same |
+| `model_has_permissions.location_id` | `unsignedBigInteger` | `uuid` | same |
+| `model_has_*.model_id` | `unsignedBigInteger` | `uuid` | `users.id` is `uuidv7()` |
 
 We publish the migrations, so we own them and these edits are ours to keep. While in
-there, add the real FK constraints the stub omits (`roles.location_id → locations(id)`,
-`model_has_roles.model_id → users(id)`); it only creates indexes.
+there, add the FK the stub omits (`roles.location_id → locations(id)`); it only creates
+indexes. Keep the migration **config-driven** rather than hardcoding the column names —
+the package reads the same config at runtime to build its queries, and the two must not
+be able to drift.
+
+**Sanctum has the identical problem**, and it isn't in the package's docs either:
+`create_personal_access_tokens_table` uses `$table->morphs('tokenable')`, which is a
+bigint. Registers are `uuidv7`, so it must be `uuidMorphs`. Left alone, enrolling a
+device fails at insert with an error that reads like a Sanctum bug.
+
+*(An earlier draft of this table claimed the pivot columns ship with `default '1'`. They
+do in `add_teams_fields.php.stub` — the migration for retrofitting teams onto an existing
+install — but not in `create_permission_tables.php.stub`, which is the one we publish.)*
 
 **`roles` and `permissions` keep their `$table->id()` bigint PKs.** This is a deliberate
 exception to the UUID convention in `02-data-model.md`, not an oversight: they are
@@ -153,8 +212,7 @@ Seeded, not user-editable in v1. Three, deliberately coarse.
 `order.transfer`, `payment.void`, `refund.create`, `shift.cash_movement`,
 `shift.approve_variance`, `drawer.no_sale`, `report.sales.view`
 
-**`admin`** (global, null team) — everything, plus `catalog.manage`, `user.manage`,
-`location.manage`, `register.enroll`, `audit.view`
+**`admin`** — not a role. `users.is_admin` + `Gate::before`, per the correction above.
 
 A cashier can open and close their own drawer without a supervisor, because requiring one
 for a routine open would mean either a manager tied to the terminal all morning or a
@@ -239,18 +297,17 @@ Two consequences worth stating:
 Permissions and roles are **seeded from code, never created at runtime**. The seeder is
 the source of truth and is safe to re-run:
 
-- `PermissionSeeder` — every permission in the catalog above.
-- `RoleSeeder` — `admin` once, globally (null team). `cashier` and `supervisor` **once per
-  location**, because with teams enabled a role row is per-team.
+`RoleProvisioner` does both halves and is safe to re-run:
+
+- `provisionGlobal()` — every permission in the catalog above. Permissions are global;
+  only roles are team-scoped. It creates no admin role (see the correction).
+- `provisionForLocation($location)` — `cashier` and `supervisor`, **once per location**,
+  because with teams enabled a role row is per-team.
 
 That last point is the one that surprises people: `Role::create(['name' => 'cashier'])`
-creates a cashier for the *current* team only. Opening a new store means seeding its roles,
-so `CreateLocation` (`04-backend-conventions.md`) does it inside the same action — a
+creates a cashier for the *current* team only. Opening a new store means provisioning its
+roles, so `CreateLocation` must call `provisionForLocation` inside the same action — a
 location without roles is a store nobody can be assigned to.
-
-Spatie treats a role with a null team key as global; `admin` relies on that. Worth an
-explicit assertion in the seeder test rather than trust, since it's load-bearing and
-quiet if wrong.
 
 ## Caching
 
@@ -275,5 +332,14 @@ The tests that must exist, each corresponding to money walking out the door:
 - A supervisor at location A is **not** a supervisor at location B. The teams test.
 - A cashier closes their own shift; a cashier cannot close another cashier's; a
   supervisor can.
-- `admin` (null team) resolves at every location.
-- Roles are seeded for a location created at runtime.
+- `admin` resolves at every location while holding no role anywhere.
+- Non-admins are unaffected by the `Gate::before` bypass — it must return `null`, not
+  `false`.
+- Roles are provisioned for a location created at runtime.
+
+One more, learned the hard way: **`StaffLogin` must set the team context itself.** Login
+runs *before* a staff session exists, so `EnsureStaffSession` hasn't run — and reading the
+user's permissions for the login response then returns an empty list. Not an error;
+silently empty. That is the failure mode this document warns about, and it happened in our
+own code within an hour of writing the warning. The login response's permission list is
+asserted in a test for exactly that reason.

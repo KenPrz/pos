@@ -2,14 +2,38 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Auth\EnrollRegisterController;
+use App\Http\Controllers\Auth\StaffLoginController;
+use App\Http\Controllers\Auth\StaffLogoutController;
 use App\Http\Controllers\System\HealthController;
 use Illuminate\Support\Facades\Route;
 
 /*
 | One system action = one route = one single-action controller.
-| See docs/03-api.md for the surface, docs/04-backend-conventions.md for the shape.
+| See docs/03-api.md for the surface and docs/04-backend-conventions.md for the shape.
+|
+| Three tiers of access, deliberately:
+|   (none)   — health only
+|   device   — the terminal is enrolled. Can read; cannot touch money.
+|   staff    — someone entered a PIN. Sets the permission team context from the register.
 */
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', HealthController::class)->name('health');
+
+    // Enrolment is bootstrapped by a back-office admin, so it authenticates with a user
+    // session rather than a device token — the device has no identity yet.
+    Route::post('/registers/enroll', EnrollRegisterController::class)
+        ->middleware('auth:sanctum')
+        ->name('registers.enroll');
+
+    Route::middleware('device')->group(function (): void {
+        Route::post('/staff/login', StaffLoginController::class)
+            ->middleware('throttle:pin')
+            ->name('staff.login');
+
+        Route::middleware('staff')->group(function (): void {
+            Route::post('/staff/logout', StaffLogoutController::class)->name('staff.logout');
+        });
+    });
 });

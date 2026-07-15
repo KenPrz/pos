@@ -87,8 +87,30 @@ Decisions taken while building, worth knowing before M3 calls this code:
 permission is missing. Tests cover the PIN collision check, the lockout, and the
 per-location roles test (same user, two registers, different `can()`).
 
-**Watch:** the uuid migration edits are known and listed, but they're the likeliest thing
-to eat an afternoon. Do them first, before any model work depends on the tables existing.
+**Status: complete.** 191 backend tests. 40 tables, 28 check constraints, 6 partial
+indexes, all verified to bite against real Postgres.
+
+What building it changed, and what to know before M3:
+
+- **Admin cannot be a spatie role.** `05-rbac.md` claimed a null team key makes a role
+  global; it doesn't — it makes a role *definition* shared, while every *assignment* still
+  pins to one location (the pivot's team column is in its primary key, so `NOT NULL`).
+  Admin is now `users.is_admin` + `Gate::before`, which is spatie's own super-admin
+  pattern. The doc is corrected.
+- **PIN login needed a lookup index.** Bcrypt is salted, so login would have to check
+  every candidate's hash — measured at 225ms each, twenty staff is a 4.5-second login. A
+  keyed `pin_lookup` (HMAC with `APP_KEY`) makes it one indexed query; `pin_hash` stays
+  the authority.
+- **Sanctum had the same uuid problem as spatie** (`morphs` → `uuidMorphs`), which no
+  document predicted.
+- **`StaffLogin` must set the permission team context itself** — login runs before the
+  middleware that normally does. Without it, the response's permission list is silently
+  empty rather than wrong-and-loud. Exactly the failure `05-rbac.md` warns about.
+- **Anything reading role assignments must query `model_has_roles` directly**, never the
+  `roles()` relation — that relation scopes to the current team, so it silently answers a
+  different question. Bit both `StaffDirectory` and `User::locationIds()`.
+- **A constraint violation aborts the Postgres transaction**, and `RefreshDatabase` wraps
+  each test in one. A test can provoke one violation, and nothing after it.
 
 ## M3 — The vertical slice 🎯
 

@@ -57,7 +57,9 @@ create table users (
   name          text not null,
   email         text,                    -- back-office login; null for PIN-only staff
   password_hash text,
-  pin_hash      text,                    -- bcrypt, register login
+  pin_hash      text,                    -- bcrypt, register login. The authority.
+  pin_lookup    text,                    -- HMAC-SHA256(pin, APP_KEY). An index, not a credential.
+  is_admin      boolean not null default false,
   is_active     boolean not null default true,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
@@ -66,7 +68,25 @@ create table users (
 );
 
 create unique index users_email_unique on users (lower(email)) where email is not null;
+create index users_pin_lookup on users (pin_lookup);
 ```
+
+**`pin_lookup` exists for performance, and is safe because it is keyed.** Bcrypt is
+salted, so a PIN cannot be looked up — login would have to `Hash::check` every candidate
+at the location. Measured at cost 12 that is 225ms each, so twenty staff is a 4.5-second
+login. Unshippable. With the lookup, login is one indexed query plus a single bcrypt
+verify, and `pin_hash` remains the authority: a lookup collision can never authenticate
+anyone.
+
+A database-only leak reveals nothing without `APP_KEY`. And bcrypt was never the real
+protection for a 4-digit secret anyway — 10,000 guesses is ~40 minutes offline. The actual
+defences are device enrolment and rate limiting.
+
+**`is_admin` is a flag rather than a role**, because it is the one capability that spans
+every location and spatie's teams cannot express an assignment that does. Granted via
+`Gate::before`. This is not the `role` column we removed — call sites still ask
+`can('order.void')`. Full reasoning, and the package behaviour that forced it, in
+`05-rbac.md`.
 
 Email is nullable because a weekend cashier may never touch the back office; the check
 constraint guarantees every user can authenticate *somehow*.
@@ -88,9 +108,13 @@ to `uuid`) are in `05-rbac.md`.
 are salted, so two identical PINs produce different hashes and no unique index can catch
 them. But two staff at one location sharing PIN `1234` destroys attribution — the audit
 log would name the wrong person, which is worse than useless in a dispute. So on PIN set,
-the application tests the candidate against every active PIN at that user's locations and
+`SetStaffPin` checks the candidate against active staff at that user's locations and
 rejects a match. This is a rare case where an invariant genuinely cannot live in the
-schema, and it needs a dedicated test.
+schema, and it has a dedicated test.
+
+`pin_lookup` makes that check one exact query rather than a bcrypt scan. It still can't be
+a unique index: uniqueness here is "no two staff *sharing a location*", and users belong
+to several — which no simple index expresses.
 
 ```sql
 create table registers (
