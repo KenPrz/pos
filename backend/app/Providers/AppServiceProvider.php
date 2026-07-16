@@ -59,6 +59,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', fn (Request $request): Limit => Limit::perMinute(
             (int) config('pos.rate_limits.default_per_minute')
         )->by($request->bearerToken() ?? $request->ip()));
+
+        RateLimiter::for('catalog', fn (Request $request): Limit => Limit::perMinute(
+            (int) config('pos.rate_limits.catalog_per_minute')
+        )->by($request->bearerToken() ?? $request->ip()));
     }
 
     /**

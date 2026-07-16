@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\EnrollRegisterController;
 use App\Http\Controllers\Auth\StaffLoginController;
 use App\Http\Controllers\Auth\StaffLogoutController;
+use App\Http\Controllers\Catalog\GetCatalogController;
+use App\Http\Controllers\Catalog\LookupBarcodeController;
 use App\Http\Controllers\Orders\AddLineController;
 use App\Http\Controllers\Orders\OpenOrderController;
 use App\Http\Controllers\Orders\ReceiptController;
@@ -38,6 +40,12 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/staff/login', StaffLoginController::class)
             ->middleware('throttle:pin')
             ->name('staff.login');
+
+        // Device tier — a terminal showing the menu before anyone clocks in is normal.
+        Route::get('/catalog', GetCatalogController::class)
+            ->middleware('throttle:catalog')
+            ->name('catalog.get');
+        Route::get('/catalog/lookup', LookupBarcodeController::class)->name('catalog.lookup');
 
         Route::middleware('staff')->group(function (): void {
             Route::post('/staff/logout', StaffLogoutController::class)->name('staff.logout');
