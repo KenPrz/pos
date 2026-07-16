@@ -4229,7 +4229,8 @@ export const api = {
   },
 
   currentShift: () => request<CurrentShift>('/shifts/current'),
-  openShift: (openingFloatCents: number) => post<Shift>('/shifts/open', { opening_float_cents: openingFloatCents }),
+  openShift: (openingFloatCents: number) =>
+    post<{ shift: Shift }>('/shifts/open', { opening_float_cents: openingFloatCents }).then((r) => r.shift),
   closeShift: (shiftId: string, countedCashCents: number) =>
     post<ShiftCloseResult>(`/shifts/${shiftId}/close`, { counted_cash_cents: countedCashCents }, { 'Idempotency-Key': crypto.randomUUID() }),
 
