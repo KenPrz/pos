@@ -131,7 +131,7 @@ idempotency, shifts, and auth *together*. Everything after it is addition; every
 before it is preparation. If the architecture is wrong, this is where it shows — while
 it's still cheap.
 
-**Status: complete.** 250 backend tests, 29 frontend. A real sale runs scan → cart →
+**Status: complete.** 255 backend tests, 29 frontend. A real sale runs scan → cart →
 cash → change → receipt in a browser, and shift close reconciles the drawer.
 
 What building it changed, and what to know before M4:
