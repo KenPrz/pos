@@ -62,12 +62,21 @@ final class DiscountResolver
     }
 
     /**
+     * Rows on the same line resolve sequentially against what's left of that line's base
+     * after earlier line-level rows in this pass — mirroring the order-level rows below.
+     * Each row is rewritten with the resolved figure, so stacked rows on one line always
+     * sum to exactly the line's discount and can never jointly exceed its base.
+     *
      * @param  Collection<int, OrderDiscount>  $rows
      * @param  Collection<int, OrderLine>  $lines
      * @param  array<string, Money>  $bases
      */
     private function resolveLineLevelRows(Collection $rows, Collection $lines, array $bases): void
     {
+        /** @var array<string, Money> $remainingBases Each line's base net of the
+         *  line-level rows already applied to it earlier in this pass. */
+        $remainingBases = $bases;
+
         foreach ($rows->whereNotNull('order_line_id') as $row) {
             $line = $lines->firstWhere('id', $row->order_line_id);
 
@@ -78,10 +87,11 @@ final class DiscountResolver
                 continue;
             }
 
-            $amount = $this->valueObjectFor($row)->amountFor($bases[$line->id]);
+            $amount = $this->valueObjectFor($row)->amountFor($remainingBases[$line->id]);
             $row->forceFill(['amount_cents' => $amount->cents])->save();
 
             $line->discount_cents += $amount->cents;
+            $remainingBases[$line->id] = $remainingBases[$line->id]->minus($amount);
         }
     }
 
@@ -114,28 +124,54 @@ final class DiscountResolver
                 continue;
             }
 
-            $lineIds = array_keys($netBases);
+            // Only lines with a positive remaining base get a ratio. A line already
+            // driven to zero by an earlier line-level or order-level row has nothing
+            // left to give — including it would still sum to the same ratios (a zero
+            // ratio contributes nothing to allocateByRatios' math) but the remainder
+            // walk inside allocateByRatios distributes stray pennies to *any* index,
+            // including a zero-ratio one, which is exactly how a spent line ends up
+            // with a share it can't afford.
+            $lineIds = array_values(array_filter(
+                array_keys($netBases),
+                static fn (string $id): bool => $netBases[$id]->isPositive()
+            ));
+
             $ratios = array_map(static fn (string $id): int => $netBases[$id]->cents, $lineIds);
             $shares = $amount->allocateByRatios($ratios);
 
+            // Belt-and-braces: even restricted to positive-base lines, allocateByRatios'
+            // remainder walk can still hand a line (near the end of the remainder cycle)
+            // a share larger than its remaining base once earlier rows in *this* pass
+            // have already eaten into it. Walk in line order, clamping each share to
+            // what the line actually has left and carrying any overflow forward. The
+            // total allocated never exceeds the total remaining base, so the carry
+            // always finds a home by the last line.
+            $carry = Money::zero();
             foreach ($lineIds as $index => $lineId) {
+                $share = $shares[$index]->plus($carry);
+                $applied = $share->min($netBases[$lineId]);
+                $carry = $share->minus($applied);
+
                 $line = $lines->firstWhere('id', $lineId);
-                $line->discount_cents += $shares[$index]->cents;
-                $netBases[$lineId] = $netBases[$lineId]->minus($shares[$index]);
+                $line->discount_cents += $applied->cents;
+                $netBases[$lineId] = $netBases[$lineId]->minus($applied);
             }
         }
     }
 
     /**
      * A row with no discount_id is ad-hoc (docs/02-data-model.md): there is no reusable
-     * definition to re-resolve against, so it behaves like a fixed discount pinned at its
-     * own currently-stored amount — still clamped by the VO against the live base.
+     * definition to re-resolve against. Ad-hoc discounts have no endpoint until M6 — fail
+     * loudly rather than pinning the row at its stored amount, which would silently
+     * ratchet it down every time the base shrinks and never back up.
      */
     private function valueObjectFor(OrderDiscount $row): DiscountValueObject
     {
-        return $row->discount_id !== null
-            ? $row->discount->toValueObject()
-            : DiscountValueObject::fixed(Money::fromCents($row->amount_cents));
+        if ($row->discount_id === null) {
+            throw new \LogicException('Ad-hoc discounts (null discount_id) are not implemented until M6.');
+        }
+
+        return $row->discount->toValueObject();
     }
 
     private function undiscountedBase(OrderLine $line): Money

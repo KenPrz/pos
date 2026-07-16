@@ -138,3 +138,108 @@ it('resolves a discount row on a voided line to zero', function (): void {
         ->and($order->fresh()->discount_cents)->toBe(0)
         ->and($order->fresh()->total_cents)->toBe(0);
 });
+
+it('never drives a zero-base line negative when an order-level discount is allocated (reviewer repro)', function (): void {
+    $order = Order::factory()->create(['prices_include_tax' => false]);
+    $lineA = discountLine($order, 200, 0); // position 0
+    $lineB = discountLine($order, 500, 0); // position 1
+    $lineC = discountLine($order, 500, 0); // position 2
+
+    $lineDiscount = Discount::factory()->percent(1_000_000)->line()->create(); // 100%
+    applyDiscount($order, $lineDiscount, $lineA->id);
+
+    $orderDiscount = Discount::factory()->fixed(999)->create();
+    applyDiscount($order, $orderDiscount);
+
+    app(OrderTotals::class)->recalculate($order);
+
+    // Line A is fully discounted by its own line-level row (200 off a 200 base) before
+    // the order-level row is even considered. Its remaining base is 0, so it is excluded
+    // from the order-level ratio split entirely — it gets none of the 999, not a stray
+    // penny from allocateByRatios' remainder walk.
+    //
+    // Lines B/C: remaining bases 500, 500 -> ratios 500, 500 ->
+    // allocateByRatios(999, [500, 500]) = 500, 499 (earliest absorbs the odd penny),
+    // and both fit exactly within their 500c bases, so the overflow-walk clamp is a
+    // no-op here (it bites in the "remainder overflow" test below).
+    expect($lineA->fresh()->discount_cents)->toBe(200)
+        ->and($lineB->fresh()->discount_cents)->toBe(500)
+        ->and($lineC->fresh()->discount_cents)->toBe(499)
+        ->and($lineA->fresh()->line_total_cents)->toBe(0)
+        ->and($lineB->fresh()->line_total_cents)->toBe(0)
+        ->and($lineC->fresh()->line_total_cents)->toBe(1)
+        ->and($order->fresh()->discount_cents)->toBe(200 + 999);
+
+    foreach ([$lineA, $lineB, $lineC] as $line) {
+        expect($line->fresh()->line_total_cents)->toBeGreaterThanOrEqual(0);
+    }
+});
+
+it('clamps the order-level remainder walk to what each line has left (three 1c lines)', function (): void {
+    $order = Order::factory()->create(['prices_include_tax' => false]);
+    $lines = [
+        discountLine($order, 1, 0),
+        discountLine($order, 1, 0),
+        discountLine($order, 1, 0),
+    ];
+    $discount = Discount::factory()->fixed(2)->create();
+    $row = applyDiscount($order, $discount);
+
+    app(OrderTotals::class)->recalculate($order);
+
+    // Bases 1,1,1 -> ratios 1,1,1 -> allocateByRatios(2, [1,1,1]): each share
+    // truncates to 0 (intdiv(2*1,3)=0), leaving a remainder of 2 handed out one cent
+    // at a time to the earliest indices -> shares [1, 1, 0]. Every share here already
+    // fits its line's 1c base, so the overflow walk never has to clamp — it just
+    // confirms the allocation never *could* exceed a base as bases shrink to nothing.
+    expect($row->fresh()->amount_cents)->toBe(2)
+        ->and($lines[0]->fresh()->discount_cents)->toBe(1)
+        ->and($lines[1]->fresh()->discount_cents)->toBe(1)
+        ->and($lines[2]->fresh()->discount_cents)->toBe(0)
+        ->and($order->fresh()->discount_cents)->toBe(2)
+        ->and($order->fresh()->total_cents)->toBe(1);
+
+    foreach ($lines as $line) {
+        expect($line->fresh()->line_total_cents)->toBeGreaterThanOrEqual(0);
+    }
+});
+
+it('resolves stacked line-level rows sequentially so they never jointly exceed the base', function (): void {
+    $order = Order::factory()->create(['prices_include_tax' => false]);
+    $line = discountLine($order, 700, 0);
+
+    $fixed = Discount::factory()->fixed(700)->line()->create();
+    $rowFixed = applyDiscount($order, $fixed, $line->id);
+
+    $percent = Discount::factory()->percent(1_000_000)->line()->create(); // 100%
+    $rowPercent = applyDiscount($order, $percent, $line->id);
+
+    app(OrderTotals::class)->recalculate($order);
+
+    // First row resolves against the raw 700c base: fixed 700 takes all of it. Second
+    // row resolves against what's left — 0 — so its 100% of 0 is 0, not a second 700
+    // that would double-discount the line. The two rows sum to exactly 700, the line's
+    // full base, never more.
+    expect($rowFixed->fresh()->amount_cents)->toBe(700)
+        ->and($rowPercent->fresh()->amount_cents)->toBe(0)
+        ->and($line->fresh()->discount_cents)->toBe(700)
+        ->and($line->fresh()->line_total_cents)->toBe(0);
+});
+
+it('throws when an ad-hoc (null discount_id) row is resolved', function (): void {
+    $order = Order::factory()->create(['prices_include_tax' => false]);
+    discountLine($order, 500, 0);
+
+    OrderDiscount::create([
+        'order_id' => $order->id,
+        'order_line_id' => null,
+        'discount_id' => null,
+        'name_snapshot' => 'Manager comp',
+        'amount_cents' => 100,
+        'applied_by' => User::factory()->create()->id,
+        'created_at' => now(),
+    ]);
+
+    expect(fn () => app(OrderTotals::class)->recalculate($order))
+        ->toThrow(LogicException::class, 'Ad-hoc discounts (null discount_id) are not implemented until M6.');
+});
