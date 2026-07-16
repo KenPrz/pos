@@ -85,10 +85,14 @@ export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: (
   if (phase.name === 'done') {
     const { payment } = phase.outcome
     return (
-      <section className="card ok">
-        <h2>Change due: {fm(payment.change_cents ?? 0)}</h2>
+      <section className="form-panel ok">
+        <h2>Payment complete — order {phase.outcome.order.number}</h2>
+        <div className="hero-panel">
+          <p className="hero-eyebrow">Change</p>
+          <p className="hero-amount">{fm(payment.change_cents ?? 0)}</p>
+        </div>
         <p className="muted">
-          {fm(payment.amount_cents)} paid on {fm(payment.tendered_cents ?? payment.amount_cents)} tendered — order {phase.outcome.order.number}
+          {fm(payment.amount_cents)} paid on {fm(payment.tendered_cents ?? payment.amount_cents)} tendered
         </p>
         {phase.receipt && (
           <div className="receipt">
@@ -110,8 +114,10 @@ export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: (
             {phase.receipt.location.footer && <p className="muted">{phase.receipt.location.footer}</p>}
           </div>
         )}
-        <button onClick={() => window.print()}>Print</button>
-        <button onClick={newSale}>New sale</button>
+        <div className="btn-row">
+          <button className="btn btn-utility" onClick={() => window.print()}>Print</button>
+          <button className="btn btn-submit" onClick={newSale}>New sale</button>
+        </div>
       </section>
     )
   }
@@ -120,10 +126,10 @@ export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: (
   const balance = order ? order.total_cents - order.paid_cents : 0
 
   return (
-    <section className="card">
+    <section className="form-panel">
       <header className="row">
         <h2>{order ? `Order ${order.number}` : 'New sale'}</h2>
-        <button type="button" className="secondary" onClick={onCloseShift}>Close shift</button>
+        <button type="button" className="btn btn-secondary" onClick={onCloseShift}>Close shift</button>
       </header>
 
       <form onSubmit={scan}>
@@ -134,17 +140,15 @@ export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: (
       </form>
 
       {lines.length > 0 && (
-        <table className="cart">
-          <tbody>
-            {lines.filter((l) => !l.voided_at).map((l) => (
-              <tr key={l.id}>
-                <td>{l.name}</td>
-                <td>{l.qty === '1.000' ? '' : l.qty}</td>
-                <td className="num">{fm(l.line_total_cents)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="cart">
+          {lines.filter((l) => !l.voided_at).map((l) => (
+            <div className="cart-row" key={l.id}>
+              <span className="cart-row-name">{l.name}</span>
+              {l.qty !== '1.000' && <span className="cart-row-qty">{l.qty}</span>}
+              <span className="cart-row-price num">{fm(l.line_total_cents)}</span>
+            </div>
+          ))}
+        </div>
       )}
 
       {order && (
@@ -156,7 +160,11 @@ export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: (
       )}
 
       {order && phase.name === 'scanning' && (
-        <button disabled={order.total_cents === 0} onClick={() => setPhase({ name: 'tender', key: crypto.randomUUID() })}>
+        <button
+          className="btn btn-submit"
+          disabled={order.total_cents === 0}
+          onClick={() => setPhase({ name: 'tender', key: crypto.randomUUID() })}
+        >
           Pay cash — {fm(balance)}
         </button>
       )}
@@ -167,8 +175,11 @@ export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: (
             Cash tendered (owed: {fm(balance)})
             <input value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" autoFocus />
           </label>
-          <button type="submit">Take payment</button>
-          <button type="button" className="secondary" onClick={() => setPhase({ name: 'scanning' })}>Back</button>
+          <hr className="dotted-divider" />
+          <div className="btn-row">
+            <button type="submit" className="btn btn-submit">Take payment</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setPhase({ name: 'scanning' })}>Back</button>
+          </div>
         </form>
       )}
 

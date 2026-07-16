@@ -34,14 +34,15 @@ export function OpenShiftScreen({ onOpened, onSessionExpired }: {
   }
 
   return (
-    <section className="card">
+    <section className="form-panel">
       <h2>Open shift</h2>
       <form onSubmit={submit}>
         <label>
           Opening float
           <input value={float} onChange={(e) => setFloat(e.target.value)} inputMode="decimal" autoFocus />
         </label>
-        <button type="submit">Open drawer</button>
+        <hr className="dotted-divider" />
+        <button type="submit" className="btn btn-submit">Open drawer</button>
       </form>
       {error && <p className="error">{error}</p>}
     </section>
@@ -78,7 +79,7 @@ export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired
 
   if (result) {
     return (
-      <section className={`card ${result.variance_cents === 0 ? 'ok' : 'bad'}`}>
+      <section className={`form-panel ${result.variance_cents === 0 ? 'ok' : 'bad'}`}>
         <h2>Drawer reconciled</h2>
         <dl>
           <dt>Expected</dt><dd>{formatMoney(cents(result.expected_cash_cents), CURRENCY)}</dd>
@@ -86,21 +87,24 @@ export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired
           <dt>Variance</dt><dd>{formatMoney(cents(result.variance_cents), CURRENCY)}</dd>
         </dl>
         {result.requires_approval && <p className="error">Variance exceeds the threshold — needs supervisor approval.</p>}
-        <button onClick={() => onClosed(result)}>Done</button>
+        <button className="btn btn-submit" onClick={() => onClosed(result)}>Done</button>
       </section>
     )
   }
 
   return (
-    <section className="card">
+    <section className="form-panel">
       <h2>Close shift — count the drawer</h2>
       <form onSubmit={submit}>
         <label>
           Counted cash
           <input value={counted} onChange={(e) => setCounted(e.target.value)} inputMode="decimal" autoFocus />
         </label>
-        <button type="submit">Close</button>
-        <button type="button" className="secondary" onClick={onCancel}>Back</button>
+        <hr className="dotted-divider" />
+        <div className="btn-row">
+          <button type="submit" className="btn btn-submit">Close</button>
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>Back</button>
+        </div>
       </form>
       {error && <p className="error">{error}</p>}
     </section>
