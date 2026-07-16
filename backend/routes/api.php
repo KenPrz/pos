@@ -20,6 +20,7 @@ use App\Http\Controllers\Orders\VoidOrderController;
 use App\Http\Controllers\Payments\TakePaymentController;
 use App\Http\Controllers\Payments\VoidPaymentController;
 use App\Http\Controllers\Refunds\RefundOrderController;
+use App\Http\Controllers\Reports\GetZReportController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
 use App\Http\Controllers\Shifts\OpenShiftController;
@@ -94,6 +95,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/orders/{order}/receipt', ReceiptController::class)->name('orders.receipt');
             Route::post('/orders/{order}/void', VoidOrderController::class)->name('orders.void');
             Route::post('/orders/{order}/reopen', ReopenOrderController::class)->name('orders.reopen');
+
+            Route::get('/reports/z', GetZReportController::class)->name('reports.z');
 
             Route::post('/stock/adjustments', AdjustStockController::class)->name('stock.adjustments.create');
             Route::post('/stock/receipts', ReceiveStockController::class)->name('stock.receipts.create');
