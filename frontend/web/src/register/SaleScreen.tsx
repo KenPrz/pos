@@ -16,7 +16,7 @@ type Phase =
   | { name: 'tender' }
   | { name: 'done'; outcome: PaymentOutcome; receipt: Receipt | null }
 
-export function SaleScreen({ onCloseShift }: { onCloseShift: () => void }) {
+export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: () => void; onSessionExpired: () => void }) {
   const [order, setOrder] = useState<Order | null>(null)
   const [phase, setPhase] = useState<Phase>({ name: 'scanning' })
   const [barcode, setBarcode] = useState('')
@@ -30,11 +30,19 @@ export function SaleScreen({ onCloseShift }: { onCloseShift: () => void }) {
     setError(null)
     try {
       const { variant } = await api.lookupBarcode(barcode.trim())
-      const current = order ?? (await api.openOrder())   // retail opens implicitly on first scan
+      let current = order   // retail opens implicitly on first scan
+      if (!current) {
+        current = await api.openOrder()
+        setOrder(current)
+      }
       setOrder(await api.addLine(current, variant.id))
       setBarcode('')
     } catch (err) {
       setBarcode('')
+      if (err instanceof ApiError && err.status === 401) {
+        onSessionExpired()
+        return
+      }
       setError(err instanceof ApiError ? err.message : 'Scan failed.')
     }
     scanRef.current?.focus()
@@ -53,6 +61,10 @@ export function SaleScreen({ onCloseShift }: { onCloseShift: () => void }) {
       setOrder(null)
       setTendered('')
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        onSessionExpired()
+        return
+      }
       setError(err instanceof ApiError ? err.message : 'Payment failed.')
     }
   }
