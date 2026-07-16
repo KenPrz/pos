@@ -28,3 +28,6 @@ node_modules/
 
 # Local infra state
 /infra/pgdata/
+
+# SDD scratch (ledger, briefs, reports)
+.superpowers/
