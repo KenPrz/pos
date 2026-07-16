@@ -24,6 +24,10 @@ use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
 use App\Http\Controllers\Shifts\OpenShiftController;
 use App\Http\Controllers\Shifts\RecordCashMovementController;
+use App\Http\Controllers\Stock\AdjustStockController;
+use App\Http\Controllers\Stock\CountStockController;
+use App\Http\Controllers\Stock\GetStockMovementsController;
+use App\Http\Controllers\Stock\ReceiveStockController;
 use App\Http\Controllers\System\HealthController;
 use Illuminate\Support\Facades\Route;
 
@@ -90,6 +94,11 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/orders/{order}/receipt', ReceiptController::class)->name('orders.receipt');
             Route::post('/orders/{order}/void', VoidOrderController::class)->name('orders.void');
             Route::post('/orders/{order}/reopen', ReopenOrderController::class)->name('orders.reopen');
+
+            Route::post('/stock/adjustments', AdjustStockController::class)->name('stock.adjustments.create');
+            Route::post('/stock/receipts', ReceiveStockController::class)->name('stock.receipts.create');
+            Route::post('/stock/counts', CountStockController::class)->name('stock.counts.create');
+            Route::get('/stock/movements', GetStockMovementsController::class)->name('stock.movements.get');
         });
     });
 });
