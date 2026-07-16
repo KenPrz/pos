@@ -21,7 +21,7 @@ final class GetReceipt
         $locationId = Register::findOrFail($registerId)->location_id;
 
         return Order::where('location_id', $locationId)->with([
-            'lines' => fn ($q) => $q->whereNull('voided_at')->orderBy('position'),
+            'lines' => fn ($q) => $q->whereNull('voided_at'),
             'payments' => fn ($q) => $q->where('status', 'captured')->orderBy('created_at'),
             'location',
             'openedBy',

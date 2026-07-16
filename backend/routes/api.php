@@ -8,6 +8,8 @@ use App\Http\Controllers\Auth\StaffLogoutController;
 use App\Http\Controllers\Catalog\GetCatalogController;
 use App\Http\Controllers\Catalog\LookupBarcodeController;
 use App\Http\Controllers\Orders\AddLineController;
+use App\Http\Controllers\Orders\GetOrderController;
+use App\Http\Controllers\Orders\ListOrdersController;
 use App\Http\Controllers\Orders\OpenOrderController;
 use App\Http\Controllers\Orders\ReceiptController;
 use App\Http\Controllers\Payments\TakePaymentController;
@@ -57,6 +59,8 @@ Route::prefix('v1')->group(function (): void {
                 ->name('shifts.close');
 
             Route::post('/orders', OpenOrderController::class)->name('orders.open');
+            Route::get('/orders', ListOrdersController::class)->name('orders.list');
+            Route::get('/orders/{order}', GetOrderController::class)->name('orders.get');
             Route::post('/orders/{order}/lines', AddLineController::class)
                 ->middleware('idempotent')
                 ->name('orders.lines.add');

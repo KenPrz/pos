@@ -54,4 +54,10 @@ class Shift extends Model
     {
         return $this->hasMany(Order::class);
     }
+
+    /** The register's currently open shift, or null if the drawer isn't running. */
+    public static function openFor(string $registerId): ?self
+    {
+        return self::where('register_id', $registerId)->whereNull('closed_at')->first();
+    }
 }

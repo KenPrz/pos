@@ -27,7 +27,7 @@ final class AddLineRequest extends FormRequest
     {
         return [
             'variant_id' => ['required', 'uuid'],
-            'qty' => ['required', 'string', 'regex:/^\d+(\.\d{1,3})?$/', 'not_in:0,0.0,0.00,0.000'],
+            'qty' => ['required', 'string', 'regex:/^\d{1,9}(\.\d{1,3})?$/', 'not_in:0,0.0,0.00,0.000'],
             'modifiers' => ['prohibited'],   // ponytail: modifiers are M5; loud beats silently ignored
             'if_match' => ['required', 'integer', 'min:0'],
         ];
