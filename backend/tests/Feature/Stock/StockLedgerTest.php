@@ -65,3 +65,42 @@ it('treats a missing level row as zero stock', function (): void {
         $this->variant->id, $this->location->id, Quantity::fromString('1'), 'order_line', (string) Str::uuid7(), null,
     )))->toThrow(InsufficientStock::class);
 });
+
+it('restock puts sold stock back with a refund movement', function (): void {
+    $ref = (string) Str::uuid7();
+    DB::transaction(function () use ($ref): void {
+        $this->ledger->receive($this->variant->id, $this->location->id, Quantity::fromString('5'));
+        $this->ledger->sell($this->variant->id, $this->location->id, Quantity::fromString('2'), 'order_line', $ref, null);
+        $this->ledger->restock($this->variant->id, $this->location->id, Quantity::fromString('1'), 'refund_line', $ref, null);
+    });
+
+    expect(stockLevel($this->variant->id, $this->location->id))->toBe('4.000');
+    $this->assertDatabaseHas('stock_movements', ['reason' => 'refund', 'qty_delta' => '1.000', 'ref_type' => 'refund_line']);
+});
+
+it('adjust refuses to take the level negative', function (): void {
+    DB::transaction(fn () => $this->ledger->receive($this->variant->id, $this->location->id, Quantity::fromString('1')));
+
+    expect(fn () => DB::transaction(fn () => $this->ledger->adjust(
+        $this->variant->id, $this->location->id, Quantity::fromString('2')->negated(), 'waste', null, 'dropped tray',
+    )))->toThrow(InsufficientStock::class);
+});
+
+it('countTo snaps the level to the counted quantity in one movement', function (): void {
+    DB::transaction(function (): void {
+        $this->ledger->receive($this->variant->id, $this->location->id, Quantity::fromString('10'));
+        $this->ledger->countTo($this->variant->id, $this->location->id, Quantity::fromString('7.500'), null, 'weekly count');
+    });
+
+    expect(stockLevel($this->variant->id, $this->location->id))->toBe('7.500');
+    $this->assertDatabaseHas('stock_movements', ['reason' => 'count', 'qty_delta' => '-2.500']);
+});
+
+it('countTo writes nothing when the count matches', function (): void {
+    DB::transaction(function (): void {
+        $this->ledger->receive($this->variant->id, $this->location->id, Quantity::fromString('3'));
+        $this->ledger->countTo($this->variant->id, $this->location->id, Quantity::fromString('3'), null, null);
+    });
+
+    expect(DB::table('stock_movements')->where('reason', 'count')->count())->toBe(0);
+});
