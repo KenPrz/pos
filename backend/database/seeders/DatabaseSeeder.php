@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Domain\Money\Quantity;
 use App\Domain\Rbac\RoleProvisioner;
 use App\Domain\Rbac\Roles;
+use App\Domain\Stock\StockLedger;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\Modifier;
@@ -16,6 +18,7 @@ use App\Models\Register;
 use App\Models\TaxRate;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -53,15 +56,31 @@ class DatabaseSeeder extends Seeder
             'receipt_footer' => 'VAT included.',
         ]);
 
+        $tokens = [];
         foreach ([$downtown, $london] as $location) {
             $provisioner->provisionForLocation($location);
 
-            Register::factory()->create(['location_id' => $location->id, 'name' => 'Till 1']);
-            Register::factory()->create(['location_id' => $location->id, 'name' => 'Till 2']);
+            foreach (['Till 1', 'Till 2'] as $name) {
+                $register = Register::factory()->create(['location_id' => $location->id, 'name' => $name]);
+                $tokens[] = [
+                    $location->code.' / '.$name,
+                    $register->createToken("device:{$register->id}", ['device'])->plainTextToken,
+                ];
+            }
         }
 
         $this->seedStaff($downtown, $london);
-        $this->seedCatalog();
+        $tracked = $this->seedCatalog();
+
+        $ledger = app(StockLedger::class);
+        DB::transaction(function () use ($ledger, $tracked, $downtown, $london): void {
+            foreach ($tracked as $variant) {
+                foreach ([$downtown, $london] as $location) {
+                    // Through the ledger, so stock_levels.qty = sum(movements) from day one.
+                    $ledger->receive($variant->id, $location->id, Quantity::fromString('20'), note: 'seed');
+                }
+            }
+        });
 
         $this->command?->newLine();
         $this->command?->info('Seeded. Development PINs:');
@@ -74,6 +93,10 @@ class DatabaseSeeder extends Seeder
                 ['Priya', '4444', 'admin (global)'],
             ],
         );
+
+        $this->command?->newLine();
+        $this->command?->info('Device tokens (paste one into the register SPA):');
+        $this->command?->table(['Register', 'Device token'], $tokens);
     }
 
     private function seedStaff(Location $downtown, Location $london): void
@@ -109,7 +132,10 @@ class DatabaseSeeder extends Seeder
         $registrar->forgetCachedPermissions();
     }
 
-    private function seedCatalog(): void
+    /**
+     * @return array<ProductVariant>
+     */
+    private function seedCatalog(): array
     {
         $standardVat = TaxRate::factory()->create(['name' => 'Standard VAT', 'rate_micros' => 200_000]);
         $nyc = TaxRate::factory()->nyc()->create();
@@ -146,10 +172,11 @@ class DatabaseSeeder extends Seeder
         // Retail: real variants — each a distinct thing you count on a shelf.
         $tshirt = Product::factory()->create(['name' => 'T-Shirt', 'category_id' => $apparel->id]);
 
+        $tracked = [];
         $sizes = [['Blue / S', 'S', '012345678905'], ['Blue / M', 'M', '012345678912'], ['Blue / L', 'L', '012345678929']];
 
         foreach ($sizes as $i => [$name, $size, $barcode]) {
-            ProductVariant::factory()->create([
+            $tracked[] = ProductVariant::factory()->create([
                 'product_id' => $tshirt->id,
                 'name' => $name,
                 'sku' => 'TSHIRT-BLUE-'.$size,
@@ -163,7 +190,7 @@ class DatabaseSeeder extends Seeder
 
         // Sold by weight: proves quantities are not integers.
         $cheese = Product::factory()->create(['name' => 'Cheddar (per kg)', 'category_id' => $food->id]);
-        ProductVariant::factory()->create([
+        $tracked[] = ProductVariant::factory()->create([
             'product_id' => $cheese->id,
             'name' => 'Default',
             'sku' => 'CHEESE-KG',
@@ -171,5 +198,7 @@ class DatabaseSeeder extends Seeder
             'price_cents' => 2400,
             'tax_rate_id' => $standardVat->id,
         ]);
+
+        return $tracked;
     }
 }
