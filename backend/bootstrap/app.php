@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Exceptions\ApiErrorEnvelope;
 use App\Http\Middleware\EnsureDeviceToken;
+use App\Http\Middleware\EnsureIdempotency;
 use App\Http\Middleware\EnsureStaffSession;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'device' => EnsureDeviceToken::class,
             'staff' => EnsureStaffSession::class,
+            'idempotent' => EnsureIdempotency::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
