@@ -112,7 +112,7 @@ What building it changed, and what to know before M3:
 - **A constraint violation aborts the Postgres transaction**, and `RefreshDatabase` wraps
   each test in one. A test can provoke one violation, and nothing after it.
 
-## M3 — The vertical slice 🎯
+## M3 — The vertical slice
 
 **Scan a barcode, ring up an item, pay cash, get change, print a receipt.**
 
@@ -130,6 +130,39 @@ What building it changed, and what to know before M3:
 idempotency, shifts, and auth *together*. Everything after it is addition; everything
 before it is preparation. If the architecture is wrong, this is where it shows — while
 it's still cheap.
+
+**Status: complete.** 250 backend tests, 29 frontend. A real sale runs scan → cart →
+cash → change → receipt in a browser, and shift close reconciles the drawer.
+
+What building it changed, and what to know before M4:
+
+- **Validation failures are `400 validation_failed`, everywhere.** Two briefs assumed 422
+  for a missing `Idempotency-Key` header; the envelope's actual split is 400 = the request
+  is malformed, 422 = the request is well-formed but the domain refuses it. Tests must
+  assert accordingly.
+- **Eloquent never hydrates DB column defaults after `create()`.** An `Order` created
+  without explicit version/totals carries PHP nulls in memory even though Postgres wrote
+  0s. `OpenOrder` sets all six explicitly; any later action creating rows that lean on
+  column defaults must do the same or `->refresh()`.
+- **Postgres `jsonb` does not preserve object key order.** An idempotency replay is
+  content-identical but not byte-identical to the original response. Tests compare
+  replays with `toEqual`, never `toBe`.
+- **Two concurrent first uses of one idempotency key: both run, one commits, the loser
+  hits the key's unique PK and 500s** — but rolls back entirely, so "a replayed key
+  charges once" holds. Accepted for v1; a retry after the 500 replays cleanly.
+- **The two-connection stock concurrency test cannot run under `RefreshDatabase`** — the
+  second connection can't see uncommitted rows. A plain PHPUnit class in `tests/Feature/`
+  escapes Pest's `uses()` binding — subtle but deliberate; see `ConcurrentSaleTest`.
+- **The register UI must keep a freshly-opened order in client state even when its first
+  add-line fails** (insufficient stock) — otherwise every retry opens another server-side
+  order, and open orders block shift close. Related accepted gap: an abandoned *empty*
+  open order still blocks close until M4 ships void-order; the register-side remedy today
+  is ringing the next sale onto it.
+- **Staff sessions genuinely end at shift close** — `CloseShift` revokes the register's
+  staff tokens; the UI returns to the PIN screen.
+- **The seeder now prints a device token per register** (paste into the SPA's setup
+  screen) and seeds stock through `StockLedger::receive`, so the ledger invariant holds
+  from row one.
 
 ## M4 — Retail complete
 
