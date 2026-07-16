@@ -253,6 +253,11 @@ Policy.** If it's a flat capability, it's a permission.
 
 Location scoping is the one exception — teams handle it structurally, so a policy never
 needs to compare `location_id` by hand. That's a second reason teams earn their keep.
+Teams scope *permission checks* only, though: a record *fetch* (`Order::whereKey(...)`
+and the like) is not filtered by the team context, so the action itself must still scope
+the query to the acting register's location — otherwise a cashier with valid permissions
+at their own location can reach another location's row by UUID, and it's a 404 that
+leaked into a 200, not a 403.
 
 ## Wiring
 
