@@ -68,8 +68,10 @@ final class ConcurrentSaleTest extends TestCase
             $blocked = false;
             try {
                 $b->query("select qty from stock_levels where variant_id = '{$ids['variant']}' and location_id = '{$ids['location']}' for update nowait");
-            } catch (PDOException) {
-                $blocked = true;   // 55P03 lock_not_available
+            } catch (PDOException $e) {
+                // Assert the specific SQLSTATE rather than treating any PDOException as
+                // "blocked" — a typo in the SQL above would silently pass this test too.
+                $blocked = $e->getCode() === '55P03' || ($e->errorInfo[0] ?? null) === '55P03';
             }
             $b->exec('rollback');
             $this->assertTrue($blocked);

@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Actions\Shifts;
 
 use App\Domain\Audit\AuditLogger;
+use App\Domain\Rbac\Permissions;
 use App\Domain\Shifts\ShiftTotals;
+use App\Exceptions\Domain\NotShiftOwner;
 use App\Exceptions\Domain\ShiftAlreadyClosed;
 use App\Exceptions\Domain\ShiftHasOpenOrders;
 use App\Models\Shift;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -34,6 +37,15 @@ final class CloseShift
 
             if ($shift->closed_at !== null) {
                 throw new ShiftAlreadyClosed($shift->id);
+            }
+
+            // docs/05-rbac.md: own shift, or a supervisor closing someone else's. This is
+            // a Policy question ("own") that shift.close as a flat permission can't express.
+            if ($shift->opened_by !== $in->actorId) {
+                $actor = User::findOrFail($in->actorId);
+                if (! $actor->can(Permissions::SHIFT_APPROVE_VARIANCE)) {
+                    throw new NotShiftOwner($shift->id, $shift->opened_by);
+                }
             }
 
             $open = $shift->orders()->where('status', 'open')->get(['id', 'number']);

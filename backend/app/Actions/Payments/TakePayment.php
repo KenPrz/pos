@@ -15,6 +15,7 @@ use App\Exceptions\Domain\PaymentExceedsBalance;
 use App\Models\Order;
 use App\Models\OrderStatus;
 use App\Models\Payment;
+use App\Models\Register;
 use App\Models\Shift;
 use Illuminate\Support\Facades\DB;
 
@@ -34,7 +35,12 @@ final class TakePayment
     public function execute(TakePaymentInput $in): Payment
     {
         return DB::transaction(function () use ($in): Payment {
-            $order = Order::whereKey($in->orderId)->lockForUpdate()->firstOrFail();
+            // Another location's order is a 404, not a bypass — teams scope permission
+            // checks, but record fetches must still be location-scoped by hand (docs/05-rbac.md).
+            $locationId = Register::findOrFail($in->registerId)->location_id;
+            $order = Order::whereKey($in->orderId)
+                ->where('location_id', $locationId)
+                ->lockForUpdate()->firstOrFail();
 
             if ($order->status !== OrderStatus::Open) {
                 throw new OrderClosed($order->id, $order->status->value);
