@@ -218,19 +218,30 @@ export const api = {
   currentShift: () => request<CurrentShift>('/shifts/current'),
   openShift: (openingFloatCents: number) =>
     post<{ shift: Shift }>('/shifts/open', { opening_float_cents: openingFloatCents }).then((r) => r.shift),
-  closeShift: (shiftId: string, countedCashCents: number) =>
-    post<ShiftCloseResult>(`/shifts/${shiftId}/close`, { counted_cash_cents: countedCashCents }, { 'Idempotency-Key': crypto.randomUUID() }),
+  // idempotencyKey is minted once by the caller and reused across retries of the SAME
+  // close attempt — minting it here, per call, would defeat the point: a lost-response
+  // retry would look like a brand-new close to the server.
+  closeShift: (shiftId: string, countedCashCents: number, idempotencyKey: string) =>
+    post<ShiftCloseResult>(`/shifts/${shiftId}/close`, { counted_cash_cents: countedCashCents }, { 'Idempotency-Key': idempotencyKey }),
 
   lookupBarcode: (barcode: string) => request<LookedUpVariant>(`/catalog/lookup?barcode=${encodeURIComponent(barcode)}`),
 
-  openOrder: () => post<Order>('/orders', {}),
-  addLine: (order: Order, variantId: string, qty = '1') =>
-    post<Order>(`/orders/${order.id}/lines`, { variant_id: variantId, qty }, { 'If-Match': String(order.version) }),
-  takePayment: (order: Order, amountCents: number, tenderedCents: number) =>
+  openOrder: () => post<{ order: Order }>('/orders', {}).then((r) => r.order),
+  // idempotencyKey is optional: retail's implicit "open order on first scan" path
+  // doesn't need one, but a caller retrying a specific scan submission should pass one.
+  addLine: (order: Order, variantId: string, qty = '1', idempotencyKey?: string) =>
+    post<{ order: Order; line: OrderLine }>(
+      `/orders/${order.id}/lines`,
+      { variant_id: variantId, qty },
+      { 'If-Match': String(order.version), ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
+    ).then((r) => r.order),
+  // idempotencyKey is minted once by the caller (when the tender phase is entered) and
+  // reused across retries — see closeShift's note.
+  takePayment: (order: Order, amountCents: number, tenderedCents: number, idempotencyKey: string) =>
     post<PaymentOutcome>(
       `/orders/${order.id}/payments`,
       { driver: 'cash', amount_cents: amountCents, tendered_cents: tenderedCents },
-      { 'If-Match': String(order.version), 'Idempotency-Key': crypto.randomUUID() },
+      { 'If-Match': String(order.version), 'Idempotency-Key': idempotencyKey },
     ),
 
   receipt: (orderId: string) => request<Receipt>(`/orders/${orderId}/receipt`),
