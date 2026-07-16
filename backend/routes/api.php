@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\StaffLoginController;
 use App\Http\Controllers\Auth\StaffLogoutController;
 use App\Http\Controllers\Orders\AddLineController;
 use App\Http\Controllers\Orders\OpenOrderController;
+use App\Http\Controllers\Orders\ReceiptController;
 use App\Http\Controllers\Payments\TakePaymentController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
@@ -54,6 +55,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/orders/{order}/payments', TakePaymentController::class)
                 ->middleware('idempotent')
                 ->name('orders.payments.take');
+            Route::get('/orders/{order}/receipt', ReceiptController::class)->name('orders.receipt');
         });
     });
 });
