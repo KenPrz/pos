@@ -57,13 +57,16 @@ export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired
   const [counted, setCounted] = useState('')
   const [result, setResult] = useState<ShiftCloseResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Minted once for the life of this screen and reused across submits, so a re-click
+  // after a lost-response timeout replays the same close instead of risking a second one.
+  const [idempotencyKey] = useState(() => crypto.randomUUID())
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const amount = toCents(counted)
     if (amount === null) return setError('Enter the counted cash, like 487.50')
     try {
-      setResult(await api.closeShift(shiftId, amount))
+      setResult(await api.closeShift(shiftId, amount, idempotencyKey))
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         onSessionExpired()

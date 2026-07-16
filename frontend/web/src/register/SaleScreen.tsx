@@ -13,7 +13,10 @@ function toCents(input: string): number | null {
 
 type Phase =
   | { name: 'scanning' }
-  | { name: 'tender' }
+  // Minted once when tender is entered and reused for every submit while in this phase,
+  // so a re-click after a lost-response timeout replays the same payment instead of
+  // risking a double charge. A fresh key is minted each time tender is re-entered.
+  | { name: 'tender'; key: string }
   | { name: 'done'; outcome: PaymentOutcome; receipt: Receipt | null }
 
 export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: () => void; onSessionExpired: () => void }) {
@@ -35,7 +38,10 @@ export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: (
         current = await api.openOrder()
         setOrder(current)
       }
-      setOrder(await api.addLine(current, variant.id))
+      // A key per submit attempt: a re-submit after an error is a new scan (the failed
+      // attempt rolled back), so it needs a new key — this only protects against a lost
+      // response within a single submission, which fetch doesn't auto-retry.
+      setOrder(await api.addLine(current, variant.id, '1', crypto.randomUUID()))
       setBarcode('')
     } catch (err) {
       setBarcode('')
@@ -51,11 +57,12 @@ export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: (
   const pay = async (e: FormEvent) => {
     e.preventDefault()
     if (!order) return
+    if (phase.name !== 'tender') return
     const handed = toCents(tendered)
     if (handed === null) return setError('Enter the cash handed over, like 50.00')
     setError(null)
     try {
-      const outcome = await api.takePayment(order, order.total_cents - order.paid_cents, handed)
+      const outcome = await api.takePayment(order, order.total_cents - order.paid_cents, handed, phase.key)
       const receipt = await api.receipt(outcome.order.id).catch(() => null)
       setPhase({ name: 'done', outcome, receipt })
       setOrder(null)
@@ -149,7 +156,7 @@ export function SaleScreen({ onCloseShift, onSessionExpired }: { onCloseShift: (
       )}
 
       {order && phase.name === 'scanning' && (
-        <button disabled={order.total_cents === 0} onClick={() => setPhase({ name: 'tender' })}>
+        <button disabled={order.total_cents === 0} onClick={() => setPhase({ name: 'tender', key: crypto.randomUUID() })}>
           Pay cash — {fm(balance)}
         </button>
       )}
