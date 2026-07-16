@@ -35,7 +35,8 @@ class OrderFactory extends Factory
         return $this->state(fn (): array => [
             'location_id' => $register->location_id,
             'register_id' => $register->id,
-            'shift_id' => Shift::factory()->create(['register_id' => $register->id])->id,
+            'shift_id' => Shift::where('register_id', $register->id)->whereNull('closed_at')->value('id')
+                ?? Shift::factory()->create(['register_id' => $register->id])->id,
         ]);
     }
 }

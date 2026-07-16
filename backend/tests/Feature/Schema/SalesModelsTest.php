@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Order;
 use App\Models\OrderStatus;
 use App\Models\ProductVariant;
+use App\Models\Register;
 use App\Models\Shift;
 
 it('round-trips an order with integer money, string qty, and enum status', function (): void {
@@ -33,4 +34,13 @@ it('creates a shift without eloquent timestamps', function (): void {
 
     expect($shift->opening_float_cents)->toBeInt()
         ->and($shift->closed_at)->toBeNull();
+});
+
+it('forRegister reuses the register\'s open shift across orders', function (): void {
+    $register = Register::factory()->create();
+
+    $first = Order::factory()->forRegister($register)->create();
+    $second = Order::factory()->forRegister($register)->create();
+
+    expect($second->shift_id)->toBe($first->shift_id);
 });
