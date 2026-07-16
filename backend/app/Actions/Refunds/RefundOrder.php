@@ -58,7 +58,8 @@ final class RefundOrder
             // anything yet — refunds.amount_cents > 0 is a DB check constraint, so the
             // parent row can only be inserted once the true total is known.
             $planned = [];
-            $seenQty = [];   // original_order_line_id => Quantity already accounted for
+            $seenQty = [];      // original_order_line_id => Quantity already accounted for
+            $seenAmount = [];   // original_order_line_id => Money already refunded
 
             foreach ($in->lines as $lineInput) {
                 $orderLine = $order->lines()
@@ -68,6 +69,7 @@ final class RefundOrder
 
                 $qty = Quantity::fromString($lineInput->qty);
                 $origQty = Quantity::fromString($orderLine->qty);
+                $lineTotal = Money::fromCents($orderLine->line_total_cents + $orderLine->tax_cents);
 
                 if (! isset($seenQty[$orderLine->id])) {
                     // Sum of prior refund_lines for this original line, read inside THIS
@@ -77,6 +79,11 @@ final class RefundOrder
                         (string) DB::table('refund_lines')
                             ->where('original_order_line_id', $orderLine->id)
                             ->sum('qty')
+                    );
+                    $seenAmount[$orderLine->id] = Money::fromCents(
+                        (int) DB::table('refund_lines')
+                            ->where('original_order_line_id', $orderLine->id)
+                            ->sum('amount_cents')
                     );
                 }
 
@@ -94,10 +101,22 @@ final class RefundOrder
 
                 $seenQty[$orderLine->id] = $cumulative;
 
+                $alreadyRefundedAmount = $seenAmount[$orderLine->id];
+                $remaining = $lineTotal->minus($alreadyRefundedAmount);
+
                 // The single rounding site: a line's refund is the same fraction of its
-                // frozen (price + tax) snapshot that this qty is of the line's own qty.
-                $lineRefund = Money::fromCents($orderLine->line_total_cents + $orderLine->tax_cents)
-                    ->fraction($qty->milli, $origQty->milli);
+                // frozen (price + tax) snapshot that this qty is of the line's own qty —
+                // capped at what's actually left on the line, and exact (not fractioned)
+                // on the qty that exhausts it. Deriving each refund from qty alone (with
+                // no amount cap) can invent or lose a penny across a piecewise refund
+                // when the line's total doesn't divide evenly by its qty; capping at the
+                // remainder, and taking the remainder exactly on exhaustion, keeps the
+                // pieces summing to precisely the line's total every time.
+                $lineRefund = $cumulative->equals($origQty)
+                    ? $remaining
+                    : $lineTotal->fraction($qty->milli, $origQty->milli)->min($remaining);
+
+                $seenAmount[$orderLine->id] = $alreadyRefundedAmount->plus($lineRefund);
 
                 $planned[] = [
                     'orderLine' => $orderLine,
