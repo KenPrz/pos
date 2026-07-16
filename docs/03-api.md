@@ -71,7 +71,7 @@ One envelope (`01-architecture.md`):
 | 401 | `invalid_device_token`, `invalid_pin`, `staff_session_expired` |
 | 403 | `requires_supervisor`, `wrong_location` |
 | 404 | `not_found` |
-| 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused` |
+| 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders` |
 | 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `modifier_group_required`, `insufficient_tender` |
 | 429 | `too_many_pin_attempts` |
 
@@ -114,6 +114,11 @@ render, and five round-trips on a cold start is five chances to half-load a menu
 Prices in this payload are already **resolved for the requested location**
 (`variant_location_prices` applied), so the register never implements price resolution.
 Pricing logic living in exactly one place is worth the denormalization.
+
+> **v1 notes:** the location is taken from the enrolled register, never from
+> `location_id` — a device that could choose its pricing location would be a tampering
+> vector. The parameter exists for the back office (M6). `updated_since` is not yet
+> implemented (`modifiers` has no `updated_at` to diff on); registers full-sync.
 
 ```
 GET /api/v1/catalog/lookup?barcode=012345678905&location_id=

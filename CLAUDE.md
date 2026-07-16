@@ -120,9 +120,10 @@ Pure integer functions, no I/O, no container.
 **M2 complete** — full schema (40 tables), register enrolment, PIN login, per-location
 RBAC. Seed with `php artisan migrate:fresh --seed`; it prints development PINs.
 
-Next: **M3 — the vertical slice** (`docs/06-roadmap.md`). Scan a barcode, ring up an item,
-pay cash, get change, reconcile the drawer. It's the milestone that proves the
-architecture while changing it is still cheap.
+**M3 complete** — the vertical slice: scan → cart → cash → change → receipt, plus shift
+open/close with variance. Seeder prints development device tokens for the register SPA.
+
+Next: **M4 — retail complete** (`docs/06-roadmap.md`).
 
 ### Gotchas that will cost you an afternoon
 
@@ -137,3 +138,7 @@ architecture while changing it is still cheap.
   spanning locations. See `docs/05-rbac.md`.
 - **A constraint violation aborts the whole Postgres transaction.** With `RefreshDatabase`,
   a test can provoke one violation and nothing after it.
+- **Eloquent `create()` never hydrates DB column defaults** — set them explicitly or
+  `->refresh()`.
+- **`jsonb` reorders keys** — idempotency replays are content-identical, not
+  byte-identical (`toEqual`, never `toBe`).
