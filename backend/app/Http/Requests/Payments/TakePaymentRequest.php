@@ -27,7 +27,7 @@ final class TakePaymentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'driver' => ['required', 'in:cash'],   // external_card lands in M4
+            'driver' => ['required', 'in:cash,external_card'],
             'amount_cents' => ['required', 'integer', 'min:1'],
             'tendered_cents' => ['nullable', 'integer', 'min:1'],   // absent = exact tender
             'reference' => ['nullable', 'string', 'max:100'],

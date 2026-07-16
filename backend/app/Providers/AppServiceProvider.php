@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Domain\Auth\Pins;
 use App\Domain\Payments\CashDriver;
 use App\Domain\Payments\DriverRegistry;
+use App\Domain\Payments\ExternalCardDriver;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(DriverRegistry::class,
             fn (): DriverRegistry => new DriverRegistry(
                 new CashDriver,
+                new ExternalCardDriver,
             ));
     }
 
