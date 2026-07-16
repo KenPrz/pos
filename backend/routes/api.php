@@ -12,6 +12,7 @@ use App\Http\Controllers\Orders\GetOrderController;
 use App\Http\Controllers\Orders\ListOrdersController;
 use App\Http\Controllers\Orders\OpenOrderController;
 use App\Http\Controllers\Orders\ReceiptController;
+use App\Http\Controllers\Orders\VoidLineController;
 use App\Http\Controllers\Payments\TakePaymentController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
@@ -64,6 +65,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/orders/{order}/lines', AddLineController::class)
                 ->middleware('idempotent')
                 ->name('orders.lines.add');
+            Route::delete('/orders/{order}/lines/{line}', VoidLineController::class)
+                ->name('orders.lines.void');
             Route::post('/orders/{order}/payments', TakePaymentController::class)
                 ->middleware('idempotent')
                 ->name('orders.payments.take');
