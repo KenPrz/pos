@@ -89,3 +89,14 @@ dd {
     --line: #e2e5ea;
   }
 }
+
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.error { color: #c0392b; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.cart, .receipt table { width: 100%; border-collapse: collapse; }
+.cart td, .receipt td { padding: 0.25rem 0; border-bottom: 1px solid #eee; }
+.totals { display: grid; grid-template-columns: 1fr auto; margin-top: 0.75rem; }
+.totals dd.grand { font-size: 1.3rem; font-weight: 700; }
+.receipt { margin: 1rem 0; padding: 1rem; border: 1px dashed #999; }
+button.secondary { background: transparent; color: inherit; border: 1px solid #999; }
+@media print { .shell > header, button, form { display: none; } .receipt { border: none; } }

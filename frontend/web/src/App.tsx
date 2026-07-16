@@ -1,71 +1,62 @@
-import { useEffect, useState } from 'react'
-import { ApiError, api, type Health } from './lib/api'
+import { useCallback, useEffect, useState } from 'react'
+import { ApiError, api, tokens, type Shift } from './lib/api'
+import { PinScreen, SetupScreen } from './register/SessionScreens'
+import { CloseShiftScreen, OpenShiftScreen } from './register/ShiftScreens'
+import { SaleScreen } from './register/SaleScreen'
 
-type State =
-  | { status: 'checking' }
-  | { status: 'up'; health: Health }
-  | { status: 'down'; reason: string }
+type Stage =
+  | { name: 'setup' }
+  | { name: 'pin' }
+  | { name: 'loading-shift' }
+  | { name: 'open-shift' }
+  | { name: 'selling'; shift: Shift }
+  | { name: 'closing'; shift: Shift }
 
 export default function App() {
-  const [state, setState] = useState<State>({ status: 'checking' })
+  const [stage, setStage] = useState<Stage>(() =>
+    !tokens.device() ? { name: 'setup' } : !tokens.staff() ? { name: 'pin' } : { name: 'loading-shift' })
 
-  useEffect(() => {
-    let cancelled = false
-
-    api
-      .health()
-      .then((health) => {
-        if (cancelled) return
-        setState(
-          health.healthy
-            ? { status: 'up', health }
-            : { status: 'down', reason: health.database.reason ?? 'Database unavailable.' },
-        )
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return
-        setState({
-          status: 'down',
-          reason: error instanceof ApiError ? error.message : 'Unknown failure.',
-        })
-      })
-
-    return () => {
-      cancelled = true
+  const loadShift = useCallback(async () => {
+    try {
+      const current = await api.currentShift()
+      setStage({ name: 'selling', shift: current.shift })
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return setStage({ name: 'open-shift' })
+      if (err instanceof ApiError && err.status === 401) {
+        tokens.clearStaff()
+        return setStage({ name: 'pin' })
+      }
+      throw err
     }
   }, [])
+
+  useEffect(() => {
+    if (stage.name === 'loading-shift') void loadShift()
+  }, [stage.name, loadShift])
 
   return (
     <main className="shell">
       <header>
         <h1>POS</h1>
-        <p className="muted">M0 — skeleton that boots</p>
+        <p className="muted">Register</p>
       </header>
 
-      {state.status === 'checking' && <p className="muted">Checking…</p>}
-
-      {state.status === 'up' && (
-        <section className="card ok">
-          <h2>System healthy</h2>
-          <dl>
-            <dt>API</dt>
-            <dd>reachable</dd>
-            <dt>App version</dt>
-            <dd>{state.health.app_version}</dd>
-            <dt>Database</dt>
-            <dd>{state.health.database.version ?? 'unknown'}</dd>
-          </dl>
-        </section>
+      {stage.name === 'setup' && <SetupScreen onDone={() => setStage({ name: 'pin' })} />}
+      {stage.name === 'pin' && <PinScreen onLoggedIn={() => setStage({ name: 'loading-shift' })} />}
+      {stage.name === 'loading-shift' && <p className="muted">Loading…</p>}
+      {stage.name === 'open-shift' && <OpenShiftScreen onOpened={(shift) => setStage({ name: 'selling', shift })} />}
+      {stage.name === 'selling' && (
+        <SaleScreen onCloseShift={() => setStage({ name: 'closing', shift: stage.shift })} />
       )}
-
-      {state.status === 'down' && (
-        <section className="card bad">
-          <h2>System unavailable</h2>
-          <p>{state.reason}</p>
-          <p className="muted">
-            v1 is online-only — the terminal needs the server.
-          </p>
-        </section>
+      {stage.name === 'closing' && (
+        <CloseShiftScreen
+          shiftId={stage.shift.id}
+          onCancel={() => setStage({ name: 'selling', shift: stage.shift })}
+          onClosed={() => {
+            tokens.clearStaff()   // the server revoked the session at close
+            setStage({ name: 'pin' })
+          }}
+        />
       )}
     </main>
   )
