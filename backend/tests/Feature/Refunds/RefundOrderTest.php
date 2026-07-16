@@ -171,6 +171,87 @@ it('a taxed line refunds line_total + tax exactly', function (): void {
     expect($refund->amount_cents)->toBe(2178);
 });
 
+it("piecewise refunds sum exactly to the line's total — no invented penny", function (): void {
+    // price 500 x qty 2 = 1000; tax = round_half_up(1000 * 0.08875) = 89 -> total 1089.
+    // Deriving each refund purely from qty/origQty (545 + 545 = 1090) invents a penny;
+    // capping the second refund at what's left of the line (544) keeps the sum exact.
+    $taxRate = TaxRate::factory()->create(['rate_micros' => 88_750]);
+    $variant = ProductVariant::factory()->create([
+        'price_cents' => 500, 'track_inventory' => true, 'tax_rate_id' => $taxRate->id,
+    ]);
+    DB::transaction(fn () => app(StockLedger::class)->receive($variant->id, $this->location->id, Quantity::fromString('10')));
+
+    $order = Order::factory()->forRegister($this->register)->create(['opened_by' => $this->cashier->id]);
+    $order = t8AddLine($this, $order->id, $variant->id, '2');
+    $line = $order->lines->first();
+
+    expect($line->line_total_cents)->toBe(1000)
+        ->and($line->tax_cents)->toBe(89);
+
+    $order = t8Pay($this, $order->id, $order->total_cents);
+    expect($order->total_cents)->toBe(1089);
+
+    $first = app(RefundOrder::class)->execute(new RefundOrderInput(
+        originalOrderId: $order->id, registerId: $this->register->id, driver: 'cash',
+        reason: 'Customer return', lines: [new RefundLineInput($line->id, '1', restock: true)],
+        actorId: $this->supervisor->id,
+    ));
+    expect($first->amount_cents)->toBe(545);
+
+    $second = app(RefundOrder::class)->execute(new RefundOrderInput(
+        originalOrderId: $order->id, registerId: $this->register->id, driver: 'cash',
+        reason: 'Customer return', lines: [new RefundLineInput($line->id, '1', restock: true)],
+        actorId: $this->supervisor->id,
+    ));
+    expect($second->amount_cents)->toBe(544);
+
+    expect((int) DB::table('refund_lines')->where('original_order_line_id', $line->id)->sum('amount_cents'))
+        ->toBe(1089);
+
+    expect(fn () => app(RefundOrder::class)->execute(new RefundOrderInput(
+        originalOrderId: $order->id, registerId: $this->register->id, driver: 'cash',
+        reason: 'Customer return', lines: [new RefundLineInput($line->id, '1', restock: true)],
+        actorId: $this->supervisor->id,
+    )))->toThrow(RefundExceedsOriginal::class);
+});
+
+it("piecewise refunds sum exactly to the line's total — no lost penny", function (): void {
+    // price 333 x qty 3 = 999; tax = round_half_up(999 * 0.10) = 100 -> total 1099.
+    // Deriving each refund purely from qty/origQty (366 x 3 = 1098) loses a penny;
+    // taking the final refund as the exact remainder (367) keeps the sum exact.
+    $taxRate = TaxRate::factory()->create(['rate_micros' => 100_000]);
+    $variant = ProductVariant::factory()->create([
+        'price_cents' => 333, 'track_inventory' => true, 'tax_rate_id' => $taxRate->id,
+    ]);
+    DB::transaction(fn () => app(StockLedger::class)->receive($variant->id, $this->location->id, Quantity::fromString('10')));
+
+    $order = Order::factory()->forRegister($this->register)->create(['opened_by' => $this->cashier->id]);
+    $order = t8AddLine($this, $order->id, $variant->id, '3');
+    $line = $order->lines->first();
+
+    expect($line->line_total_cents)->toBe(999)
+        ->and($line->tax_cents)->toBe(100);
+
+    $order = t8Pay($this, $order->id, $order->total_cents);
+    expect($order->total_cents)->toBe(1099);
+
+    $amounts = [];
+    foreach (range(1, 3) as $i) {
+        $refund = app(RefundOrder::class)->execute(new RefundOrderInput(
+            originalOrderId: $order->id, registerId: $this->register->id, driver: 'cash',
+            reason: 'Customer return', lines: [new RefundLineInput($line->id, '1', restock: true)],
+            actorId: $this->supervisor->id,
+        ));
+        $amounts[] = $refund->amount_cents;
+    }
+
+    expect($amounts)->toBe([366, 366, 367])
+        ->and(array_sum($amounts))->toBe(1099);
+
+    expect((int) DB::table('refund_lines')->where('original_order_line_id', $line->id)->sum('amount_cents'))
+        ->toBe(1099);
+});
+
 it("a cash refund lowers the shift's expected cash by exactly the refund amount", function (): void {
     $before = app(ShiftTotals::class)->expectedCashCents($this->shift);
     expect($before)->toBe($this->shift->opening_float_cents + 2000);   // float + the sale
