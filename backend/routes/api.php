@@ -23,6 +23,7 @@ use App\Http\Controllers\Refunds\RefundOrderController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
 use App\Http\Controllers\Shifts\OpenShiftController;
+use App\Http\Controllers\Shifts\RecordCashMovementController;
 use App\Http\Controllers\System\HealthController;
 use Illuminate\Support\Facades\Route;
 
@@ -61,6 +62,8 @@ Route::prefix('v1')->group(function (): void {
 
             Route::post('/shifts/open', OpenShiftController::class)->name('shifts.open');
             Route::get('/shifts/current', CurrentShiftController::class)->name('shifts.current');
+            Route::post('/shifts/{shift}/cash-movements', RecordCashMovementController::class)
+                ->name('shifts.cash-movements.record');
             Route::post('/shifts/{shift}/close', CloseShiftController::class)
                 ->middleware('idempotent')
                 ->name('shifts.close');
