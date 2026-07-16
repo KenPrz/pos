@@ -26,7 +26,10 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
   )
 }
 
-export function PinScreen({ onLoggedIn }: { onLoggedIn: (session: StaffSession) => void }) {
+export function PinScreen({ onLoggedIn, onDeviceInvalid }: {
+  onLoggedIn: (session: StaffSession) => void
+  onDeviceInvalid: () => void
+}) {
   const [pin, setPin] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -37,6 +40,13 @@ export function PinScreen({ onLoggedIn }: { onLoggedIn: (session: StaffSession) 
       onLoggedIn(await api.staffLogin(pin))
     } catch (err) {
       setPin('')
+      // A stale device token (e.g. after a re-seed) would otherwise dead-end here —
+      // the setup screen only shows when no token is stored.
+      if (err instanceof ApiError && err.code === 'invalid_device_token') {
+        tokens.clearDevice()
+        onDeviceInvalid()
+        return
+      }
       setError(err instanceof ApiError ? err.message : 'Login failed.')
     }
   }

@@ -58,6 +58,7 @@ const STAFF_TOKEN_KEY = 'pos.staff_token'
 export const tokens = {
   device: () => localStorage.getItem(DEVICE_TOKEN_KEY),
   setDevice: (t: string) => localStorage.setItem(DEVICE_TOKEN_KEY, t),
+  clearDevice: () => localStorage.removeItem(DEVICE_TOKEN_KEY),
   staff: () => localStorage.getItem(STAFF_TOKEN_KEY),
   setStaff: (t: string) => localStorage.setItem(STAFF_TOKEN_KEY, t),
   clearStaff: () => localStorage.removeItem(STAFF_TOKEN_KEY),
