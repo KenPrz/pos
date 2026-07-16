@@ -63,6 +63,12 @@ class Order extends Model
         return $this->hasMany(Payment::class);
     }
 
+    /** @return HasMany<OrderDiscount, $this> */
+    public function discounts(): HasMany
+    {
+        return $this->hasMany(OrderDiscount::class);
+    }
+
     /** @return BelongsTo<Location, $this> */
     public function location(): BelongsTo
     {

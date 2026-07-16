@@ -9,6 +9,7 @@ use App\Domain\Rbac\RoleProvisioner;
 use App\Domain\Rbac\Roles;
 use App\Domain\Stock\StockLedger;
 use App\Models\Category;
+use App\Models\Discount;
 use App\Models\Location;
 use App\Models\Modifier;
 use App\Models\ModifierGroup;
@@ -71,6 +72,7 @@ class DatabaseSeeder extends Seeder
 
         $this->seedStaff($downtown, $london);
         $tracked = $this->seedCatalog();
+        $this->seedDiscounts();
 
         $ledger = app(StockLedger::class);
         DB::transaction(function () use ($ledger, $tracked, $downtown, $london): void {
@@ -200,5 +202,12 @@ class DatabaseSeeder extends Seeder
         ]);
 
         return $tracked;
+    }
+
+    /** The two discounts a cashier reaches for most: a round percentage, and a flat comp. */
+    private function seedDiscounts(): void
+    {
+        Discount::factory()->percent(100_000)->create(['name' => '10% off']);
+        Discount::factory()->fixed(500)->create(['name' => '$5 off']);
     }
 }
