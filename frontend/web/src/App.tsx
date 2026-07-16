@@ -47,7 +47,12 @@ export default function App() {
       </header>
 
       {stage.name === 'setup' && <SetupScreen onDone={() => setStage({ name: 'pin' })} />}
-      {stage.name === 'pin' && <PinScreen onLoggedIn={() => setStage({ name: 'loading-shift' })} />}
+      {stage.name === 'pin' && (
+        <PinScreen
+          onLoggedIn={() => setStage({ name: 'loading-shift' })}
+          onDeviceInvalid={() => setStage({ name: 'setup' })}
+        />
+      )}
       {stage.name === 'loading-shift' && <p className="muted">Loading…</p>}
       {stage.name === 'open-shift' && (
         <OpenShiftScreen onOpened={(shift) => setStage({ name: 'selling', shift })} onSessionExpired={sessionExpired} />
