@@ -11,7 +11,10 @@ function toCents(input: string): number | null {
   return Number(m[1]) * 100 + Number((m[2] ?? '0').padEnd(2, '0'))
 }
 
-export function OpenShiftScreen({ onOpened }: { onOpened: (shift: Shift) => void }) {
+export function OpenShiftScreen({ onOpened, onSessionExpired }: {
+  onOpened: (shift: Shift) => void
+  onSessionExpired: () => void
+}) {
   const [float, setFloat] = useState('200.00')
   const [error, setError] = useState<string | null>(null)
 
@@ -22,6 +25,10 @@ export function OpenShiftScreen({ onOpened }: { onOpened: (shift: Shift) => void
     try {
       onOpened(await api.openShift(amount))
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        onSessionExpired()
+        return
+      }
       setError(err instanceof ApiError ? err.message : 'Could not open the shift.')
     }
   }
@@ -41,10 +48,11 @@ export function OpenShiftScreen({ onOpened }: { onOpened: (shift: Shift) => void
   )
 }
 
-export function CloseShiftScreen({ shiftId, onClosed, onCancel }: {
+export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired }: {
   shiftId: string
   onClosed: (result: ShiftCloseResult) => void
   onCancel: () => void
+  onSessionExpired: () => void
 }) {
   const [counted, setCounted] = useState('')
   const [result, setResult] = useState<ShiftCloseResult | null>(null)
@@ -57,6 +65,10 @@ export function CloseShiftScreen({ shiftId, onClosed, onCancel }: {
     try {
       setResult(await api.closeShift(shiftId, amount))
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        onSessionExpired()
+        return
+      }
       setError(err instanceof ApiError ? err.message : 'Could not close the shift.')
     }
   }

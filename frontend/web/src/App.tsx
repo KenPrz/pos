@@ -34,6 +34,11 @@ export default function App() {
     if (stage.name === 'loading-shift') void loadShift()
   }, [stage.name, loadShift])
 
+  const sessionExpired = () => {
+    tokens.clearStaff()
+    setStage({ name: 'pin' })
+  }
+
   return (
     <main className="shell">
       <header>
@@ -44,9 +49,11 @@ export default function App() {
       {stage.name === 'setup' && <SetupScreen onDone={() => setStage({ name: 'pin' })} />}
       {stage.name === 'pin' && <PinScreen onLoggedIn={() => setStage({ name: 'loading-shift' })} />}
       {stage.name === 'loading-shift' && <p className="muted">Loading…</p>}
-      {stage.name === 'open-shift' && <OpenShiftScreen onOpened={(shift) => setStage({ name: 'selling', shift })} />}
+      {stage.name === 'open-shift' && (
+        <OpenShiftScreen onOpened={(shift) => setStage({ name: 'selling', shift })} onSessionExpired={sessionExpired} />
+      )}
       {stage.name === 'selling' && (
-        <SaleScreen onCloseShift={() => setStage({ name: 'closing', shift: stage.shift })} />
+        <SaleScreen onCloseShift={() => setStage({ name: 'closing', shift: stage.shift })} onSessionExpired={sessionExpired} />
       )}
       {stage.name === 'closing' && (
         <CloseShiftScreen
@@ -56,6 +63,7 @@ export default function App() {
             tokens.clearStaff()   // the server revoked the session at close
             setStage({ name: 'pin' })
           }}
+          onSessionExpired={sessionExpired}
         />
       )}
     </main>
