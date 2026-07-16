@@ -16,6 +16,7 @@ use App\Http\Controllers\Orders\ReopenOrderController;
 use App\Http\Controllers\Orders\VoidLineController;
 use App\Http\Controllers\Orders\VoidOrderController;
 use App\Http\Controllers\Payments\TakePaymentController;
+use App\Http\Controllers\Payments\VoidPaymentController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
 use App\Http\Controllers\Shifts\OpenShiftController;
@@ -72,6 +73,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/orders/{order}/payments', TakePaymentController::class)
                 ->middleware('idempotent')
                 ->name('orders.payments.take');
+            Route::post('/payments/{payment}/void', VoidPaymentController::class)->name('payments.void');
             Route::get('/orders/{order}/receipt', ReceiptController::class)->name('orders.receipt');
             Route::post('/orders/{order}/void', VoidOrderController::class)->name('orders.void');
             Route::post('/orders/{order}/reopen', ReopenOrderController::class)->name('orders.reopen');
