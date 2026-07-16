@@ -6,6 +6,7 @@ namespace App\Http\Requests\Orders;
 
 use App\Actions\Orders\AddLineInput;
 use App\Domain\Rbac\Permissions;
+use App\Http\Middleware\EnsureDeviceToken;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class AddLineRequest extends FormRequest
@@ -36,6 +37,7 @@ final class AddLineRequest extends FormRequest
     {
         return new AddLineInput(
             orderId: (string) $this->route('order'),
+            registerId: $this->attributes->get(EnsureDeviceToken::REGISTER)->id,
             variantId: $this->string('variant_id')->toString(),
             qty: $this->string('qty')->toString(),
             expectedVersion: (int) $this->header('If-Match'),

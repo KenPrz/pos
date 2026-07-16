@@ -44,7 +44,7 @@ it('opens over HTTP with the envelope', function (): void {
 
     $this->postJson('/api/v1/orders', [], staffHeaders($this->register, $this->cashier))
         ->assertCreated()
-        ->assertJsonPath('data.status', 'open')
-        ->assertJsonPath('data.version', 0)
-        ->assertJsonPath('data.total_cents', 0);
+        ->assertJsonPath('data.order.status', 'open')
+        ->assertJsonPath('data.order.version', 0)
+        ->assertJsonPath('data.order.total_cents', 0);
 });

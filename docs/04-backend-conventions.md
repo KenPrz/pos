@@ -321,7 +321,12 @@ final class AddLineToOrder
     public function execute(AddLineInput $in): Order
     {
         return DB::transaction(function () use ($in) {
-            $order = Order::whereKey($in->orderId)->lockForUpdate()->firstOrFail();
+            // Teams scope permission checks, not record fetches — another location's
+            // order must still be excluded by hand, or it's a 404 that leaked into a 200.
+            $locationId = Register::findOrFail($in->registerId)->location_id;
+            $order = Order::whereKey($in->orderId)
+                ->where('location_id', $locationId)
+                ->lockForUpdate()->firstOrFail();
 
             if ($order->status !== OrderStatus::Open) {
                 throw new OrderClosed($order->id);

@@ -11,6 +11,7 @@ use App\Exceptions\Domain\InsufficientStock;
 use App\Exceptions\Domain\OrderClosed;
 use App\Exceptions\Domain\OrderVersionConflict;
 use App\Models\Order;
+use App\Models\OrderLine;
 use App\Models\ProductVariant;
 use App\Models\TaxRate;
 use Illuminate\Support\Facades\DB;
@@ -32,13 +33,16 @@ beforeEach(function (): void {
 // name — namespaced per task to keep this file free to move or be copied.
 function m3AddLine(object $t, string $qty = '1', ?int $version = null): Order
 {
-    return app(AddLineToOrder::class)->execute(new AddLineInput(
+    $line = app(AddLineToOrder::class)->execute(new AddLineInput(
         orderId: $t->order->id,
+        registerId: $t->register->id,
         variantId: $t->variant->id,
         qty: $qty,
         expectedVersion: $version ?? Order::findOrFail($t->order->id)->version,
         actorId: $t->cashier->id,
     ));
+
+    return $line->order;
 }
 
 it('snapshots the line, decrements stock, recomputes totals, bumps version — atomically', function (): void {
@@ -97,23 +101,25 @@ it('refuses to oversell and leaves NO orphan line behind', function (): void {
 it('skips the stock lock for untracked variants', function (): void {
     $latte = ProductVariant::factory()->untracked()->create(['price_cents' => 350]);
 
-    $order = app(AddLineToOrder::class)->execute(new AddLineInput(
-        orderId: $this->order->id, variantId: $latte->id, qty: '1',
+    $line = app(AddLineToOrder::class)->execute(new AddLineInput(
+        orderId: $this->order->id, registerId: $this->register->id, variantId: $latte->id, qty: '1',
         expectedVersion: 0, actorId: $this->cashier->id,
     ));
 
-    expect($order->lines->count())->toBe(1);
+    expect($line)->toBeInstanceOf(OrderLine::class)
+        ->and($line->order->lines->count())->toBe(1);
     $this->assertDatabaseMissing('stock_movements', ['variant_id' => $latte->id]);
 });
 
-it('adds a line over HTTP with If-Match and returns the whole order', function (): void {
+it('adds a line over HTTP with If-Match and returns { order, line }', function (): void {
     $headers = staffHeaders($this->register, $this->cashier) + ['If-Match' => '0'];
 
     $this->postJson("/api/v1/orders/{$this->order->id}/lines", ['variant_id' => $this->variant->id, 'qty' => '1'], $headers)
         ->assertCreated()
-        ->assertJsonPath('data.version', 1)
-        ->assertJsonPath('data.total_cents', 2176)   // 1999 + round(1999×0.08875)=177
-        ->assertJsonPath('data.lines.0.sku', 'TSHIRT-BLUE-L');
+        ->assertJsonPath('data.order.version', 1)
+        ->assertJsonPath('data.order.total_cents', 2176)   // 1999 + round(1999×0.08875)=177
+        ->assertJsonPath('data.order.lines.0.sku', 'TSHIRT-BLUE-L')
+        ->assertJsonPath('data.line.sku', 'TSHIRT-BLUE-L');
 });
 
 it('rejects modifiers in M3', function (): void {
@@ -122,4 +128,24 @@ it('rejects modifiers in M3', function (): void {
     $this->postJson("/api/v1/orders/{$this->order->id}/lines",
         ['variant_id' => $this->variant->id, 'qty' => '1', 'modifiers' => ['x']], $headers)
         ->assertStatus(400);
+});
+
+it("404s a register at a different location adding a line to another location's order", function (): void {
+    $otherLocation = provisionedLocation();
+    $otherRegister = registerAt($otherLocation);
+    $otherCashier = staffWithRole($otherLocation, Roles::CASHIER);
+    $headers = staffHeaders($otherRegister, $otherCashier) + ['If-Match' => '0'];
+
+    // The order belongs to $this->location; a register at $otherLocation must not reach it.
+    $this->postJson("/api/v1/orders/{$this->order->id}/lines", ['variant_id' => $this->variant->id, 'qty' => '1'], $headers)
+        ->assertStatus(404);
+});
+
+it("404s a register at a different location fetching another location's receipt", function (): void {
+    $otherLocation = provisionedLocation();
+    $otherRegister = registerAt($otherLocation);
+    $otherCashier = staffWithRole($otherLocation, Roles::CASHIER);
+
+    $this->getJson("/api/v1/orders/{$this->order->id}/receipt", staffHeaders($otherRegister, $otherCashier))
+        ->assertStatus(404);
 });

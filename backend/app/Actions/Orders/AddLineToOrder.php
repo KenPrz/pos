@@ -12,8 +12,10 @@ use App\Domain\Stock\StockLedger;
 use App\Exceptions\Domain\OrderClosed;
 use App\Exceptions\Domain\OrderVersionConflict;
 use App\Models\Order;
+use App\Models\OrderLine;
 use App\Models\OrderStatus;
 use App\Models\ProductVariant;
+use App\Models\Register;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -32,10 +34,15 @@ final class AddLineToOrder
         private readonly AuditLogger $audit,
     ) {}
 
-    public function execute(AddLineInput $in): Order
+    public function execute(AddLineInput $in): OrderLine
     {
-        return DB::transaction(function () use ($in): Order {
-            $order = Order::whereKey($in->orderId)->lockForUpdate()->firstOrFail();
+        return DB::transaction(function () use ($in): OrderLine {
+            // Another location's order is a 404, not a bypass — teams scope permission
+            // checks, but record fetches must still be location-scoped by hand (docs/05-rbac.md).
+            $locationId = Register::findOrFail($in->registerId)->location_id;
+            $order = Order::whereKey($in->orderId)
+                ->where('location_id', $locationId)
+                ->lockForUpdate()->firstOrFail();
 
             if ($order->status !== OrderStatus::Open) {
                 throw new OrderClosed($order->id, $order->status->value);
@@ -75,9 +82,9 @@ final class AddLineToOrder
 
             $this->audit->record('order.line.add', $line, $in->actorId, [
                 'order_id' => $order->id, 'sku' => $line->sku_snapshot, 'qty' => $in->qty,
-            ]);
+            ], registerId: $in->registerId);
 
-            return $order->fresh(['lines']);
+            return $line->setRelation('order', $order->fresh(['lines']));
         });
     }
 }

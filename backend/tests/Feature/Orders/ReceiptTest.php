@@ -18,7 +18,7 @@ beforeEach(function (): void {
     $this->variant = ProductVariant::factory()->untracked()->create(['price_cents' => 1999]);
 
     app(AddLineToOrder::class)->execute(new AddLineInput(
-        orderId: $this->order->id, variantId: $this->variant->id, qty: '1',
+        orderId: $this->order->id, registerId: $this->register->id, variantId: $this->variant->id, qty: '1',
         expectedVersion: 0, actorId: $this->cashier->id,
     ));
 });

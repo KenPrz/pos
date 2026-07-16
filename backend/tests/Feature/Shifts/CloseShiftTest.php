@@ -6,6 +6,7 @@ declare(strict_types=1);
 use App\Actions\Shifts\CloseShift;
 use App\Actions\Shifts\CloseShiftInput;
 use App\Domain\Rbac\Roles;
+use App\Exceptions\Domain\NotShiftOwner;
 use App\Exceptions\Domain\ShiftAlreadyClosed;
 use App\Exceptions\Domain\ShiftHasOpenOrders;
 use App\Models\Order;
@@ -79,6 +80,36 @@ it('requires an Idempotency-Key over HTTP', function (): void {
     // domain-semantic conflicts (payment_exceeds_balance and the like).
     $this->postJson("/api/v1/shifts/{$this->shift->id}/close", ['counted_cash_cents' => 10000], staffHeaders($this->register, $this->cashier))
         ->assertStatus(400);
+});
+
+it("forbids a different cashier at the location from closing another cashier's shift", function (): void {
+    $otherCashier = staffWithRole($this->location, Roles::CASHIER);
+
+    expect(fn () => app(CloseShift::class)->execute(new CloseShiftInput(
+        $this->shift->id, $this->register->id, 10000, null, $otherCashier->id,
+    )))->toThrow(NotShiftOwner::class);
+});
+
+it("forbids a different cashier from closing another cashier's shift over HTTP", function (): void {
+    $otherCashier = staffWithRole($this->location, Roles::CASHIER);
+    $headers = staffHeaders($this->register, $otherCashier) + ['Idempotency-Key' => (string) Str::uuid()];
+
+    $this->postJson("/api/v1/shifts/{$this->shift->id}/close", ['counted_cash_cents' => 10000], $headers)
+        ->assertStatus(403)
+        ->assertJsonPath('error.code', 'requires_supervisor');
+
+    expect(Shift::findOrFail($this->shift->id)->closed_at)->toBeNull();
+});
+
+it("allows a supervisor who isn't the opener to close the shift", function (): void {
+    $supervisor = staffWithRole($this->location, Roles::SUPERVISOR);
+
+    $closed = app(CloseShift::class)->execute(new CloseShiftInput(
+        $this->shift->id, $this->register->id, 10000, null, $supervisor->id,
+    ));
+
+    expect($closed->closed_at)->not->toBeNull()
+        ->and($closed->closed_by)->toBe($supervisor->id);
 });
 
 it('ends the staff sessions on that register at close', function (): void {
