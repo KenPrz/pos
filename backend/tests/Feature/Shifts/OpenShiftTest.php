@@ -35,6 +35,6 @@ it('refuses a second open shift on the same register', function (): void {
 it('opens over HTTP with the right envelope', function (): void {
     $this->postJson('/api/v1/shifts/open', ['opening_float_cents' => 15000], staffHeaders($this->register, $this->cashier))
         ->assertCreated()
-        ->assertJsonPath('data.opening_float_cents', 15000)
-        ->assertJsonPath('data.register_id', $this->register->id);
+        ->assertJsonPath('data.shift.opening_float_cents', 15000)
+        ->assertJsonPath('data.shift.register_id', $this->register->id);
 });
