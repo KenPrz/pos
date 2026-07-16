@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\EnrollRegisterController;
 use App\Http\Controllers\Auth\StaffLoginController;
 use App\Http\Controllers\Auth\StaffLogoutController;
+use App\Http\Controllers\Orders\AddLineController;
+use App\Http\Controllers\Orders\OpenOrderController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
 use App\Http\Controllers\Shifts\OpenShiftController;
@@ -43,6 +45,11 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/shifts/{shift}/close', CloseShiftController::class)
                 ->middleware('idempotent')
                 ->name('shifts.close');
+
+            Route::post('/orders', OpenOrderController::class)->name('orders.open');
+            Route::post('/orders/{order}/lines', AddLineController::class)
+                ->middleware('idempotent')
+                ->name('orders.lines.add');
         });
     });
 });
