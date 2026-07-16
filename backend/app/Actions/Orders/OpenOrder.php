@@ -30,8 +30,7 @@ final class OpenOrder
         return DB::transaction(function () use ($in): Order {
             $register = Register::with('location')->findOrFail($in->registerId);
 
-            $shift = Shift::where('register_id', $register->id)->whereNull('closed_at')->first()
-                ?? throw new NoOpenShift($register->id);
+            $shift = Shift::openFor($register->id) ?? throw new NoOpenShift($register->id);
 
             $location = $register->location;
             // The local calendar day at the store, stored so every report groups by it.
