@@ -54,6 +54,10 @@ final class GetCatalog
                 ->get(['id', 'group_id', 'name', 'price_delta_cents', 'position'])->map(fn ($r): array => (array) $r)->all(),
             taxRates: DB::table('tax_rates')->where('is_active', true)
                 ->get(['id', 'name', 'rate_micros'])->map(fn ($r): array => (array) $r)->all(),
+            // Discounts are a global catalog, not location-scoped — see docs/02-data-model.md.
+            discounts: DB::table('discounts')->where('is_active', true)
+                ->get(['id', 'name', 'kind', 'percent_micros', 'amount_cents', 'scope', 'requires_supervisor'])
+                ->map(fn ($r): array => (array) $r)->all(),
         );
     }
 }

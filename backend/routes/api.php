@@ -8,10 +8,12 @@ use App\Http\Controllers\Auth\StaffLogoutController;
 use App\Http\Controllers\Catalog\GetCatalogController;
 use App\Http\Controllers\Catalog\LookupBarcodeController;
 use App\Http\Controllers\Orders\AddLineController;
+use App\Http\Controllers\Orders\ApplyDiscountController;
 use App\Http\Controllers\Orders\GetOrderController;
 use App\Http\Controllers\Orders\ListOrdersController;
 use App\Http\Controllers\Orders\OpenOrderController;
 use App\Http\Controllers\Orders\ReceiptController;
+use App\Http\Controllers\Orders\RemoveDiscountController;
 use App\Http\Controllers\Orders\ReopenOrderController;
 use App\Http\Controllers\Orders\VoidLineController;
 use App\Http\Controllers\Orders\VoidOrderController;
@@ -70,6 +72,10 @@ Route::prefix('v1')->group(function (): void {
                 ->name('orders.lines.add');
             Route::delete('/orders/{order}/lines/{line}', VoidLineController::class)
                 ->name('orders.lines.void');
+            Route::post('/orders/{order}/discounts', ApplyDiscountController::class)
+                ->name('orders.discounts.apply');
+            Route::delete('/orders/{order}/discounts/{discount}', RemoveDiscountController::class)
+                ->name('orders.discounts.remove');
             Route::post('/orders/{order}/payments', TakePaymentController::class)
                 ->middleware('idempotent')
                 ->name('orders.payments.take');
