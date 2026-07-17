@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { ApiError, api, tokens, type Shift, type StaffSession } from '../lib/api'
 import { PinScreen, SetupScreen } from './SessionScreens'
@@ -37,17 +37,23 @@ export function Register() {
   // so the machine boots neutral and resolves its real stage after mount.
   const [stage, setStage] = useState<Stage>({ name: 'booting' })
   const [user, setUser] = useState<StaffUser | null>(null)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     setUser(tokens.staffUser())
     setStage(!tokens.device() ? { name: 'setup' } : !tokens.staff() ? { name: 'pin' } : { name: 'loading-shift' })
   }, [])
 
-  const sessionExpired = () => {
+  // A cached shift outliving the session that fetched it would let the next login
+  // skip straight to selling on a closed drawer — evict it whenever a session ends.
+  const endSession = () => {
+    queryClient.removeQueries({ queryKey: ['current-shift'] })
     tokens.clearStaff()
     setUser(null)
     setStage({ name: 'pin' })
   }
+
+  const sessionExpired = endSession
 
   // Resolving "is a shift open on this register?" — a real server-state read, so it goes
   // through React Query; the stage machine just reacts to the answer.
@@ -66,12 +72,12 @@ export function Register() {
     const err = shiftQuery.error
     if (err instanceof ApiError && err.status === 404) setStage({ name: 'open-shift' })
     else if (err instanceof ApiError && err.status === 401) sessionExpired()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- endSession is identity-stable in behavior; listing it would re-run on every render
   }, [stage.name, shiftQuery.data, shiftQuery.error])
 
   const clockOut = async () => {
     await api.staffLogout()
-    setUser(null)
-    setStage({ name: 'pin' })
+    endSession()
   }
 
   const permissions = user?.permissions ?? []
@@ -126,6 +132,7 @@ export function Register() {
           <div hidden={stage.name !== 'selling'}>
             <SaleScreen
               can={can}
+              registerId={stage.shift.register_id}
               onCloseShift={() => setStage({ name: 'closing', shift: stage.shift })}
               onSessionExpired={sessionExpired}
             />
@@ -138,11 +145,7 @@ export function Register() {
           <CloseShiftScreen
             shiftId={stage.shift.id}
             onCancel={() => setStage({ name: 'selling', shift: stage.shift })}
-            onClosed={() => {
-              tokens.clearStaff() // the server revoked the session at close
-              setUser(null)
-              setStage({ name: 'pin' })
-            }}
+            onClosed={() => endSession()} // the server revoked the session at close
             onSessionExpired={sessionExpired}
           />
         )}

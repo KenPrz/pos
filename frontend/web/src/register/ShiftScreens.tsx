@@ -3,17 +3,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiError, api, type Shift, type ShiftCloseResult } from '../lib/api'
-import { cents, formatMoney } from '../lib/money'
+import { cents, formatMoney, parseCentsOrNull } from '../lib/money'
 
 const CURRENCY = 'USD' // display only; the server owns all arithmetic
 const fm = (n: number) => formatMoney(cents(n), CURRENCY)
-
-/** Parse a human dollars-and-cents string to integer cents; '' -> null. */
-function toCents(input: string): number | null {
-  const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(input.trim())
-  if (!m) return null
-  return Number(m[1]) * 100 + Number((m[2] ?? '0').padEnd(2, '0'))
-}
 
 export function OpenShiftScreen({ onOpened, onSessionExpired }: {
   onOpened: (shift: Shift) => void
@@ -24,7 +17,7 @@ export function OpenShiftScreen({ onOpened, onSessionExpired }: {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    const amount = toCents(float)
+    const amount = parseCentsOrNull(float)
     if (amount === null) return setError('Enter an amount like 200.00')
     try {
       onOpened(await api.openShift(amount))
@@ -112,7 +105,7 @@ export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    const amount = toCents(counted)
+    const amount = parseCentsOrNull(counted)
     if (amount === null) return setError('Enter the counted cash, like 487.50')
     try {
       setResult(await api.closeShift(shiftId, amount, idempotencyKey))

@@ -33,6 +33,7 @@ function stubFetch(respond: () => Response | Promise<Response>) {
 const sampleOrder: Order = {
   id: 'order-1',
   number: 'N-0001',
+  register_id: 'register-1',
   status: 'open',
   table_ref: null,
   business_date: '2026-07-16',

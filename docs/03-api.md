@@ -30,7 +30,7 @@ Every subsequent request carries `Authorization: Bearer <device_token>`.
 ```
 POST /api/v1/staff/login             # device token + PIN
   { "pin": "1234" }
-  → { staff_token, user: { id, name, role }, expires_at }
+  → { staff_token, user: { id, name, is_admin, permissions[] }, expires_at }
 ```
 
 Requests that act on behalf of a person send **both**:
@@ -70,10 +70,10 @@ One envelope (`01-architecture.md`):
 | --- | --- |
 | 400 | `validation_failed` |
 | 401 | `invalid_device_token`, `invalid_pin`, `staff_session_expired` |
-| 403 | `requires_supervisor`, `wrong_location` |
+| 403 | `forbidden`, `requires_supervisor`, `wrong_location` (mostly structural — location scoping yields 404s; reserved for record/register location disagreements) |
 | 404 | `not_found` |
 | 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders`, `line_already_voided`, `payment_already_voided`, `payment_shift_closed` |
-| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `modifier_group_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch` |
+| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required` (M5), `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use` |
 | 429 | `too_many_pin_attempts` |
 
 `code` is stable forever once shipped; clients branch on it. `message` is for humans and
@@ -81,10 +81,11 @@ may change freely.
 
 ## Idempotency
 
-`Idempotency-Key: <uuidv4>` — optional on most mutations, **required** on
-`/payments`, `/refunds`, and `/shifts/close`. Semantics in `01-architecture.md`:
-replay with a matching body returns the stored response without re-executing; replay with
-a different body is `409 idempotency_key_reused`.
+`Idempotency-Key: <uuidv4>` — honored on the routes carrying the idempotent middleware:
+add-line, payments, refunds, and shift close. **Required** on `/payments`, `/refunds`,
+and `/shifts/close`; optional but recommended on add-line. Semantics in
+`01-architecture.md`: replay with a matching body returns the stored response without
+re-executing; replay with a different body is `409 idempotency_key_reused`.
 
 ## Optimistic locking
 
@@ -161,7 +162,7 @@ of `02-data-model.md`). If `|variance|` exceeds the threshold,
 `requires_approval: true` comes back and a supervisor confirms via:
 
 ```
-POST /api/v1/shifts/{id}/approve-variance    # supervisor
+POST /api/v1/shifts/{id}/approve-variance    # supervisor (arrives in M5; the requires_approval flag and permission exist today)
 ```
 
 The shift is already closed by then. Approval is an audit event, not a gate — blocking the
@@ -175,19 +176,23 @@ closed or transferred first; a tab cannot outlive the drawer that's accountable 
 ```
 POST /api/v1/stock/adjustments
   { "variant_id": "...", "qty_delta": "-2.000", "reason": "adjustment", "note": "" }
-  → { movement }                 # supervisor; reason: adjustment | waste
+  → { level: { variant_id, qty } }   # supervisor; reason: adjustment | waste
 
 POST /api/v1/stock/receipts
   { "variant_id": "...", "qty": "24.000", "note": "PO 4471" }
-  → { movement }                 # supervisor
+  → { level: { variant_id, qty } }   # supervisor
 
 POST /api/v1/stock/counts
   { "variant_id": "...", "counted_qty": "18.000", "note": "" }
-  → { movement }                 # supervisor
+  → { level: { variant_id, qty } }   # supervisor
 
 GET  /api/v1/stock/movements?variant_id=
   → { movements[], level }       # last 50 movements, plus the current level
 ```
+
+The three write endpoints return the resulting `level`, not the movement they just
+inserted — the register wants a fresh number to render, and the movement row is an
+audit artifact, not something the caller needs echoed back.
 
 All location-scoped to the acting register — stock is per-location, and a register only
 ever touches the location it's enrolled at. Every write goes through the stock ledger
@@ -228,7 +233,7 @@ POST   /api/v1/orders/{id}/lines                 # If-Match
   { "variant_id": "...", "qty": "1", "modifiers": ["<modifier_id>", ...] }
   → { order, line }
 
-PATCH  /api/v1/orders/{id}/lines/{lineId}        # If-Match
+PATCH  /api/v1/orders/{id}/lines/{lineId}        # If-Match (arrives in M5 — not yet shipped)
   { "qty": "3" }
 
 DELETE /api/v1/orders/{id}/lines/{lineId}        # If-Match — voids, never deletes
@@ -236,8 +241,8 @@ DELETE /api/v1/orders/{id}/lines/{lineId}        # If-Match — voids, never del
 ```
 
 Adding a line does all of this **in one transaction**: resolve the location price, snapshot
-name/SKU/price/tax-rate onto the line, validate modifier group `min_select`/`max_select`,
-lock and decrement stock if tracked, recompute order totals, bump `version`.
+name/SKU/price/tax-rate onto the line, validate modifier group `min_select`/`max_select`
+(M5), lock and decrement stock if tracked, recompute order totals, bump `version`.
 
 The whole order comes back on every line mutation. It's slightly more bytes than
 returning the line alone, and it means the register's totals are **incapable** of drifting
@@ -272,6 +277,16 @@ POST /api/v1/orders/{id}/void                    # If-Match, supervisor
 An order closes **automatically** when captured payments reach `total_cents` — there is no
 "close" endpoint, because a manual close would be a second, disagreeing definition of
 "paid in full."
+
+```
+POST /api/v1/orders/{id}/settle                  # If-Match
+  → { order }                                    # 422 order_not_zero
+```
+
+Closes a zero-total order — 100% comped, fully discounted — without a tender. Valid only
+when `total_cents == 0` and the order has lines; otherwise `422 order_not_zero`. This is
+not a second, competing definition of "closed" — it's the same "captured payments reach
+the total" rule evaluated at a total of zero, where there is no payment left to capture.
 
 ```
 POST /api/v1/orders/{id}/reopen                  # supervisor
@@ -334,18 +349,20 @@ POST /api/v1/refunds                             # Idempotency-Key required, sup
 
 Amounts are **derived from the original lines**, never sent by the client — a
 client-specified refund amount is an open till. Validated inside the transaction against
-prior refunds on each line (`422 refund_exceeds_original`). `driver: "external_card"` is
-rejected: that money never came through us.
+prior refunds on each line (`422 refund_exceeds_original`). A derived amount of zero — a
+fully discounted line, or a quantity that rounds to nothing — is refused
+(`422 refund_amount_zero`) rather than writing a no-op refund. `driver: "external_card"`
+is rejected: that money never came through us.
 
 The original order is never modified.
 
 ## Reports
 
 ```
-GET /api/v1/reports/z?shift_id=          # Z-report: the drawer close summary
-GET /api/v1/reports/sales?location_id=&from=&to=&group_by=day|category|user
-GET /api/v1/reports/stock?location_id=&low_only=true
-GET /api/v1/reports/audit?entity_type=&entity_id=&user_id=&from=&to=
+GET /api/v1/reports/z?shift_id=          # Z-report: the drawer close summary — shipped
+GET /api/v1/reports/sales?location_id=&from=&to=&group_by=day|category|user  # M6 — back office
+GET /api/v1/reports/stock?location_id=&low_only=true                        # M6 — back office
+GET /api/v1/reports/audit?entity_type=&entity_id=&user_id=&from=&to=        # M6 — back office
 ```
 
 All date filtering is on `business_date` (`02-data-model.md`), so a report means the same

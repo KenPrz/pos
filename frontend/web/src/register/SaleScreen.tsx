@@ -1,18 +1,12 @@
 'use client'
 
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError, api, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
-import { cents, formatMoney } from '../lib/money'
+import { cents, formatMoney, parseCentsOrNull, subtract } from '../lib/money'
 
 const CURRENCY = 'USD'
 const fm = (n: number) => formatMoney(cents(n), CURRENCY)
-
-function toCents(input: string): number | null {
-  const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(input.trim())
-  if (!m) return null
-  return Number(m[1]) * 100 + Number((m[2] ?? '0').padEnd(2, '0'))
-}
 
 type Driver = 'cash' | 'external_card'
 
@@ -24,8 +18,9 @@ type Phase =
   | { name: 'tender'; key: string }
   | { name: 'done'; outcome: PaymentOutcome; receipt: Receipt | null }
 
-export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
+export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: {
   can: (permission: string) => boolean
+  registerId: string
   onCloseShift: () => void
   onSessionExpired: () => void
 }) {
@@ -41,6 +36,7 @@ export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
   const [discountReason, setDiscountReason] = useState('')
   const [voidingOrder, setVoidingOrder] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const scanRef = useRef<HTMLInputElement>(null)
 
   const fail = (err: unknown, fallback: string) => {
@@ -65,12 +61,31 @@ export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
   // back, and a deliberate second scan of the same item must be a new line.
   const scanKeyRef = useRef<{ code: string; key: string } | null>(null)
 
+  // Recovery: a reload or re-login can leave this register's open order alive only on
+  // the server, where it silently blocks shift close. One shot per mount, this
+  // register's orders only (a sibling till's tab is not ours to grab — that's M5).
+  const openOrders = useQuery({
+    queryKey: ['open-orders', registerId],
+    queryFn: () => api.findOrders({ status: 'open' }),
+    staleTime: Infinity,
+  })
+  const resumed = useRef(false)
+  useEffect(() => {
+    if (resumed.current || !openOrders.data) return
+    resumed.current = true
+    const mine = openOrders.data.filter((o) => o.register_id === registerId)
+    if (mine.length > 0) {
+      setOrder((existing) => existing ?? mine[0])
+      setNotice(`Resumed open order ${mine[0].number}.`)
+    }
+  }, [openOrders.data, registerId])
+
   const scan = useMutation({
     mutationFn: async ({ code, key }: { code: string; key: string }) => {
       const { variant } = await api.lookupBarcode(code)
       let current = order // retail opens implicitly on first scan
       if (!current) {
-        current = await api.openOrder()
+        current = await api.openOrder(key) // same key: a lost response won't mint a twin
         setOrder(current)
       }
       return api.addLine(current, variant.id, '1', key)
@@ -113,6 +128,17 @@ export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
     onError: (err) => fail(err, 'Void failed.'),
   })
 
+  const settle = useMutation({
+    mutationFn: () => api.settleOrder(order as Order),
+    onSuccess: (closed) => {
+      setOrder(null)
+      setError(null)
+      setNotice(`Order ${closed.number} closed — nothing to pay.`)
+      setTimeout(() => scanRef.current?.focus(), 0)
+    },
+    onError: (err) => fail(err, 'Could not close the order.'),
+  })
+
   const applyDiscount = useMutation({
     mutationFn: ({ discountId, reason }: { discountId: string; reason: string }) =>
       api.applyDiscount(order as Order, discountId, reason),
@@ -137,10 +163,10 @@ export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
   const pay = useMutation({
     mutationFn: async ({ key }: { key: string }) => {
       const current = order as Order
-      const amount = current.total_cents - current.paid_cents
+      const amount = subtract(cents(current.total_cents), cents(current.paid_cents))
       const outcome =
         driver === 'cash'
-          ? await api.takePayment(current, amount, 'cash', key, { tenderedCents: toCents(tendered) ?? 0 })
+          ? await api.takePayment(current, amount, 'cash', key, { tenderedCents: parseCentsOrNull(tendered) ?? 0 })
           : await api.takePayment(current, amount, 'external_card', key, { reference: reference.trim() || undefined })
       const receipt = await api.receipt(outcome.order.id).catch(() => null)
       return { outcome, receipt }
@@ -159,6 +185,7 @@ export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
     e.preventDefault()
     if (!barcode.trim() || scan.isPending) return
     setError(null)
+    setNotice(null)
     const code = barcode.trim()
     const previous = scanKeyRef.current
     const key = previous && previous.code === code ? previous.key : crypto.randomUUID()
@@ -169,7 +196,7 @@ export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
   const submitPay = (e: FormEvent) => {
     e.preventDefault()
     if (!order || phase.name !== 'tender' || pay.isPending) return
-    if (driver === 'cash' && toCents(tendered) === null) return setError('Enter the cash handed over, like 50.00')
+    if (driver === 'cash' && parseCentsOrNull(tendered) === null) return setError('Enter the cash handed over, like 50.00')
     setError(null)
     pay.mutate({ key: phase.key })
   }
@@ -355,13 +382,18 @@ export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
             </form>
           )}
           <div className="btn-row">
-            <button
-              className="btn btn-submit"
-              disabled={order.total_cents === 0}
-              onClick={() => setPhase({ name: 'tender', key: crypto.randomUUID() })}
-            >
-              Pay — {fm(balance)}
-            </button>
+            {order.total_cents === 0 ? (
+              <button className="btn btn-submit" disabled={settle.isPending} onClick={() => settle.mutate()}>
+                {(order.discounts?.length ?? 0) > 0 ? 'Close — fully comped' : 'Close empty order'}
+              </button>
+            ) : (
+              <button
+                className="btn btn-submit"
+                onClick={() => setPhase({ name: 'tender', key: crypto.randomUUID() })}
+              >
+                Pay — {fm(balance)}
+              </button>
+            )}
             {can('order.discount.apply') && !discountOpen && (
               <button type="button" className="btn btn-utility" onClick={() => setDiscountOpen(true)}>Discount</button>
             )}
@@ -416,6 +448,7 @@ export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
       )}
 
       {error && <p className="error">{error}</p>}
+      {notice && <p className="muted">{notice}</p>}
     </section>
   )
 }

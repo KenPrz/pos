@@ -199,6 +199,7 @@ export type OrderDiscount = {
 export type Order = {
   id: string
   number: string
+  register_id: string
   status: 'open' | 'closed' | 'voided'
   table_ref: string | null
   business_date: string
@@ -320,7 +321,14 @@ export const api = {
   lookupBarcode: (barcode: string) => request<LookedUpVariant>(`/catalog/lookup?barcode=${encodeURIComponent(barcode)}`),
   catalog: () => request<Catalog>('/catalog'),
 
-  openOrder: () => post<{ order: Order }>('/orders', {}).then((r) => r.order),
+  // The key matters here too: a lost response on the implicit first-scan open would
+  // otherwise mint a second, invisible empty order on rescan — and open orders block
+  // shift close. Callers reuse the scan attempt's key.
+  openOrder: (idempotencyKey?: string) =>
+    post<{ order: Order }>('/orders', {}, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}).then((r) => r.order),
+  // Closes a zero-total order (full comp / abandoned empty) without a tender.
+  settleOrder: (order: Order) =>
+    post<{ order: Order }>(`/orders/${order.id}/settle`, {}, { 'If-Match': String(order.version) }).then((r) => r.order),
   getOrder: (id: string) => request<{ order: Order }>(`/orders/${id}`).then((r) => r.order),
   // A targeted lookup (receipt number for refunds, an open tab), not a browse — mirrors
   // ListOrdersRequest, which requires at least one of the two.

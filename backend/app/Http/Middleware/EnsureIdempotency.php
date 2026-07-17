@@ -27,7 +27,21 @@ final class EnsureIdempotency
             return $next($request);
         }
 
-        $hash = hash('sha256', $request->method().$request->path().$request->getContent());
+        /*
+         * The replay path below short-circuits BEFORE the controller, so FormRequest
+         * authorization and the action's location scoping never run for a cache hit.
+         * Folding the acting register and user into the hash confines a key to whoever
+         * minted it: anyone else replaying the same key + body gets a 409, never a
+         * cached money response from another till or another person's permissions.
+         */
+        $register = $request->attributes->get(EnsureDeviceToken::REGISTER);
+        $hash = hash('sha256', implode('|', [
+            $register?->id ?? '',
+            $request->user()?->getAuthIdentifier() ?? '',
+            $request->method(),
+            $request->path(),
+            $request->getContent(),
+        ]));
 
         return DB::transaction(function () use ($key, $hash, $request, $next): Response {
             $seen = IdempotencyKey::whereKey($key)->lockForUpdate()->first();
