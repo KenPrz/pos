@@ -15,6 +15,7 @@ use App\Http\Controllers\Orders\OpenOrderController;
 use App\Http\Controllers\Orders\ReceiptController;
 use App\Http\Controllers\Orders\RemoveDiscountController;
 use App\Http\Controllers\Orders\ReopenOrderController;
+use App\Http\Controllers\Orders\SettleZeroOrderController;
 use App\Http\Controllers\Orders\VoidLineController;
 use App\Http\Controllers\Orders\VoidOrderController;
 use App\Http\Controllers\Payments\TakePaymentController;
@@ -68,6 +69,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/shifts/open', OpenShiftController::class)->name('shifts.open');
             Route::get('/shifts/current', CurrentShiftController::class)->name('shifts.current');
             Route::post('/shifts/{shift}/cash-movements', RecordCashMovementController::class)
+                ->middleware('idempotent')
                 ->name('shifts.cash-movements.record');
             Route::post('/shifts/{shift}/close', CloseShiftController::class)
                 ->middleware('idempotent')
@@ -94,6 +96,7 @@ Route::prefix('v1')->group(function (): void {
                 ->name('refunds.create');
             Route::get('/orders/{order}/receipt', ReceiptController::class)->name('orders.receipt');
             Route::post('/orders/{order}/void', VoidOrderController::class)->name('orders.void');
+            Route::post('/orders/{order}/settle', SettleZeroOrderController::class)->name('orders.settle');
             Route::post('/orders/{order}/reopen', ReopenOrderController::class)->name('orders.reopen');
 
             Route::get('/reports/z', GetZReportController::class)->name('reports.z');

@@ -14,7 +14,7 @@ Laravel 13.20 (PHP 8.5) · PostgreSQL 18 · React 19 + TypeScript 7 on Next.js 1
 
 ```
 backend/        Laravel API. Action-class architecture — see docs/04-backend-conventions.md
-frontend/web/   React SPA (the register + back office)
+frontend/web/   Next.js register app (back office arrives in M6)
 frontend/native/  Reserved for a desktop shell (Electron/Tauri) — hosts the same SPA and
                   adds cash drawer + receipt printer access. Empty in v1.
 infra/          docker-compose for local Postgres

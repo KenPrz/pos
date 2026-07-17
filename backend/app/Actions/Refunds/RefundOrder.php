@@ -10,6 +10,7 @@ use App\Domain\Money\Quantity;
 use App\Domain\Stock\StockLedger;
 use App\Exceptions\Domain\NoOpenShift;
 use App\Exceptions\Domain\OrderClosed;
+use App\Exceptions\Domain\RefundAmountZero;
 use App\Exceptions\Domain\RefundExceedsOriginal;
 use App\Models\Order;
 use App\Models\OrderStatus;
@@ -115,6 +116,12 @@ final class RefundOrder
                 $lineRefund = $cumulative->equals($origQty)
                     ? $remaining
                     : $lineTotal->fraction($qty->milli, $origQty->milli)->min($remaining);
+
+                // A zero-money refund (fully discounted line, or a fraction rounding to
+                // nothing) would violate the schema's amount > 0 checks as a raw 500.
+                if (! $lineRefund->isPositive()) {
+                    throw new RefundAmountZero($orderLine->id);
+                }
 
                 $seenAmount[$orderLine->id] = $alreadyRefundedAmount->plus($lineRefund);
 

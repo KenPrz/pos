@@ -218,7 +218,8 @@ the business without a customer noticing?"
 
 ## Roles
 
-Seeded, not user-editable in v1. Three, deliberately coarse.
+Seeded, not user-editable in v1. Two roles, deliberately coarse, plus the `admin` flag
+that sits outside the role system entirely (see the correction above).
 
 **`cashier`** — the shift they can run alone:
 `order.open`, `order.line.add`, `order.line.update`, `payment.take`, `shift.open`,

@@ -107,7 +107,7 @@ and mirrored on the client in `frontend/web/src/lib/money.ts`.
 - **Postgres:** `bigint`. Never `money` (locale-dependent, genuinely unusable) and never
   `float8`. `numeric` is acceptable for *quantities* but not for money — integers make
   the "no fractional cents" invariant structural rather than aspirational.
-- **JSON:** amounts cross the wire as integers. `{"total": 1234}`. The frontend formats
+- **JSON:** amounts cross the wire as integers. `{"total_cents": 1234}`. The frontend formats
   for display at the very last moment and never parses a formatted string back.
 - **TypeScript:** a branded type, so cents can't be assigned to a plain number by
   accident:
@@ -121,7 +121,7 @@ Rounding is only ever needed for **percentage-based** math: tax and percentage
 discounts. Every such calculation:
 
 1. Computes in integers.
-2. Rounds **half up** at the point of the percentage application.
+2. Rounds **half away from zero** at the point of the percentage application.
 3. Rounds **per line**, then sums. Never sums then rounds.
 
 Per-line rounding is chosen because the receipt must add up in front of a customer who
@@ -177,12 +177,15 @@ Coarse and boring on purpose:
 
 - `cashier` — open/modify/close own orders, take payments, open/close own shift.
 - `supervisor` — cashier, plus: void lines, apply manual discounts, no-sale drawer open,
-  reopen an order, approve variance.
-- `admin` — everything, including catalog, users, and settings.
+  reopen an order, approve variance, stock adjustments/receiving/counting.
+- `admin` — not a role. `users.is_admin` plus a `Gate::before` bypass, because spatie's
+  teams cannot express a role assignment that spans locations. Full rationale in
+  `05-rbac.md`.
 
-The actions gated at `supervisor` are exactly the ones that let someone remove money
-without a customer noticing. That's the whole design rationale: the permission boundary
-follows the fraud surface, not an org chart.
+The actions gated at `supervisor` are exactly the ones that let someone take value out of
+the business without a customer noticing — cash out of the drawer or sellable stock out
+of the count. That's the whole design rationale: the permission boundary follows the
+fraud surface, not an org chart.
 
 Implemented with `spatie/laravel-permission`, and **roles are scoped per location** — a
 supervisor at one store is not a supervisor at another. Call sites ask
@@ -196,8 +199,9 @@ Non-negotiable even though we're online-only. The failure this prevents: a cashi
 "Charge $50", the response is lost to a flaky network, the client retries, and the
 customer is charged twice.
 
-Every `POST`/`PATCH`/`DELETE` accepts an `Idempotency-Key` header (client-generated
-UUIDv4). Payment endpoints **require** it.
+The routes carrying the idempotent middleware — add-line, payments, refunds, and shift
+close — accept an `Idempotency-Key` header (client-generated UUIDv4). Payments, refunds,
+and shift close **require** it.
 
 ```
 idempotency_keys
