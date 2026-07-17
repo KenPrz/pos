@@ -16,6 +16,7 @@ use App\Http\Controllers\Orders\ReceiptController;
 use App\Http\Controllers\Orders\RemoveDiscountController;
 use App\Http\Controllers\Orders\ReopenOrderController;
 use App\Http\Controllers\Orders\SettleZeroOrderController;
+use App\Http\Controllers\Orders\UpdateLineQtyController;
 use App\Http\Controllers\Orders\VoidLineController;
 use App\Http\Controllers\Orders\VoidOrderController;
 use App\Http\Controllers\Payments\TakePaymentController;
@@ -81,6 +82,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/orders/{order}/lines', AddLineController::class)
                 ->middleware('idempotent')
                 ->name('orders.lines.add');
+            Route::patch('/orders/{order}/lines/{line}', UpdateLineQtyController::class)
+                ->name('orders.lines.update');
             Route::delete('/orders/{order}/lines/{line}', VoidLineController::class)
                 ->name('orders.lines.void');
             Route::post('/orders/{order}/discounts', ApplyDiscountController::class)
