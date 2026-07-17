@@ -119,12 +119,17 @@ export function Register() {
         {stage.name === 'open-shift' && (
           <OpenShiftScreen onOpened={(shift) => setStage({ name: 'selling', shift })} onSessionExpired={sessionExpired} />
         )}
-        {stage.name === 'selling' && (
-          <SaleScreen
-            can={can}
-            onCloseShift={() => setStage({ name: 'closing', shift: stage.shift })}
-            onSessionExpired={sessionExpired}
-          />
+        {/* The sale screen stays MOUNTED (hidden) while on Refunds or Close Shift: its
+            in-progress order lives in component state, and unmounting it would strand
+            an open order server-side with no way back to it from the register. */}
+        {(stage.name === 'selling' || stage.name === 'refunds' || stage.name === 'closing') && (
+          <div hidden={stage.name !== 'selling'}>
+            <SaleScreen
+              can={can}
+              onCloseShift={() => setStage({ name: 'closing', shift: stage.shift })}
+              onSessionExpired={sessionExpired}
+            />
+          </div>
         )}
         {stage.name === 'refunds' && (
           <RefundScreen onDone={() => setStage({ name: 'selling', shift: stage.shift })} onSessionExpired={sessionExpired} />

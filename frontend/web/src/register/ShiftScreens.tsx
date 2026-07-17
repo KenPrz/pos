@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { ApiError, api, type Shift, type ShiftCloseResult } from '../lib/api'
 import { cents, formatMoney } from '../lib/money'
 
@@ -99,6 +99,11 @@ export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired
 }) {
   const zReport = useZReport(shiftId)   // while the session is still alive — see ZReportPanel
   const [counted, setCounted] = useState('')
+
+  // 401 anywhere clears the staff session and returns to PIN — including this fetch.
+  useEffect(() => {
+    if (zReport.error instanceof ApiError && zReport.error.status === 401) onSessionExpired()
+  }, [zReport.error, onSessionExpired])
   const [result, setResult] = useState<ShiftCloseResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Minted once for the life of this screen and reused across submits, so a re-click

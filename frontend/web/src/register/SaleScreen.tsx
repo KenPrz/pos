@@ -59,24 +59,30 @@ export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
     select: (catalog) => catalog.discounts.filter((d) => d.scope === 'order'),
   })
 
+  // A lost response (network_unreachable) may have succeeded server-side, so a rescan
+  // of the SAME barcode right after one reuses the same idempotency key and replays
+  // instead of double-adding. Any other outcome clears it: a domain refusal rolled
+  // back, and a deliberate second scan of the same item must be a new line.
+  const scanKeyRef = useRef<{ code: string; key: string } | null>(null)
+
   const scan = useMutation({
-    mutationFn: async (code: string) => {
+    mutationFn: async ({ code, key }: { code: string; key: string }) => {
       const { variant } = await api.lookupBarcode(code)
       let current = order // retail opens implicitly on first scan
       if (!current) {
         current = await api.openOrder()
         setOrder(current)
       }
-      // A key per submit attempt: a failed attempt rolled back, so a re-submit is a new
-      // scan — the key only guards a lost response within this one submission.
-      return api.addLine(current, variant.id, '1', crypto.randomUUID())
+      return api.addLine(current, variant.id, '1', key)
     },
     onSuccess: (next) => {
+      scanKeyRef.current = null
       setOrder(next)
       setBarcode('')
       setError(null)
     },
     onError: (err) => {
+      if (!(err instanceof ApiError && err.code === 'network_unreachable')) scanKeyRef.current = null
       setBarcode('')
       fail(err, 'Scan failed.')
     },
@@ -153,7 +159,11 @@ export function SaleScreen({ can, onCloseShift, onSessionExpired }: {
     e.preventDefault()
     if (!barcode.trim() || scan.isPending) return
     setError(null)
-    scan.mutate(barcode.trim())
+    const code = barcode.trim()
+    const previous = scanKeyRef.current
+    const key = previous && previous.code === code ? previous.key : crypto.randomUUID()
+    scanKeyRef.current = { code, key }
+    scan.mutate({ code, key })
   }
 
   const submitPay = (e: FormEvent) => {
