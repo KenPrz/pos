@@ -13,5 +13,7 @@ final readonly class AddLineInput
         public string $qty,            // numeric string; never float — see docs/03-api.md
         public int $expectedVersion,
         public string $actorId,
+        /** @var list<string> ids as selected; repeats are meaningful ("double bacon") */
+        public array $modifierIds = [],
     ) {}
 }
