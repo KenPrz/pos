@@ -1546,26 +1546,23 @@ it('refuses once money has been taken, and out-of-range ways', function (): void
         ->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
 
-it('property: every money column sums exactly, for odd totals across 2..10 ways', function (): void {
+it('exactness on hostile numbers: odd totals, fractional qty', function (): void {
+    // 1089 does not divide by 2; 77×3=231 doesn't either; qty 3.000/2 = 1.500 each
     splitAdd($this, 1089);
     splitAdd($this, 77, '3');
     $original = Order::findOrFail($this->order->id);
+    $originalLineTotals = $original->lines()->orderBy('position')->pluck('line_total_cents')->all();
 
-    foreach (range(2, 10) as $ways) {
-        $response = $this->postJson("/api/v1/orders/{$this->order->id}/split", ['ways' => $ways], ($this->headers)($original->version));
-        if ($ways === 2) {
-            // first split consumes the order; re-create for subsequent iterations
-            $response->assertCreated();
-            $children = $response->json('data.orders');
-            expect(array_sum(array_column($children, 'total_cents')))->toBe($original->total_cents);
-            foreach ([0, 1] as $lineIx) {
-                $lineTotals = array_map(fn ($c) => $c['lines'][$lineIx]['line_total_cents'], $children);
-                expect(array_sum($lineTotals))->toBe(Order::withoutGlobalScopes()->findOrFail($this->order->id)->lines[$lineIx]->line_total_cents);
-            }
-            break;   // ponytail: one odd-total case here; the allocator's own M1 property
-                     // suite already sweeps parts 2..10 — re-proving it per-ways would test Money, not SplitOrder
-        }
+    $children = $this->postJson("/api/v1/orders/{$this->order->id}/split", ['ways' => 2], ($this->headers)($original->version))
+        ->assertCreated()->json('data.orders');
+
+    expect(array_sum(array_column($children, 'total_cents')))->toBe($original->total_cents);
+    foreach ([0, 1] as $lineIx) {
+        $lineTotals = array_map(fn ($c) => $c['lines'][$lineIx]['line_total_cents'], $children);
+        expect(array_sum($lineTotals))->toBe($originalLineTotals[$lineIx]);
     }
+    // ponytail: one hostile case here; Money::allocate's own M1 property suite already
+    // sweeps parts 2..10 — repeating it per-ways would test Money, not SplitOrder.
 });
 ```
 
