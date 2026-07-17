@@ -71,7 +71,7 @@ final class VoidOrder
                 'order_id' => $order->id, 'reason' => $in->reason,
             ], registerId: $in->registerId);
 
-            return $order->fresh(['lines']);
+            return $order->fresh(['lines', 'discounts']);
         });
     }
 }

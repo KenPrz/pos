@@ -96,7 +96,7 @@ final class TakePayment
                 'amount_cents' => $in->amountCents,
             ], registerId: $in->registerId);
 
-            return $payment->setRelation('order', $order->fresh(['lines']));
+            return $payment->setRelation('order', $order->fresh(['lines', 'discounts']));
         });
     }
 }

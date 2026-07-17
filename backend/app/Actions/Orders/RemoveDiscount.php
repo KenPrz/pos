@@ -53,7 +53,7 @@ final class RemoveDiscount
                 'order_id' => $order->id, 'discount_id' => $discountId,
             ], registerId: $in->registerId);
 
-            return $order->fresh(['lines']);
+            return $order->fresh(['lines', 'discounts']);
         });
     }
 }

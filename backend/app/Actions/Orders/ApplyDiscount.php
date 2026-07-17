@@ -75,7 +75,7 @@ final class ApplyDiscount
                 'order_id' => $order->id, 'discount_id' => $discount->id, 'reason' => $in->reason,
             ], registerId: $in->registerId);
 
-            return $order->fresh(['lines']);
+            return $order->fresh(['lines', 'discounts']);
         });
     }
 }

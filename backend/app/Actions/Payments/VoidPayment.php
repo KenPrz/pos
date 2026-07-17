@@ -74,7 +74,7 @@ final class VoidPayment
                 'amount_cents' => $payment->amount_cents,
             ], registerId: $in->registerId);
 
-            return $payment->setRelation('order', $order->fresh(['lines']));
+            return $payment->setRelation('order', $order->fresh(['lines', 'discounts']));
         });
     }
 }
