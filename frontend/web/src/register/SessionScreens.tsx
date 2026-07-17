@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, tokens, type StaffSession } from '../lib/api'
 

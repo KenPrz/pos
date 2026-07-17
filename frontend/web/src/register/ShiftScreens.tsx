@@ -1,8 +1,12 @@
+'use client'
+
+import { useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Shift, type ShiftCloseResult } from '../lib/api'
 import { cents, formatMoney } from '../lib/money'
 
-const CURRENCY = 'USD'   // display only; the server owns all arithmetic
+const CURRENCY = 'USD' // display only; the server owns all arithmetic
+const fm = (n: number) => formatMoney(cents(n), CURRENCY)
 
 /** Parse a human dollars-and-cents string to integer cents; '' -> null. */
 function toCents(input: string): number | null {
@@ -49,12 +53,51 @@ export function OpenShiftScreen({ onOpened, onSessionExpired }: {
   )
 }
 
+/**
+ * The drawer's whole day, from the ledgers. Fetched while the cashier is still counting
+ * (the close revokes this register's staff sessions, so afterwards would be a 401) —
+ * sales, refunds, and movements are already final by the time the drawer is being
+ * counted, so the running Z is the closing Z.
+ */
+function ZReportPanel({ z }: { z: ReturnType<typeof useZReport> }) {
+  if (z.isPending) return <p className="muted">Loading the Z-report…</p>
+  if (z.isError) return <p className="muted">Z-report unavailable — it can be pulled later from /reports/z.</p>
+
+  const r = z.data
+  return (
+    <div className="zreport">
+      <p className="picker-label">Z-report</p>
+      <dl>
+        {Object.entries(r.sales_by_driver).map(([driver, amount]) => (
+          <span key={driver} className="zrow"><dt>Sales — {driver}</dt><dd>{fm(amount)}</dd></span>
+        ))}
+        {Object.entries(r.refunds_by_driver).map(([driver, amount]) => (
+          <span key={driver} className="zrow"><dt>Refunds — {driver}</dt><dd>−{fm(amount)}</dd></span>
+        ))}
+        <span className="zrow"><dt>Paid in</dt><dd>{fm(r.movements.paid_in)}</dd></span>
+        <span className="zrow"><dt>Payouts</dt><dd>−{fm(r.movements.payout)}</dd></span>
+        <span className="zrow"><dt>Drops</dt><dd>−{fm(r.movements.drop)}</dd></span>
+        <span className="zrow"><dt>Orders closed</dt><dd>{r.orders_closed}</dd></span>
+        <span className="zrow"><dt>Orders voided</dt><dd>{r.orders_voided}</dd></span>
+      </dl>
+    </div>
+  )
+}
+
+function useZReport(shiftId: string) {
+  return useQuery({
+    queryKey: ['z-report', shiftId],
+    queryFn: () => api.zReport(shiftId),
+  })
+}
+
 export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired }: {
   shiftId: string
   onClosed: (result: ShiftCloseResult) => void
   onCancel: () => void
   onSessionExpired: () => void
 }) {
+  const zReport = useZReport(shiftId)   // while the session is still alive — see ZReportPanel
   const [counted, setCounted] = useState('')
   const [result, setResult] = useState<ShiftCloseResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -82,12 +125,17 @@ export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired
       <section className={`form-panel ${result.variance_cents === 0 ? 'ok' : 'bad'}`}>
         <h2>Drawer reconciled</h2>
         <dl>
-          <dt>Expected</dt><dd>{formatMoney(cents(result.expected_cash_cents), CURRENCY)}</dd>
-          <dt>Counted</dt><dd>{formatMoney(cents(result.shift.counted_cash_cents ?? 0), CURRENCY)}</dd>
-          <dt>Variance</dt><dd>{formatMoney(cents(result.variance_cents), CURRENCY)}</dd>
+          <dt>Expected</dt><dd>{fm(result.expected_cash_cents)}</dd>
+          <dt>Counted</dt><dd>{fm(result.shift.counted_cash_cents ?? 0)}</dd>
+          <dt>Variance</dt><dd>{fm(result.variance_cents)}</dd>
         </dl>
         {result.requires_approval && <p className="error">Variance exceeds the threshold — needs supervisor approval.</p>}
-        <button className="btn btn-submit" onClick={() => onClosed(result)}>Done</button>
+        <hr className="dotted-divider" />
+        <ZReportPanel z={zReport} />
+        <div className="btn-row">
+          <button className="btn btn-utility" onClick={() => window.print()}>Print</button>
+          <button className="btn btn-submit" onClick={() => onClosed(result)}>Done</button>
+        </div>
       </section>
     )
   }
