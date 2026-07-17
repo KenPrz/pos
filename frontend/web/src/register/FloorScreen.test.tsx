@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import { FloorScreen } from './FloorScreen'
 import { api, type Order } from '../lib/api'
@@ -11,6 +11,13 @@ import { api, type Order } from '../lib/api'
 // @testing-library/react's auto-cleanup never registers itself — do it by hand or DOM
 // from one test leaks into the next.
 afterEach(cleanup)
+
+// The mocked api.* fns are module-scoped (the vi.mock factory below runs once), so their
+// call history accumulates across tests unless cleared — bites the retry/key-reuse
+// assertion below, which reads mock.calls positionally.
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 // Module mock: keep everything real (ApiError, types, other api.* members) except the
 // three endpoints this screen actually calls, so `err instanceof ApiError` checks inside
@@ -149,7 +156,29 @@ describe('FloorScreen', () => {
     fireEvent.change(screen.getByPlaceholderText(/table/i), { target: { value: '9' } })
     fireEvent.click(screen.getByRole('button', { name: /open tab/i }))
 
-    await waitFor(() => expect(api.openOrder).toHaveBeenCalledWith({ tableRef: '9' }))
+    // idempotencyKey is minted when the pad opens (see FloorScreen's newTabKeyRef) so a
+    // lost response can't mint a twin order on retry — asserted as "some string", the
+    // exact UUID isn't the point.
+    await waitFor(() =>
+      expect(api.openOrder).toHaveBeenCalledWith({ tableRef: '9', idempotencyKey: expect.any(String) }),
+    )
     await waitFor(() => expect(onNewTab).toHaveBeenCalledWith(created))
+  })
+
+  it('reuses the same idempotency key across a retry after a failed submit, and mints a new one on the next pad-open', async () => {
+    vi.mocked(api.openOrders).mockResolvedValue([])
+    vi.mocked(api.openOrder).mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(makeOrder({ id: 'order-new' }))
+    renderFloor()
+
+    await screen.findByText('No open tabs.')
+    fireEvent.click(screen.getByRole('button', { name: /new tab/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open tab/i }))
+    await waitFor(() => expect(api.openOrder).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('button', { name: /open tab/i }))
+    await waitFor(() => expect(api.openOrder).toHaveBeenCalledTimes(2))
+
+    const [firstCall, secondCall] = vi.mocked(api.openOrder).mock.calls
+    expect(firstCall[0]?.idempotencyKey).toBe(secondCall[0]?.idempotencyKey)
   })
 })

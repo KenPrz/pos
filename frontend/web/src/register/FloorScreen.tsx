@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ApiError, api, type Order } from '../lib/api'
 import { cents, formatMoney } from '../lib/money'
 
@@ -51,6 +51,11 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
   const [transferOpenId, setTransferOpenId] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
+  // Minted once when the NEW TAB pad opens and reused across every submit attempt while
+  // it stays open — same idiom as SaleScreen's tender-phase key — so a lost response
+  // can't mint a twin order on retry. A fresh key is minted the next time the pad opens.
+  const newTabKeyRef = useRef<string | null>(null)
+
   const fail = (err: unknown, fallback: string) => {
     if (err instanceof ApiError && err.status === 401) return onSessionExpired()
     setError(err instanceof ApiError ? err.message : fallback)
@@ -69,8 +74,10 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
   }, [openOrders.error, onSessionExpired])
 
   const newTab = useMutation({
-    mutationFn: (tableRef: string) => api.openOrder({ tableRef: tableRef || undefined }),
+    mutationFn: (tableRef: string) =>
+      api.openOrder({ tableRef: tableRef || undefined, idempotencyKey: newTabKeyRef.current ?? undefined }),
     onSuccess: (order) => {
+      newTabKeyRef.current = null
       setNewTabOpen(false)
       setTableRefInput('')
       setError(null)
@@ -119,17 +126,27 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
       {newTabOpen ? (
         <form className="inline-reason" onSubmit={submitNewTab}>
           <input
-            autoFocus placeholder="Table (optional)…"
+            autoFocus placeholder="Table (optional)…" maxLength={20}
             value={tableRefInput} onChange={(e) => setTableRefInput(e.target.value)}
           />
           <button type="submit" className="btn btn-submit" disabled={newTab.isPending}>
             {newTab.isPending ? 'Opening…' : 'Open tab'}
           </button>
-          <button type="button" className="btn btn-secondary" onClick={() => setNewTabOpen(false)}>Cancel</button>
+          <button
+            type="button" className="btn btn-secondary"
+            onClick={() => { newTabKeyRef.current = null; setNewTabOpen(false) }}
+          >
+            Cancel
+          </button>
         </form>
       ) : (
         <div className="btn-row">
-          <button type="button" className="btn btn-submit" onClick={() => setNewTabOpen(true)}>New tab</button>
+          <button
+            type="button" className="btn btn-submit"
+            onClick={() => { newTabKeyRef.current = crypto.randomUUID(); setNewTabOpen(true) }}
+          >
+            New tab
+          </button>
         </div>
       )}
 

@@ -63,10 +63,20 @@ export function Register() {
 
   // A cached shift outliving the session that fetched it would let the next login
   // skip straight to selling on a closed drawer — evict it whenever a session ends.
+  //
+  // resumeOrder/activeOrder must be cleared here too: SaleScreen only stays mounted
+  // while stage is selling/floor/refunds/closing, so ending the session (stage → 'pin')
+  // unmounts it. A stale resumeOrder would otherwise re-seed the NEXT login's freshly
+  // mounted SaleScreen with the previous session's order (the seed effect keys on id,
+  // and a fresh mount has no prior id to compare against) — and a stale activeOrder
+  // would wrongly show that order as "in progress" on the floor, blocking every other
+  // card's resume for no reason.
   const endSession = () => {
     queryClient.removeQueries({ queryKey: ['current-shift'] })
     tokens.clearStaff()
     setUser(null)
+    setResumeOrder(null)
+    setActiveOrder(null)
     setStage({ name: 'pin' })
   }
 
