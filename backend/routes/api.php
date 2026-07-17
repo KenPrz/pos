@@ -18,6 +18,7 @@ use App\Http\Controllers\Orders\ReopenOrderController;
 use App\Http\Controllers\Orders\SetLinePrepStateController;
 use App\Http\Controllers\Orders\SetTableRefController;
 use App\Http\Controllers\Orders\SettleZeroOrderController;
+use App\Http\Controllers\Orders\TransferOrderController;
 use App\Http\Controllers\Orders\UpdateLineQtyController;
 use App\Http\Controllers\Orders\VoidLineController;
 use App\Http\Controllers\Orders\VoidOrderController;
@@ -106,6 +107,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/orders/{order}/void', VoidOrderController::class)->name('orders.void');
             Route::post('/orders/{order}/settle', SettleZeroOrderController::class)->name('orders.settle');
             Route::post('/orders/{order}/reopen', ReopenOrderController::class)->name('orders.reopen');
+            Route::post('/orders/{order}/transfer', TransferOrderController::class)->name('orders.transfer');
 
             Route::get('/reports/z', GetZReportController::class)->name('reports.z');
 
