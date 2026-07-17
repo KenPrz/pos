@@ -2,8 +2,9 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ApiError, api, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
+import { ApiError, api, tokens, type CatalogProduct, type CatalogVariant, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
 import { cents, formatMoney, parseCentsOrNull, subtract } from '../lib/money'
+import { MenuGrid } from './MenuGrid'
 
 const CURRENCY = 'USD'
 const fm = (n: number) => formatMoney(cents(n), CURRENCY)
@@ -38,6 +39,11 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const scanRef = useRef<HTMLInputElement>(null)
+  // Read once per render, not cached in state: SaleScreen only ever mounts after
+  // Register's own bootstrap effect has already resolved tokens client-side (it's gated
+  // behind stage transitions that themselves require a mount), so there's no SSR/hydration
+  // mismatch to guard against here the way Register.tsx has to for its own first paint.
+  const foodMode = tokens.registerInfo()?.mode === 'food'
 
   const fail = (err: unknown, fallback: string) => {
     if (err instanceof ApiError && err.status === 401) return onSessionExpired()
@@ -103,6 +109,46 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
     },
     onSettled: () => scanRef.current?.focus(),
   })
+
+  // Same idiom as `scan` above (implicit open-order-on-first-pick, keyed addLine so a
+  // lost-response retry replays instead of double-adding) — signature-keyed rather than
+  // barcode-keyed, since the grid has no barcode. A second tap of the *same* variant with
+  // the *same* modifiers right after one is still read as a fresh replay attempt, exactly
+  // like a rescanned barcode; a genuinely new order for the same item mints its own key
+  // once the previous attempt has settled (scanKeyRef's own comment explains why: a
+  // deliberate repeat pick must be a new line, not a merge).
+  const pickKeyRef = useRef<{ signature: string; key: string } | null>(null)
+
+  const pick = useMutation({
+    mutationFn: async ({ variant, modifierIds, key }: { variant: CatalogVariant; modifierIds?: string[]; key: string }) => {
+      let current = order
+      if (!current) {
+        current = await api.openOrder({ idempotencyKey: key })
+        setOrder(current)
+      }
+      return api.addLine(current, variant.id, '1', key, modifierIds)
+    },
+    onSuccess: (next) => {
+      pickKeyRef.current = null
+      setOrder(next)
+      setError(null)
+    },
+    onError: (err) => {
+      if (!(err instanceof ApiError && err.code === 'network_unreachable')) pickKeyRef.current = null
+      fail(err, 'Could not add item.')
+    },
+  })
+
+  const handleMenuPick = (variant: CatalogVariant, _product: CatalogProduct, modifierIds?: string[]) => {
+    if (pick.isPending) return
+    setError(null)
+    setNotice(null)
+    const signature = `${variant.id}:${(modifierIds ?? []).join(',')}`
+    const previous = pickKeyRef.current
+    const key = previous && previous.signature === signature ? previous.key : crypto.randomUUID()
+    pickKeyRef.current = { signature, key }
+    pick.mutate({ variant, modifierIds, key })
+  }
 
   const voidLine = useMutation({
     mutationFn: ({ lineId, reason }: { lineId: string; reason: string }) =>
@@ -274,18 +320,38 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
         <button type="button" className="btn btn-secondary" onClick={onCloseShift}>Close shift</button>
       </header>
 
-      <form onSubmit={submitScan}>
+      <form onSubmit={submitScan} className={foodMode ? 'scan-form-compact' : undefined}>
         <input
           ref={scanRef} autoFocus placeholder="Scan or type a barcode…"
           value={barcode} onChange={(e) => setBarcode(e.target.value)}
         />
       </form>
 
+      {/* Food mode keeps the scan field above (a case of Cheddar arrives with a barcode
+          too), but the grid — not the barcode reader — is the everyday food-order idiom.
+          It reuses the exact keyed addLine/open-order-implicit path the scan form uses. */}
+      {foodMode && phase.name === 'scanning' && <MenuGrid onPick={handleMenuPick} />}
+
       {lines.length > 0 && (
         <div className="cart">
           {lines.filter((l) => !l.voided_at).map((l) => (
             <div className="cart-row" key={l.id}>
-              <span className="cart-row-name">{l.name}</span>
+              {/* A <div>, not a <span>: it wraps the modifier <ul> below, and <ul> is
+                  flow content — invalid inside a <span>, which only permits phrasing
+                  content. */}
+              <div className="cart-row-main">
+                <span className="cart-row-name">{l.name}</span>
+                {l.modifiers && l.modifiers.length > 0 && (
+                  <ul className="cart-row-modifiers">
+                    {l.modifiers.map((m, i) => (
+                      <li key={i}>
+                        {m.name}
+                        {m.price_delta_cents !== 0 && <span className="num"> {fm(m.price_delta_cents)}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               {l.qty !== '1.000' && <span className="cart-row-qty">{l.qty}</span>}
               <span className="cart-row-price num">{fm(l.line_total_cents)}</span>
               {can('order.line.void') && phase.name === 'scanning' && voidingLineId !== l.id && (
