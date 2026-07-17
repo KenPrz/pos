@@ -11,7 +11,7 @@ Versions verified against the registries on 2026-07-15, not from memory.
 | API auth | Laravel Sanctum | 4.3 |
 | Database | PostgreSQL | 18 (`postgres:18-alpine`) |
 | Frontend | React + TypeScript | 19.2 / 7.0 |
-| Bundler | Vite | 8.1 |
+| Frontend framework | Next.js (app router) + TanStack React Query | 16 |
 | Local infra | Docker Compose | 29.1 |
 
 Notes on the less obvious picks:
@@ -23,6 +23,9 @@ Notes on the less obvious picks:
   bug the escape hatch is pinning to 5.x — no source changes required.
 - **Sanctum, not Passport.** We're issuing tokens to our own first-party terminals. There
   is no third-party OAuth client to authorize, so Passport is pure overhead.
+- **Next.js 16 replaced Vite at M4**, mid-milestone, at the owner's direction. React Query
+  came with it for server-state caching. The port changed what renders the API responses,
+  not the responses themselves — the API client contract held throughout.
 
 ## Topology
 
@@ -47,9 +50,11 @@ the request. Receipt emails and report generation are the first things that will
 queue; when that day comes, add Redis and Horizon. Adding it now would be scaffolding
 with nothing to run on it.
 
-`frontend/web/` is a single SPA. Cashier and back-office are routes within it, separated
-by permission, not separate builds — the code they share (money formatting, catalog types,
-the API client) far outweighs what they don't.
+`frontend/web/` is a Next.js app serving one client-boundary register under a server
+shell; `/api` rewrites replace the Vite dev proxy (same single-origin story). Cashier and
+back-office are routes within it, separated by permission, not separate builds — the code
+they share (money formatting, catalog types, the API client) far outweighs what they
+don't.
 
 `frontend/native/` is reserved for a **desktop shell** (Electron or Tauri) and is empty in
 v1. It is not a second frontend: the plan is that it hosts the same SPA and adds the two

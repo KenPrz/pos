@@ -8,7 +8,7 @@ this file only covers how to run things.
 
 ## Stack
 
-Laravel 13.20 (PHP 8.5) · PostgreSQL 18 · React 19 + TypeScript 7 + Vite 8 · Docker Compose
+Laravel 13.20 (PHP 8.5) · PostgreSQL 18 · React 19 + TypeScript 7 on Next.js 16 + React Query · Docker Compose
 
 ## Layout
 
@@ -43,7 +43,7 @@ php artisan migrate
 php artisan serve
 ```
 
-**3. SPA** — http://127.0.0.1:5173
+**3. SPA** — http://127.0.0.1:5174
 
 ```bash
 cd frontend/web
@@ -51,16 +51,16 @@ npm install
 npm run dev
 ```
 
-Vite proxies `/api` to the API, so the browser sees one origin and CORS never comes up.
+Next rewrites `/api` to the API, so the browser sees one origin and CORS never comes up.
 
-Check it works: <http://127.0.0.1:5173> should say **System healthy** and print the
+Check it works: <http://127.0.0.1:5174> should say **System healthy** and print the
 Postgres version.
 
 ## Tests
 
 ```bash
 cd backend && ./vendor/bin/pest         # needs Postgres up (creates/uses pos_test)
-cd frontend/web && npm test && npx tsc -b --force && npm run build
+cd frontend/web && npm test && npm run typecheck && npm run build
 ```
 
 The test database is created once:
@@ -123,7 +123,11 @@ RBAC. Seed with `php artisan migrate:fresh --seed`; it prints development PINs.
 **M3 complete** — the vertical slice: scan → cart → cash → change → receipt, plus shift
 open/close with variance. Seeder prints development device tokens for the register SPA.
 
-Next: **M4 — retail complete** (`docs/06-roadmap.md`).
+**M4 complete** — retail: voids, discounts, refunds with restock, external card, cash
+movements, stock ops, Z-report; register UI restyled to DESIGN.md console chrome and
+ported to Next.js + React Query.
+
+Next: **M5 — food service** (`docs/06-roadmap.md`).
 
 ### Gotchas that will cost you an afternoon
 
@@ -142,3 +146,7 @@ Next: **M4 — retail complete** (`docs/06-roadmap.md`).
   `->refresh()`.
 - **`jsonb` reorders keys** — idempotency replays are content-identical, not
   byte-identical (`toEqual`, never `toBe`).
+- **Next's type-check step can't drive TypeScript 7** — it's disabled in
+  `next.config.ts`; `npm run typecheck` is the gate.
+- **The Z-report is fetched before close** — closing revokes the register's staff
+  sessions.
