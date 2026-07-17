@@ -20,6 +20,7 @@ final class TakePaymentResource extends JsonResource
                 'amount_cents' => $this->amount_cents,
                 'tendered_cents' => $this->tendered_cents,
                 'change_cents' => $this->change_cents,
+                'reference' => $this->reference,
             ],
             'order' => new OrderResource($this->whenLoaded('order')),
         ];
