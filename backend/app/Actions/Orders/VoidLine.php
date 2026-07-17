@@ -68,7 +68,7 @@ final class VoidLine
                 'order_id' => $order->id, 'reason' => $in->reason, 'sku' => $line->sku_snapshot,
             ], registerId: $in->registerId);
 
-            return $order->fresh(['lines']);
+            return $order->fresh(['lines', 'discounts']);
         });
     }
 }

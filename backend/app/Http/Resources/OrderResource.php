@@ -29,6 +29,7 @@ final class OrderResource extends JsonResource
             'paid_cents' => $this->paid_cents,
             'version' => $this->version,
             'lines' => OrderLineResource::collection($this->whenLoaded('lines')),
+            'discounts' => OrderDiscountResource::collection($this->whenLoaded('discounts')),
         ];
     }
 }

@@ -17,7 +17,7 @@ final class GetOrder
 
         return Order::whereKey($orderId)
             ->where('location_id', $locationId)
-            ->with('lines')
+            ->with(['lines', 'discounts'])
             ->firstOrFail();
     }
 }
