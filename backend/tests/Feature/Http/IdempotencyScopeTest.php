@@ -11,10 +11,13 @@ use App\Models\ProductVariant;
 use Illuminate\Support\Str;
 
 /*
-| The idempotency key hash folds in the request path (EnsureIdempotency), so a key
-| minted once and reused across two different orders must execute twice, not collide —
-| while replaying the *same* key against the *same* order must still short-circuit.
-| M4 triage item: these two invariants were previously untested together.
+| idempotency_keys.key is the sole primary key (docs/02-data-model.md) — global, not
+| scoped by path. So a key minted once and reused across two DIFFERENT orders is a
+| collision: the stored request_hash (method + path + body) won't match the second
+| request's hash, and per docs/01-architecture.md ("Idempotency", case 3) that's a
+| 409, not a second execution. Replaying the *same* key against the *same* order,
+| by contrast, must short-circuit to the stored response. M4 triage item: these two
+| invariants were previously untested together.
 */
 
 beforeEach(function (): void {
