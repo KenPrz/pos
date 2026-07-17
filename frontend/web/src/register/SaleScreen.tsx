@@ -19,9 +19,17 @@ type Phase =
   | { name: 'tender'; key: string }
   | { name: 'done'; outcome: PaymentOutcome; receipt: Receipt | null }
 
-export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: {
+export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onCloseShift, onSessionExpired }: {
   can: (permission: string) => boolean
   registerId: string
+  // Set by the floor screen (Task 12) when staff resume a tab: seeds `order` on the
+  // sale screen that stays mounted-hidden underneath it. Identity-compared, not
+  // deep-compared — a fresh object with the same id (e.g. a floor re-poll) must NOT
+  // re-seed and stomp whatever the till has done to the order since.
+  initialOrder?: Order
+  // Lifted so the floor screen can tell "my own tab, already in progress elsewhere"
+  // apart from every other card and disable resuming it out from under itself.
+  onOrderChange?: (order: Order | null) => void
   onCloseShift: () => void
   onSessionExpired: () => void
 }) {
@@ -44,6 +52,26 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
   // behind stage transitions that themselves require a mount), so there's no SSR/hydration
   // mismatch to guard against here the way Register.tsx has to for its own first paint.
   const foodMode = tokens.registerInfo()?.mode === 'food'
+
+  // Resuming a tab from the floor screen (Task 12): seed `order` whenever a NEW
+  // initialOrder arrives. Keyed on id, not object identity — the floor list re-polls
+  // every 10s and hands a fresh Order object with the SAME id on every tick; only an
+  // actual "you tapped a different card" transition should reset scanning/phase here.
+  const initialOrderId = initialOrder?.id ?? null
+  useEffect(() => {
+    if (!initialOrder) return
+    setOrder(initialOrder)
+    setPhase({ name: 'scanning' })
+    setError(null)
+    setNotice(`Resumed order ${initialOrder.number}.`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed on the id (see comment above), not the initialOrder object
+  }, [initialOrderId])
+
+  // The floor screen (mounted alongside this, hidden) needs to know whether a DIFFERENT
+  // order is already in progress here, to disable resuming other tabs out from under it.
+  useEffect(() => {
+    onOrderChange?.(order)
+  }, [order, onOrderChange])
 
   const fail = (err: unknown, fallback: string) => {
     if (err instanceof ApiError && err.status === 401) return onSessionExpired()
@@ -163,6 +191,20 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
       setError(null)
     },
     onError: (err) => fail(err, 'Void failed.'),
+  })
+
+  // Kitchen prep chips (Task 12, food mode only). No If-Match: the server doesn't bump
+  // the order's version for a prep-state change (SetLinePrepStateRequest carries none —
+  // see api.ts's setLinePrep comment), so the response is applied directly.
+  const PREP_CYCLE = { pending: 'in_progress', in_progress: 'ready', ready: 'pending' } as const
+  const setPrep = useMutation({
+    mutationFn: ({ lineId, state }: { lineId: string; state: 'pending' | 'in_progress' | 'ready' }) =>
+      api.setLinePrep((order as Order).id, lineId, state),
+    onSuccess: (next) => {
+      setOrder(next)
+      setError(null)
+    },
+    onError: (err) => fail(err, 'Could not update prep status.'),
   })
 
   const voidOrder = useMutation({
@@ -361,6 +403,19 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
               </div>
               {l.qty !== '1.000' && <span className="cart-row-qty">{l.qty}</span>}
               <span className="cart-row-price num">{fm(l.line_total_cents)}</span>
+              {/* Prep chip: pending → in_progress → ready → pending, one tap per step. Lines
+                  with no prep tracking (prep_state null — e.g. a bagged retail add-on rung
+                  up on a food-mode till) get no chip at all. */}
+              {foodMode && l.prep_state !== null && phase.name === 'scanning' && (
+                <button
+                  type="button"
+                  className={`chip prep-chip prep-${l.prep_state}`}
+                  disabled={setPrep.isPending}
+                  onClick={() => setPrep.mutate({ lineId: l.id, state: PREP_CYCLE[l.prep_state as 'pending' | 'in_progress' | 'ready'] })}
+                >
+                  {l.prep_state === 'pending' ? 'Pending' : l.prep_state === 'in_progress' ? 'Cooking' : 'Ready'}
+                </button>
+              )}
               {can('order.line.void') && phase.name === 'scanning' && voidingLineId !== l.id && (
                 <button type="button" className="btn btn-void btn-chip" onClick={() => { setVoidingLineId(l.id); setVoidReason('') }}>
                   Void

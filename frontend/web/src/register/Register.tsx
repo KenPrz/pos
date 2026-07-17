@@ -2,11 +2,12 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { ApiError, api, tokens, type Shift, type StaffSession } from '../lib/api'
+import { ApiError, api, tokens, type Order, type Shift, type StaffSession } from '../lib/api'
 import { PinScreen, SetupScreen } from './SessionScreens'
 import { CloseShiftScreen, OpenShiftScreen } from './ShiftScreens'
 import { SaleScreen } from './SaleScreen'
 import { RefundScreen } from './RefundScreen'
+import { FloorScreen } from './FloorScreen'
 
 type StaffUser = StaffSession['user']
 
@@ -17,6 +18,7 @@ type Stage =
   | { name: 'loading-shift' }
   | { name: 'open-shift' }
   | { name: 'selling'; shift: Shift }
+  | { name: 'floor'; shift: Shift }
   | { name: 'refunds'; shift: Shift }
   | { name: 'closing'; shift: Shift }
 
@@ -28,6 +30,7 @@ const SECTION_LABEL: Record<Stage['name'], string> = {
   'loading-shift': 'Loading',
   'open-shift': 'Open Shift',
   selling: 'Register',
+  floor: 'Floor',
   refunds: 'Refunds',
   closing: 'Close Shift',
 }
@@ -37,10 +40,24 @@ export function Register() {
   // so the machine boots neutral and resolves its real stage after mount.
   const [stage, setStage] = useState<Stage>({ name: 'booting' })
   const [user, setUser] = useState<StaffUser | null>(null)
+  // Whether THIS register is food mode — decides the post-shift-resolve landing stage
+  // (floor vs. selling) and whether the TABS/REGISTER toggle appears at all. Lives in
+  // state, not read from tokens.registerInfo() at render time, for the same SSR reason
+  // `stage` does: localStorage doesn't exist while Next prerenders this tree.
+  const [foodMode, setFoodMode] = useState(false)
+  // The order in progress on the (mounted-hidden) sale screen, if any — fed by
+  // SaleScreen's onOrderChange so the floor screen can disable resuming a DIFFERENT
+  // tab out from under an in-progress sale (Task 12).
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null)
+  // Set by FloorScreen's onResume/onNewTab; handed to SaleScreen as `initialOrder` to
+  // seed it, then the stage flips to `selling` so the (already-mounted) sale screen
+  // becomes visible.
+  const [resumeOrder, setResumeOrder] = useState<Order | null>(null)
   const queryClient = useQueryClient()
 
   useEffect(() => {
     setUser(tokens.staffUser())
+    setFoodMode(tokens.registerInfo()?.mode === 'food')
     setStage(!tokens.device() ? { name: 'setup' } : !tokens.staff() ? { name: 'pin' } : { name: 'loading-shift' })
   }, [])
 
@@ -66,14 +83,16 @@ export function Register() {
   useEffect(() => {
     if (stage.name !== 'loading-shift') return
     if (shiftQuery.data) {
-      setStage({ name: 'selling', shift: shiftQuery.data.shift })
+      // Food-mode registers land on the floor after shift resolve; retail is unchanged
+      // (straight to selling — M5's floor/tab machinery is food-only).
+      setStage(foodMode ? { name: 'floor', shift: shiftQuery.data.shift } : { name: 'selling', shift: shiftQuery.data.shift })
       return
     }
     const err = shiftQuery.error
     if (err instanceof ApiError && err.status === 404) setStage({ name: 'open-shift' })
     else if (err instanceof ApiError && err.status === 401) sessionExpired()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- endSession is identity-stable in behavior; listing it would re-run on every render
-  }, [stage.name, shiftQuery.data, shiftQuery.error])
+  }, [stage.name, shiftQuery.data, shiftQuery.error, foodMode])
 
   const clockOut = async () => {
     await api.staffLogout()
@@ -82,7 +101,7 @@ export function Register() {
 
   const permissions = user?.permissions ?? []
   const can = (permission: string) => user !== null && (user.is_admin || permissions.includes(permission))
-  const onShift = stage.name === 'selling' || stage.name === 'refunds'
+  const onShift = stage.name === 'selling' || stage.name === 'refunds' || stage.name === 'floor'
 
   return (
     <main className="shell">
@@ -98,6 +117,19 @@ export function Register() {
             }
           >
             {stage.name === 'refunds' ? 'Register' : 'Refunds'}
+          </button>
+        )}
+        {/* Food mode only — mirrors the Refunds toggle idiom above. Retail registers
+            never see the floor at all (M5's tab/table machinery is food-only). */}
+        {onShift && foodMode && (
+          <button
+            type="button"
+            className="carbon-bar-link"
+            onClick={() =>
+              setStage(stage.name === 'floor' ? { name: 'selling', shift: stage.shift } : { name: 'floor', shift: stage.shift })
+            }
+          >
+            {stage.name === 'floor' ? 'Register' : 'Tabs'}
           </button>
         )}
         {user && onShift && (
@@ -117,6 +149,7 @@ export function Register() {
           <PinScreen
             onLoggedIn={(session) => {
               setUser(session.user)
+              setFoodMode(session.register.mode === 'food')
               setStage({ name: 'loading-shift' })
             }}
             onDeviceInvalid={() => setStage({ name: 'setup' })}
@@ -125,18 +158,37 @@ export function Register() {
         {stage.name === 'open-shift' && (
           <OpenShiftScreen onOpened={(shift) => setStage({ name: 'selling', shift })} onSessionExpired={sessionExpired} />
         )}
-        {/* The sale screen stays MOUNTED (hidden) while on Refunds or Close Shift: its
-            in-progress order lives in component state, and unmounting it would strand
-            an open order server-side with no way back to it from the register. */}
-        {(stage.name === 'selling' || stage.name === 'refunds' || stage.name === 'closing') && (
+        {/* The sale screen stays MOUNTED (hidden) while on Refunds, the Floor, or Close
+            Shift: its in-progress order lives in component state, and unmounting it
+            would strand an open order server-side with no way back to it from the
+            register. */}
+        {(stage.name === 'selling' || stage.name === 'floor' || stage.name === 'refunds' || stage.name === 'closing') && (
           <div hidden={stage.name !== 'selling'}>
             <SaleScreen
               can={can}
               registerId={stage.shift.register_id}
+              initialOrder={resumeOrder ?? undefined}
+              onOrderChange={setActiveOrder}
               onCloseShift={() => setStage({ name: 'closing', shift: stage.shift })}
               onSessionExpired={sessionExpired}
             />
           </div>
+        )}
+        {stage.name === 'floor' && (
+          <FloorScreen
+            registerId={stage.shift.register_id}
+            canTransfer={can('order.transfer')}
+            activeOrderId={activeOrder?.id ?? null}
+            onResume={(order) => {
+              setResumeOrder(order)
+              setStage({ name: 'selling', shift: stage.shift })
+            }}
+            onNewTab={(order) => {
+              setResumeOrder(order)
+              setStage({ name: 'selling', shift: stage.shift })
+            }}
+            onSessionExpired={sessionExpired}
+          />
         )}
         {stage.name === 'refunds' && (
           <RefundScreen onDone={() => setStage({ name: 'selling', shift: stage.shift })} onSessionExpired={sessionExpired} />

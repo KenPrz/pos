@@ -838,3 +838,114 @@ form > *:not(:last-child) {
   font-variant-numeric: tabular-nums;
   color: var(--color-ink);
 }
+
+/* ── M5 additions: floor view (tab cards, new tab, transfer, prep chips) ── */
+
+.floor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.tab-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+/* A big platinum plate-button — the "card" IS the resume affordance, tapped directly
+   (no separate Resume button), same touch-first idiom as `.menu-tile`. */
+.tab-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xxs);
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-platinum);
+  border: none;
+  border-top: 1px solid #fff;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tab-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The tab currently in progress on the (hidden) sale screen — wayfinding, not an
+   action, so it's the same periwinkle "active" tone as `.menu-rail-tab.active`. */
+.tab-card.active {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+}
+
+.tab-card-ref {
+  font: bold 16px/1.2 Arial, Helvetica, sans-serif;
+  color: var(--color-ink-soft);
+}
+
+.tab-card-meta {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink);
+  opacity: 0.75;
+}
+
+.tab-card-due {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.tab-card-hint {
+  margin: 0;
+  padding: 0 var(--space-xs);
+  font-size: 10px;
+  color: var(--color-ink-soft);
+}
+
+.tab-card-transfer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.transfer-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--color-periwinkle);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+}
+
+/* Prep chips (cart lines, food mode) — reuse `.chip`'s hit area but colored per kitchen
+   state rather than a plain selected/unselected toggle. Cool for "not started yet" and
+   "being made" (state, not action); signal orange only at `ready`, where tapping means
+   "send it out" — the one point warm color's forward-motion rule genuinely applies. */
+.prep-chip {
+  margin-left: var(--space-sm);
+}
+
+.prep-chip.prep-pending {
+  background: var(--color-surface);
+}
+
+.prep-chip.prep-in_progress {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+}
+
+.prep-chip.prep-ready {
+  background: var(--color-signal);
+  color: var(--color-on-primary);
+  border-color: var(--color-signal);
+}
