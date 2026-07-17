@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Actions\Orders;
 
 use App\Domain\Audit\AuditLogger;
-use App\Exceptions\Domain\OrderClosed;
+use App\Domain\Orders\OpenOrderLock;
 use App\Exceptions\Domain\OrderNotZero;
-use App\Exceptions\Domain\OrderVersionConflict;
 use App\Models\Order;
 use App\Models\OrderStatus;
-use App\Models\Register;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,24 +22,15 @@ use Illuminate\Support\Facades\DB;
  */
 final class SettleZeroOrder
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly OpenOrderLock $lock,
+        private readonly AuditLogger $audit,
+    ) {}
 
     public function execute(SettleZeroOrderInput $in): Order
     {
         return DB::transaction(function () use ($in): Order {
-            $locationId = Register::findOrFail($in->registerId)->location_id;
-
-            $order = Order::whereKey($in->orderId)
-                ->where('location_id', $locationId)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if ($order->status !== OrderStatus::Open) {
-                throw new OrderClosed($order->id, $order->status->value);
-            }
-            if ($order->version !== $in->expectedVersion) {
-                throw new OrderVersionConflict($order->id, $in->expectedVersion, $order->version);
-            }
+            $order = $this->lock->acquire($in->orderId, $in->registerId, $in->expectedVersion);
 
             if ($order->total_cents !== 0 || $order->paid_cents !== 0) {
                 throw new OrderNotZero($order->id, $order->total_cents - $order->paid_cents);

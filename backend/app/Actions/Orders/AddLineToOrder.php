@@ -6,16 +6,12 @@ namespace App\Actions\Orders;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Money\Quantity;
+use App\Domain\Orders\OpenOrderLock;
 use App\Domain\Pricing\OrderTotals;
 use App\Domain\Pricing\PriceResolver;
 use App\Domain\Stock\StockLedger;
-use App\Exceptions\Domain\OrderClosed;
-use App\Exceptions\Domain\OrderVersionConflict;
-use App\Models\Order;
 use App\Models\OrderLine;
-use App\Models\OrderStatus;
 use App\Models\ProductVariant;
-use App\Models\Register;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -28,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 final class AddLineToOrder
 {
     public function __construct(
+        private readonly OpenOrderLock $lock,
         private readonly PriceResolver $prices,
         private readonly StockLedger $stock,
         private readonly OrderTotals $totals,
@@ -37,21 +34,7 @@ final class AddLineToOrder
     public function execute(AddLineInput $in): OrderLine
     {
         return DB::transaction(function () use ($in): OrderLine {
-            // Another location's order is a 404, not a bypass — teams scope permission
-            // checks, but record fetches must still be location-scoped by hand (docs/05-rbac.md).
-            $locationId = Register::findOrFail($in->registerId)->location_id;
-            $order = Order::whereKey($in->orderId)
-                ->where('location_id', $locationId)
-                ->lockForUpdate()->firstOrFail();
-
-            if ($order->status !== OrderStatus::Open) {
-                throw new OrderClosed($order->id, $order->status->value);
-            }
-
-            // Inside the transaction, after the lock — never in the FormRequest.
-            if ($order->version !== $in->expectedVersion) {
-                throw new OrderVersionConflict($order->id, $in->expectedVersion, $order->version);
-            }
+            $order = $this->lock->acquire($in->orderId, $in->registerId, $in->expectedVersion);
 
             $variant = ProductVariant::query()->active()->with(['product', 'taxRate'])->findOrFail($in->variantId);
             $price = $this->prices->for($variant, $order->location_id);
