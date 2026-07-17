@@ -12,15 +12,21 @@
  */
 import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SaleScreen } from './SaleScreen'
 import { api, type Order } from '../lib/api'
 
 afterEach(cleanup)
 
-// Same idiom as FloorScreen.test.tsx: keep everything real except the one endpoint
-// SaleScreen's recovery query calls on every mount.
+// Mocked api.* fns are module-scoped (the vi.mock factory below runs once); clear call
+// history between tests the same way FloorScreen.test.tsx does.
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+// Same idiom as FloorScreen.test.tsx: keep everything real except the endpoints
+// SaleScreen's recovery query and the split flow call.
 vi.mock('../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/api')>()
   return {
@@ -28,6 +34,9 @@ vi.mock('../lib/api', async (importOriginal) => {
     api: {
       ...actual.api,
       findOrders: vi.fn(),
+      splitOrder: vi.fn(),
+      takePayment: vi.fn(),
+      receipt: vi.fn(),
     },
   }
 })
@@ -78,5 +87,69 @@ describe('SaleScreen resume seeding', () => {
     renderSale(order)
 
     expect(await screen.findByText(`Order ${order.number}`)).toBeInTheDocument()
+  })
+})
+
+describe('SaleScreen split flow', () => {
+  it('splits into checks, advances through each child on payment, and lands on a combined done plate', async () => {
+    vi.mocked(api.findOrders).mockResolvedValue([])
+    const parent: Order = { ...order, id: 'parent-1', number: 'N-0001', total_cents: 1000, due_cents: 1000, paid_cents: 0, version: 1 }
+    const childA: Order = { ...order, id: 'child-a', number: 'N-0002', total_cents: 500, due_cents: 500, paid_cents: 0, version: 0 }
+    const childB: Order = { ...order, id: 'child-b', number: 'N-0003', total_cents: 500, due_cents: 500, paid_cents: 0, version: 0 }
+    vi.mocked(api.splitOrder).mockResolvedValue([childA, childB])
+    vi.mocked(api.takePayment)
+      .mockResolvedValueOnce({
+        payment: { id: 'pay-a', driver: 'cash', status: 'captured', amount_cents: 500, tendered_cents: 500, change_cents: 0 },
+        order: { ...childA, paid_cents: 500, due_cents: 0, status: 'closed' },
+      })
+      .mockResolvedValueOnce({
+        payment: { id: 'pay-b', driver: 'cash', status: 'captured', amount_cents: 500, tendered_cents: 500, change_cents: 0 },
+        order: { ...childB, paid_cents: 500, due_cents: 0, status: 'closed' },
+      })
+    vi.mocked(api.receipt).mockRejectedValue(new Error('receipt unavailable in this test'))
+
+    renderSale(parent)
+    await screen.findByText('Order N-0001')
+
+    fireEvent.click(screen.getByText(/Pay —/))
+    fireEvent.click(screen.getByRole('button', { name: 'Split bill' }))
+    fireEvent.click(screen.getByRole('button', { name: 'GO' }))
+
+    await waitFor(() => expect(api.splitOrder).toHaveBeenCalledWith(parent, 2, expect.any(String)))
+    await screen.findByText('Check 1')
+    expect(screen.getByText('Check 2')).toBeInTheDocument()
+    await screen.findByText('Order N-0002')
+
+    fireEvent.change(screen.getByLabelText(/cash tendered/i), { target: { value: '5.00' } })
+    fireEvent.click(screen.getByRole('button', { name: /take payment/i }))
+
+    await waitFor(() => expect(screen.getByText('Order N-0003')).toBeInTheDocument())
+    expect(api.takePayment).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(screen.getByLabelText(/cash tendered/i), { target: { value: '5.00' } })
+    fireEvent.click(screen.getByRole('button', { name: /take payment/i }))
+
+    expect(await screen.findByText(/All checks settled — 2 checks/)).toBeInTheDocument()
+    expect(api.takePayment).toHaveBeenCalledTimes(2)
+    expect(screen.getByText('Check 1 — order N-0002')).toBeInTheDocument()
+    expect(screen.getByText('Check 2 — order N-0003')).toBeInTheDocument()
+  })
+
+  it('hides the SPLIT control once a child is being tendered (no re-splitting a check)', async () => {
+    vi.mocked(api.findOrders).mockResolvedValue([])
+    const parent: Order = { ...order, id: 'parent-1', number: 'N-0001', total_cents: 1000, due_cents: 1000, paid_cents: 0, version: 1 }
+    const childA: Order = { ...order, id: 'child-a', number: 'N-0002', total_cents: 500, due_cents: 500, paid_cents: 0, version: 0 }
+    const childB: Order = { ...order, id: 'child-b', number: 'N-0003', total_cents: 500, due_cents: 500, paid_cents: 0, version: 0 }
+    vi.mocked(api.splitOrder).mockResolvedValue([childA, childB])
+
+    renderSale(parent)
+    await screen.findByText('Order N-0001')
+
+    fireEvent.click(screen.getByText(/Pay —/))
+    fireEvent.click(screen.getByRole('button', { name: 'Split bill' }))
+    fireEvent.click(screen.getByRole('button', { name: 'GO' }))
+
+    await screen.findByText('Order N-0002')
+    expect(screen.queryByRole('button', { name: 'Split bill' })).not.toBeInTheDocument()
   })
 })

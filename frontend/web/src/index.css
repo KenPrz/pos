@@ -949,3 +949,99 @@ form > *:not(:last-child) {
   color: var(--color-on-primary);
   border-color: var(--color-signal);
 }
+
+/* ── M5 additions: split flow (Task 13) ── */
+
+/* One chip per check. Cool periwinkle for the child currently being tendered — state,
+   not action, same vocabulary as `.tab-card.active` — never signal orange, which this
+   file reserves for forward-motion buttons only. */
+.split-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.split-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xxs);
+  min-width: 88px;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-platinum);
+  border-top: 1px solid #fff;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-sm);
+}
+
+.split-chip.active {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+}
+
+.split-chip.settled {
+  opacity: 0.6;
+}
+
+.split-chip-num {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink-soft);
+}
+
+.split-chip-due {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.split-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--color-periwinkle);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  margin: var(--space-sm) 0;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.stepper-value {
+  min-width: 24px;
+  text-align: center;
+  font: bold 16px/1 Arial, Helvetica, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.split-preview {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.split-receipt {
+  margin: var(--space-md) 0;
+  padding-top: var(--space-md);
+  border-top: 1px dotted var(--color-muted-indigo);
+}
+
+.split-receipt > header.row {
+  align-items: center;
+}
+
+/* The blind-count hint below the count form — same muted tone as everything else in
+   `.muted`, just calling out that the masked figure specifically isn't a typo. */
+.blind-count span {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
+}

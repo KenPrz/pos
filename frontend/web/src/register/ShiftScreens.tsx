@@ -1,12 +1,17 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
-import { ApiError, api, type Shift, type ShiftCloseResult } from '../lib/api'
+import { ApiError, api, tokens, type Shift, type ShiftCloseResult } from '../lib/api'
 import { cents, formatMoney, parseCentsOrNull } from '../lib/money'
 
 const CURRENCY = 'USD' // display only; the server owns all arithmetic
 const fm = (n: number) => formatMoney(cents(n), CURRENCY)
+
+// The blind-count mask (Task 13): a cashier who can see the expected figure before
+// counting is primed to just type it back rather than count. Presentation only — the
+// Z-report is fetched exactly as before, this just controls whether the number is drawn.
+const MASK = '•••••'
 
 export function OpenShiftScreen({ onOpened, onSessionExpired }: {
   onOpened: (shift: Shift) => void
@@ -84,8 +89,9 @@ function useZReport(shiftId: string) {
   })
 }
 
-export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired }: {
+export function CloseShiftScreen({ shiftId, can, onClosed, onCancel, onSessionExpired }: {
   shiftId: string
+  can: (permission: string) => boolean
   onClosed: (result: ShiftCloseResult) => void
   onCancel: () => void
   onSessionExpired: () => void
@@ -98,17 +104,43 @@ export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired
     if (zReport.error instanceof ApiError && zReport.error.status === 401) onSessionExpired()
   }, [zReport.error, onSessionExpired])
   const [result, setResult] = useState<ShiftCloseResult | null>(null)
+  // Blind count (Task 13): presentation state only, flipped the moment the close result
+  // comes back — never gates the Z-report fetch above, which still runs at mount exactly
+  // as before (the session dies at close, so it has to happen while it's still alive).
+  const [revealed, setRevealed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Minted once for the life of this screen and reused across submits, so a re-click
   // after a lost-response timeout replays the same close instead of risking a second one.
   const [idempotencyKey] = useState(() => crypto.randomUUID())
+
+  // A supervisor sign-off on the result plate's variance, once `result.requires_approval`
+  // comes back true. Tracked separately from `result.shift` (which is a snapshot from the
+  // close, before any approval) so a successful approve can swap the warning for a line
+  // naming who signed off without re-fetching anything.
+  const [approvedShift, setApprovedShift] = useState<Shift | null>(null)
+  const approveVariance = useMutation({
+    mutationFn: () => api.approveVariance(shiftId),
+    onSuccess: (shift) => {
+      setApprovedShift(shift)
+      setError(null)
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 401) {
+        onSessionExpired()
+        return
+      }
+      setError(err instanceof ApiError ? err.message : 'Could not approve the variance.')
+    },
+  })
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const amount = parseCentsOrNull(counted)
     if (amount === null) return setError('Enter the counted cash, like 487.50')
     try {
-      setResult(await api.closeShift(shiftId, amount, idempotencyKey))
+      const closeResult = await api.closeShift(shiftId, amount, idempotencyKey)
+      setResult(closeResult)
+      setRevealed(true)
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         onSessionExpired()
@@ -123,11 +155,32 @@ export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired
       <section className={`form-panel ${result.variance_cents === 0 ? 'ok' : 'bad'}`}>
         <h2>Drawer reconciled</h2>
         <dl>
-          <dt>Expected</dt><dd>{fm(result.expected_cash_cents)}</dd>
+          <dt>Expected</dt><dd>{revealed ? fm(result.expected_cash_cents) : MASK}</dd>
           <dt>Counted</dt><dd>{fm(result.shift.counted_cash_cents ?? 0)}</dd>
-          <dt>Variance</dt><dd>{fm(result.variance_cents)}</dd>
+          <dt>Variance</dt><dd>{revealed ? fm(result.variance_cents) : MASK}</dd>
         </dl>
-        {result.requires_approval && <p className="error">Variance exceeds the threshold — needs supervisor approval.</p>}
+        {result.requires_approval && (
+          approvedShift ? (
+            <p className="muted">
+              Variance approved by {tokens.staffUser()?.name ?? 'supervisor'}
+              {approvedShift.variance_approved_at && ` at ${new Date(approvedShift.variance_approved_at).toLocaleTimeString()}`}
+            </p>
+          ) : (
+            <>
+              <p className="error">Variance exceeds the threshold — needs supervisor approval.</p>
+              {can('shift.approve_variance') && (
+                <button
+                  type="button" className="btn btn-submit"
+                  disabled={approveVariance.isPending}
+                  onClick={() => approveVariance.mutate()}
+                >
+                  {approveVariance.isPending ? 'Approving…' : 'Approve variance'}
+                </button>
+              )}
+            </>
+          )
+        )}
+        {error && <p className="error">{error}</p>}
         <hr className="dotted-divider" />
         <ZReportPanel z={zReport} />
         <div className="btn-row">
@@ -152,6 +205,13 @@ export function CloseShiftScreen({ shiftId, onClosed, onCancel, onSessionExpired
           <button type="button" className="btn btn-secondary" onClick={onCancel}>Back</button>
         </div>
       </form>
+      {/* Blind count: the count field above is what the cashier sees first and acts on;
+          this is just a standing reminder that expected cash stays hidden until they do. */}
+      {zReport.data && (
+        <p className="muted blind-count">
+          Expected cash: <span>{revealed ? fm(zReport.data.expected_cash_cents) : MASK}</span>
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
     </section>
   )

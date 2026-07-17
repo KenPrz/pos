@@ -5,19 +5,61 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError, api, tokens, type CatalogProduct, type CatalogVariant, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
 import { cents, formatMoney, parseCentsOrNull, subtract } from '../lib/money'
 import { MenuGrid } from './MenuGrid'
+import { SplitPrompt, SplitStrip } from './SplitStrip'
 
 const CURRENCY = 'USD'
 const fm = (n: number) => formatMoney(cents(n), CURRENCY)
 
 type Driver = 'cash' | 'external_card'
 
+// One paid-off child, kept for the combined done plate once every check has closed.
+type PaidChild = { outcome: PaymentOutcome; receipt: Receipt | null }
+
+// Split-into-N-checks (Task 13): `children` are ordinary orders returned by
+// api.splitOrder — the original order is voided server-side and is not among them.
+// `activeIx` is which child is currently the working `order` for the tender flow;
+// `paid` accumulates as each one closes, in order, for the combined done plate.
+type SplitState = { children: Order[]; activeIx: number; paid: PaidChild[] }
+
 type Phase =
   | { name: 'scanning' }
   // Minted once when tender is entered and reused for every submit while in this phase,
   // so a re-click after a lost-response timeout replays the same payment instead of
-  // risking a double charge. A fresh key is minted each time tender is re-entered.
+  // risking a double charge. A fresh key is minted each time tender is re-entered
+  // (including advancing to the next split child — each child's payment is its own
+  // idempotent attempt, distinct from the one key minted per confirmed split itself).
   | { name: 'tender'; key: string }
   | { name: 'done'; outcome: PaymentOutcome; receipt: Receipt | null }
+  | { name: 'split-done'; paid: PaidChild[] }
+
+/** The lines/discount/tax/total table shared by the single-order and split done plates. */
+function ReceiptCard({ receipt }: { receipt: Receipt }) {
+  return (
+    <div className="receipt">
+      <h3>{receipt.location.header ?? receipt.business.name}</h3>
+      <p className="muted">
+        {receipt.order.number} · {receipt.order.business_date} · {receipt.order.cashier}
+      </p>
+      <table>
+        <tbody>
+          {receipt.lines.map((l, i) => (
+            <tr key={i}>
+              <td>{l.name}</td>
+              <td>{l.qty === '1.000' ? '' : l.qty}</td>
+              <td className="num">{fm(l.line_total_cents)}</td>
+            </tr>
+          ))}
+          {receipt.totals.discount_cents > 0 && (
+            <tr><td>Discount</td><td /><td className="num">−{fm(receipt.totals.discount_cents)}</td></tr>
+          )}
+          <tr><td>Tax</td><td /><td className="num">{fm(receipt.totals.tax_cents)}</td></tr>
+          <tr className="total"><td>Total</td><td /><td className="num">{fm(receipt.totals.total_cents)}</td></tr>
+        </tbody>
+      </table>
+      {receipt.location.footer && <p className="muted">{receipt.location.footer}</p>}
+    </div>
+  )
+}
 
 export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onCloseShift, onSessionExpired }: {
   can: (permission: string) => boolean
@@ -46,6 +88,12 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
   const [voidingOrder, setVoidingOrder] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [split, setSplit] = useState<SplitState | null>(null)
+  const [splitPromptOpen, setSplitPromptOpen] = useState(false)
+  const [splitWays, setSplitWays] = useState(2)
+  // Same idiom as scanKeyRef/pickKeyRef: minted once when GO is confirmed and reused
+  // across a lost-response retry of that SAME split, so it can't mint a second one.
+  const splitKeyRef = useRef<string | null>(null)
   const scanRef = useRef<HTMLInputElement>(null)
   // Read once per render, not cached in state: SaleScreen only ever mounts after
   // Register's own bootstrap effect has already resolved tokens client-side (it's gated
@@ -262,14 +310,60 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
       const receipt = await api.receipt(outcome.order.id).catch(() => null)
       return { outcome, receipt }
     },
+    // Split children always close in one shot: the tender form always submits the
+    // child's FULL due (never a partial amount the cashier typed), so a successful
+    // payment here always means this child is done — never "partially paid, still open".
     onSuccess: ({ outcome, receipt }) => {
-      setPhase({ name: 'done', outcome, receipt })
-      setOrder(null)
+      setTendered('')
+      setReference('')
+      setError(null)
+      if (!split) {
+        setPhase({ name: 'done', outcome, receipt })
+        setOrder(null)
+        return
+      }
+      const paid = [...split.paid, { outcome, receipt }]
+      const nextIx = split.activeIx + 1
+      if (nextIx < split.children.length) {
+        // Next unpaid child becomes the working order, straight into a fresh tender —
+        // same code path every other order goes through, just re-entered per child.
+        setSplit({ ...split, activeIx: nextIx, paid })
+        setOrder(split.children[nextIx])
+        setPhase({ name: 'tender', key: crypto.randomUUID() })
+      } else {
+        setSplit(null)
+        setOrder(null)
+        setPhase({ name: 'split-done', paid })
+      }
+    },
+    onError: (err) => fail(err, 'Payment failed.'),
+  })
+
+  // Splits the working order into `ways` new ones (SplitOrderRequest: 2–10). Only ever
+  // called on the pre-split original — a child can't be re-split (the tender-phase SPLIT
+  // control is hidden once `split` is set), and the server itself refuses once
+  // paid_cents > 0, so this only ever runs before any money has been taken.
+  const splitOrderMut = useMutation({
+    mutationFn: async (ways: number) => {
+      const key = splitKeyRef.current ?? crypto.randomUUID()
+      splitKeyRef.current = key
+      return api.splitOrder(order as Order, ways, key)
+    },
+    onSuccess: (children) => {
+      splitKeyRef.current = null
+      setSplit({ children, activeIx: 0, paid: [] })
+      setOrder(children[0])
+      setSplitPromptOpen(false)
+      setSplitWays(2)
+      setPhase({ name: 'tender', key: crypto.randomUUID() })
       setTendered('')
       setReference('')
       setError(null)
     },
-    onError: (err) => fail(err, 'Payment failed.'),
+    onError: (err) => {
+      if (!(err instanceof ApiError && err.code === 'network_unreachable')) splitKeyRef.current = null
+      fail(err, 'Could not split the order.')
+    },
   })
 
   const submitScan = (e: FormEvent) => {
@@ -299,6 +393,9 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
   const newSale = () => {
     setPhase({ name: 'scanning' })
     setDriver('cash')
+    setSplit(null)
+    setSplitPromptOpen(false)
+    setSplitWays(2)
     setError(null)
     setTimeout(() => scanRef.current?.focus(), 0)
   }
@@ -325,33 +422,34 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
             ? `${fm(payment.amount_cents)} paid on ${fm(payment.tendered_cents ?? payment.amount_cents)} tendered`
             : `${fm(payment.amount_cents)} recorded on the card terminal`}
         </p>
-        {phase.receipt && (
-          <div className="receipt">
-            <h3>{phase.receipt.location.header ?? phase.receipt.business.name}</h3>
-            <p className="muted">
-              {phase.receipt.order.number} · {phase.receipt.order.business_date} · {phase.receipt.order.cashier}
-            </p>
-            <table>
-              <tbody>
-                {phase.receipt.lines.map((l, i) => (
-                  <tr key={i}>
-                    <td>{l.name}</td>
-                    <td>{l.qty === '1.000' ? '' : l.qty}</td>
-                    <td className="num">{fm(l.line_total_cents)}</td>
-                  </tr>
-                ))}
-                {phase.receipt.totals.discount_cents > 0 && (
-                  <tr><td>Discount</td><td /><td className="num">−{fm(phase.receipt.totals.discount_cents)}</td></tr>
-                )}
-                <tr><td>Tax</td><td /><td className="num">{fm(phase.receipt.totals.tax_cents)}</td></tr>
-                <tr className="total"><td>Total</td><td /><td className="num">{fm(phase.receipt.totals.total_cents)}</td></tr>
-              </tbody>
-            </table>
-            {phase.receipt.location.footer && <p className="muted">{phase.receipt.location.footer}</p>}
-          </div>
-        )}
+        {phase.receipt && <ReceiptCard receipt={phase.receipt} />}
         <div className="btn-row">
           <button className="btn btn-utility" onClick={() => window.print()}>Print</button>
+          <button className="btn btn-submit" onClick={newSale}>New sale</button>
+        </div>
+      </section>
+    )
+  }
+
+  if (phase.name === 'split-done') {
+    return (
+      <section className="form-panel ok">
+        <h2>All checks settled — {phase.paid.length} {phase.paid.length === 1 ? 'check' : 'checks'}</h2>
+        {phase.paid.map(({ outcome, receipt }, ix) => (
+          <div className="split-receipt" key={outcome.order.id}>
+            <header className="row">
+              <h3>Check {ix + 1} — order {outcome.order.number}</h3>
+              {receipt && <button className="btn btn-utility" onClick={() => window.print()}>Print</button>}
+            </header>
+            <p className="muted">
+              {outcome.payment.driver === 'cash'
+                ? `${fm(outcome.payment.amount_cents)} paid on ${fm(outcome.payment.tendered_cents ?? outcome.payment.amount_cents)} tendered`
+                : `${fm(outcome.payment.amount_cents)} recorded on the card terminal`}
+            </p>
+            {receipt && <ReceiptCard receipt={receipt} />}
+          </div>
+        ))}
+        <div className="btn-row">
           <button className="btn btn-submit" onClick={newSale}>New sale</button>
         </div>
       </section>
@@ -368,6 +466,16 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
         <h2>{order ? `Order ${order.number}` : 'New sale'}</h2>
         <button type="button" className="btn btn-secondary" onClick={onCloseShift}>Close shift</button>
       </header>
+
+      {/* Visible through scanning AND tender for the active child — the active child's
+          own due tracks the live `order` (not the split snapshot), so an edit made to
+          its cart before it's paid shows up here immediately. */}
+      {split && (
+        <SplitStrip
+          orders={split.children.map((c, ix) => (ix === split.activeIx ? (order ?? c) : c))}
+          activeIx={split.activeIx}
+        />
+      )}
 
       <form onSubmit={submitScan} className={foodMode ? 'scan-form-compact' : undefined}>
         <input
@@ -534,7 +642,29 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
         </>
       )}
 
-      {order && phase.name === 'tender' && (
+      {/* SPLIT ×N: only offered on the pre-split original (never a child — the server
+          itself refuses once paid_cents > 0, and re-splitting a child isn't a supported
+          shape here) and only before any tender is entered for it. */}
+      {order && phase.name === 'tender' && !split && (
+        splitPromptOpen ? (
+          <SplitPrompt
+            ways={splitWays}
+            totalCents={order.total_cents}
+            onWaysChange={setSplitWays}
+            onConfirm={() => splitOrderMut.mutate(splitWays)}
+            onCancel={() => setSplitPromptOpen(false)}
+            pending={splitOrderMut.isPending}
+          />
+        ) : (
+          <div className="btn-row">
+            <button type="button" className="btn btn-secondary" onClick={() => setSplitPromptOpen(true)}>
+              Split bill
+            </button>
+          </div>
+        )
+      )}
+
+      {order && phase.name === 'tender' && !splitPromptOpen && (
         <form onSubmit={submitPay}>
           <div className="btn-row" role="group" aria-label="Payment method">
             <button

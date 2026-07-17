@@ -206,6 +206,7 @@ export function Register() {
         {stage.name === 'closing' && (
           <CloseShiftScreen
             shiftId={stage.shift.id}
+            can={can}
             onCancel={() => setStage({ name: 'selling', shift: stage.shift })}
             onClosed={() => endSession()} // the server revoked the session at close
             onSessionExpired={sessionExpired}
