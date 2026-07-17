@@ -15,6 +15,7 @@ use App\Http\Controllers\Orders\OpenOrderController;
 use App\Http\Controllers\Orders\ReceiptController;
 use App\Http\Controllers\Orders\RemoveDiscountController;
 use App\Http\Controllers\Orders\ReopenOrderController;
+use App\Http\Controllers\Orders\SetTableRefController;
 use App\Http\Controllers\Orders\SettleZeroOrderController;
 use App\Http\Controllers\Orders\UpdateLineQtyController;
 use App\Http\Controllers\Orders\VoidLineController;
@@ -78,6 +79,7 @@ Route::prefix('v1')->group(function (): void {
 
             Route::post('/orders', OpenOrderController::class)->name('orders.open');
             Route::get('/orders', ListOrdersController::class)->name('orders.list');
+            Route::patch('/orders/{order}', SetTableRefController::class)->name('orders.update');
             Route::get('/orders/{order}', GetOrderController::class)->name('orders.get');
             Route::post('/orders/{order}/lines', AddLineController::class)
                 ->middleware('idempotent')

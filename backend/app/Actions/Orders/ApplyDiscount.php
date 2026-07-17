@@ -8,6 +8,7 @@ use App\Domain\Audit\AuditLogger;
 use App\Domain\Orders\OpenOrderLock;
 use App\Domain\Pricing\OrderTotals;
 use App\Exceptions\Domain\DiscountScopeMismatch;
+use App\Exceptions\Domain\LineAlreadyVoided;
 use App\Models\Discount;
 use App\Models\Order;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,11 @@ final class ApplyDiscount
             if ($discount->scope === 'line') {
                 // Must belong to this order — a stray or foreign line id is a 404, same
                 // as any other cross-order lookup.
-                $order->lines()->whereKey($in->orderLineId)->firstOrFail();
+                $line = $order->lines()->whereKey($in->orderLineId)->firstOrFail();
+
+                if ($line->voided_at !== null) {
+                    throw new LineAlreadyVoided($line->id);
+                }
             } elseif ($in->orderLineId !== null) {
                 throw new DiscountScopeMismatch($discount->id, $discount->scope);
             }
