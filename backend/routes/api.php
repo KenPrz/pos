@@ -27,6 +27,7 @@ use App\Http\Controllers\Payments\TakePaymentController;
 use App\Http\Controllers\Payments\VoidPaymentController;
 use App\Http\Controllers\Refunds\RefundOrderController;
 use App\Http\Controllers\Reports\GetZReportController;
+use App\Http\Controllers\Shifts\ApproveVarianceController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
 use App\Http\Controllers\Shifts\OpenShiftController;
@@ -79,6 +80,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/shifts/{shift}/close', CloseShiftController::class)
                 ->middleware('idempotent')
                 ->name('shifts.close');
+            Route::post('/shifts/{shift}/approve-variance', ApproveVarianceController::class)
+                ->name('shifts.approve-variance');
 
             Route::post('/orders', OpenOrderController::class)->name('orders.open');
             Route::get('/orders', ListOrdersController::class)->name('orders.list');
