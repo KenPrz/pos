@@ -29,6 +29,19 @@ it('stores a variance approval on shifts', function (): void {
     expect($shift->refresh()->variance_approved_by)->toBe($supervisor->id);
 });
 
+it('refuses a half-set variance approval on shifts', function (): void {
+    $location = provisionedLocation();
+    $register = registerAt($location);
+    $supervisor = staffWithRole($location, Roles::SUPERVISOR);
+    $shift = Shift::factory()->create(['register_id' => $register->id, 'closed_at' => now(), 'counted_cash_cents' => 0]);
+
+    // A constraint violation aborts the whole Postgres transaction, so this must be the
+    // last assertion in this block.
+    expect(fn () => DB::statement(
+        'update shifts set variance_approved_by = ? where id = ?', [$supervisor->id, $shift->id]
+    ))->toThrow(QueryException::class);
+});
+
 it('returns the register with its mode on staff login', function (): void {
     $location = provisionedLocation();
     $register = registerAt($location);
