@@ -85,7 +85,7 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
       const { variant } = await api.lookupBarcode(code)
       let current = order // retail opens implicitly on first scan
       if (!current) {
-        current = await api.openOrder(key) // same key: a lost response won't mint a twin
+        current = await api.openOrder({ idempotencyKey: key }) // same key: a lost response won't mint a twin
         setOrder(current)
       }
       return api.addLine(current, variant.id, '1', key)

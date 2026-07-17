@@ -43,6 +43,7 @@ const sampleOrder: Order = {
   tax_cents: 0,
   total_cents: 1000,
   paid_cents: 0,
+  due_cents: 1000,
   version: 3,
 }
 
@@ -131,6 +132,199 @@ describe('takePayment', () => {
     expect(body.driver).toBe('external_card')
     expect(body.tendered_cents).toBeNull()
     expect(body.reference).toBe('auth-001122')
+  })
+})
+
+describe('tokens.registerInfo', () => {
+  it('round-trips through localStorage', () => {
+    expect(tokens.registerInfo()).toBeNull()
+
+    tokens.setRegisterInfo({ id: 'register-1', name: 'Bar 1', mode: 'food' })
+
+    expect(tokens.registerInfo()).toEqual({ id: 'register-1', name: 'Bar 1', mode: 'food' })
+  })
+})
+
+describe('openOrder', () => {
+  it('sends { table_ref } when tableRef is passed', async () => {
+    const fetchMock = stubFetch(() => jsonResponse({ data: { order: sampleOrder } }, 201))
+
+    await api.openOrder({ tableRef: 'T1' })
+
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body).toEqual({ table_ref: 'T1' })
+  })
+
+  it('sends an empty body when no options are passed', async () => {
+    const fetchMock = stubFetch(() => jsonResponse({ data: { order: sampleOrder } }, 201))
+
+    await api.openOrder()
+
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body).toEqual({})
+    const headers = init?.headers as Record<string, string>
+    expect(headers['Idempotency-Key']).toBeUndefined()
+  })
+
+  it('still sends Idempotency-Key when only idempotencyKey is passed', async () => {
+    const fetchMock = stubFetch(() => jsonResponse({ data: { order: sampleOrder } }, 201))
+
+    await api.openOrder({ idempotencyKey: 'key-1' })
+
+    const [, init] = fetchMock.mock.calls[0]
+    const headers = init?.headers as Record<string, string>
+    expect(headers['Idempotency-Key']).toBe('key-1')
+  })
+})
+
+describe('addLine', () => {
+  it('includes modifiers in the body only when provided', async () => {
+    const fetchMock = stubFetch(() =>
+      jsonResponse({ data: { order: sampleOrder, line: { id: 'line-1' } } }),
+    )
+
+    await api.addLine(sampleOrder, 'variant-1', '1', undefined, ['mod-1', 'mod-2'])
+
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body.modifiers).toEqual(['mod-1', 'mod-2'])
+  })
+
+  it('omits modifiers from the body when not provided', async () => {
+    const fetchMock = stubFetch(() =>
+      jsonResponse({ data: { order: sampleOrder, line: { id: 'line-1' } } }),
+    )
+
+    await api.addLine(sampleOrder, 'variant-1')
+
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body).not.toHaveProperty('modifiers')
+  })
+})
+
+describe('transferOrder', () => {
+  it('posts the target register id with If-Match', async () => {
+    const fetchMock = stubFetch(() => jsonResponse({ data: { order: { ...sampleOrder, register_id: 'register-2' } } }))
+
+    await api.transferOrder(sampleOrder, 'register-2')
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain(`/orders/${sampleOrder.id}/transfer`)
+    const headers = init?.headers as Record<string, string>
+    expect(headers['If-Match']).toBe(String(sampleOrder.version))
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body).toEqual({ register_id: 'register-2' })
+  })
+})
+
+describe('splitOrder', () => {
+  it('unwraps data.orders and sends If-Match + Idempotency-Key', async () => {
+    const splitOrders = [
+      { ...sampleOrder, id: 'order-2' },
+      { ...sampleOrder, id: 'order-3' },
+    ]
+    const fetchMock = stubFetch(() => jsonResponse({ data: { orders: splitOrders } }, 201))
+
+    const result = await api.splitOrder(sampleOrder, 2, 'split-key-1')
+
+    expect(result).toEqual(splitOrders)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain(`/orders/${sampleOrder.id}/split`)
+    const headers = init?.headers as Record<string, string>
+    expect(headers['If-Match']).toBe(String(sampleOrder.version))
+    expect(headers['Idempotency-Key']).toBe('split-key-1')
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body).toEqual({ ways: 2 })
+  })
+})
+
+describe('approveVariance', () => {
+  it('unwraps data.shift', async () => {
+    const shift = {
+      id: 'shift-1',
+      register_id: 'register-1',
+      opened_by: 'user-1',
+      opened_at: '2026-07-16T00:00:00Z',
+      opening_float_cents: 10000,
+      closed_at: '2026-07-16T08:00:00Z',
+      counted_cash_cents: 9800,
+      expected_cash_cents: 10000,
+      variance_cents: -200,
+      variance_approved_by: 'user-2',
+      variance_approved_at: '2026-07-16T08:05:00Z',
+    }
+    stubFetch(() => jsonResponse({ data: { shift } }))
+
+    const result = await api.approveVariance('shift-1')
+
+    expect(result).toEqual(shift)
+  })
+})
+
+describe('setLinePrep', () => {
+  it('PATCHes the prep state without an If-Match header', async () => {
+    const fetchMock = stubFetch(() => jsonResponse({ data: { order: sampleOrder, line: { id: 'line-1' } } }))
+
+    await api.setLinePrep('order-1', 'line-1', 'in_progress')
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/orders/order-1/lines/line-1/prep')
+    expect(init?.method).toBe('PATCH')
+    const headers = init?.headers as Record<string, string>
+    expect(headers['If-Match']).toBeUndefined()
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body).toEqual({ state: 'in_progress' })
+  })
+})
+
+describe('updateLineQty', () => {
+  it('PATCHes the qty with If-Match from the order version', async () => {
+    const fetchMock = stubFetch(() => jsonResponse({ data: { order: sampleOrder, line: { id: 'line-1' } } }))
+
+    await api.updateLineQty(sampleOrder, 'line-1', '2')
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init?.method).toBe('PATCH')
+    const headers = init?.headers as Record<string, string>
+    expect(headers['If-Match']).toBe(String(sampleOrder.version))
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body).toEqual({ qty: '2' })
+  })
+})
+
+describe('setTableRef', () => {
+  it('PATCHes /orders/{id} with the table_ref and If-Match', async () => {
+    const fetchMock = stubFetch(() => jsonResponse({ data: { order: { ...sampleOrder, table_ref: 'T1' } } }))
+
+    await api.setTableRef(sampleOrder, 'T1')
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain(`/orders/${sampleOrder.id}`)
+    expect(init?.method).toBe('PATCH')
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body).toEqual({ table_ref: 'T1' })
+  })
+})
+
+describe('staffLogin', () => {
+  it('stores the register info alongside the staff token', async () => {
+    stubFetch(() =>
+      jsonResponse({
+        data: {
+          staff_token: 'staff-token-1',
+          expires_at: '2026-07-16T12:00:00Z',
+          user: { id: 'user-1', name: 'Alex', is_admin: false, permissions: [] },
+          register: { id: 'register-1', name: 'Bar 1', mode: 'food' },
+        },
+      }),
+    )
+
+    await api.staffLogin('1234')
+
+    expect(tokens.registerInfo()).toEqual({ id: 'register-1', name: 'Bar 1', mode: 'food' })
   })
 })
 

@@ -55,6 +55,7 @@ export type Health = {
 const DEVICE_TOKEN_KEY = 'pos.device_token'
 const STAFF_TOKEN_KEY = 'pos.staff_token'
 const STAFF_USER_KEY = 'pos.staff_user'
+const REGISTER_INFO_KEY = 'pos.register_info'
 
 export const tokens = {
   device: () => localStorage.getItem(DEVICE_TOKEN_KEY),
@@ -74,6 +75,20 @@ export const tokens = {
     if (!raw) return null
     try {
       return JSON.parse(raw) as StaffSession['user']
+    } catch {
+      return null
+    }
+  },
+  // The register this staff session logged into — its mode ('retail' | 'food') decides
+  // which screens the SPA shows. Same lifetime as the staff token, but not cleared by
+  // clearStaff(): a re-login at the same register redundantly overwrites it anyway, and
+  // keeping it around between logins costs nothing.
+  setRegisterInfo: (r: RegisterInfo) => localStorage.setItem(REGISTER_INFO_KEY, JSON.stringify(r)),
+  registerInfo: (): RegisterInfo | null => {
+    const raw = localStorage.getItem(REGISTER_INFO_KEY)
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as RegisterInfo
     } catch {
       return null
     }
@@ -146,17 +161,33 @@ function del<T>(path: string, body: unknown, extra?: Record<string, string>): Pr
   })
 }
 
+// PATCH endpoints (M5): partial updates to an existing resource — line qty, prep state,
+// table_ref — as opposed to POST's "do an action" / DELETE's "remove this" shapes above.
+function patch<T>(path: string, body: unknown, extra?: Record<string, string>): Promise<T> {
+  return request<T>(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...extra },
+    body: JSON.stringify(body),
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Wire types — cents are plain integers on the wire (docs/03-api.md); brand them
 // with money.ts's cents() at the display edge, not here.
 // ---------------------------------------------------------------------------
 
-// Field names verified against StaffSessionResource.php (M2): the resource also emits
-// `is_admin` and `permissions` on `user`, which docs/03-api.md's example omits.
+// The register a staff session logged into. `mode` decides which screens the SPA shows
+// (M5: 'food' registers get table/prep/split UI retail registers don't).
+export type RegisterInfo = { id: string; name: string; mode: 'retail' | 'food' }
+
+// Field names verified against StaffSessionResource.php (M2, register added M5): the
+// resource also emits `is_admin` and `permissions` on `user`, which docs/03-api.md's
+// example omits.
 export type StaffSession = {
   staff_token: string
   expires_at: string
   user: { id: string; name: string; is_admin: boolean; permissions: string[] }
+  register: RegisterInfo
 }
 
 export type Shift = {
@@ -169,6 +200,8 @@ export type Shift = {
   counted_cash_cents: number | null
   expected_cash_cents: number | null
   variance_cents: number | null
+  variance_approved_by: string | null
+  variance_approved_at: string | null
 }
 
 export type SalesSummary = { orders_closed: number; total_cents: number; cash_cents: number }
@@ -184,6 +217,8 @@ export type OrderLine = {
   tax_cents: number
   line_total_cents: number
   voided_at: string | null
+  prep_state: 'pending' | 'in_progress' | 'ready' | null
+  modifiers?: Array<{ name: string; price_delta_cents: number }>
 }
 
 /** An applied discount row — its id is what removal takes. */
@@ -202,6 +237,8 @@ export type Order = {
   register_id: string
   status: 'open' | 'closed' | 'voided'
   table_ref: string | null
+  opened_at?: string
+  opened_by_name?: string
   business_date: string
   prices_include_tax: boolean
   subtotal_cents: number
@@ -209,6 +246,9 @@ export type Order = {
   tax_cents: number
   total_cents: number
   paid_cents: number
+  // Server-computed: max(0, total_cents - paid_cents). Never derive this client-side —
+  // see OrderResource.php.
+  due_cents: number
   version: number
   lines?: OrderLine[]
   discounts?: OrderDiscount[]
@@ -244,13 +284,42 @@ export type Discount = {
   requires_supervisor: boolean
 }
 
+// Field names verified against GetCatalog.php / CatalogResource.php (M5). Note the wire
+// shape differs from a naive read of the M5 design doc: categories carry `parent_id` +
+// `sort_order` (not `position`), products carry `description` + `kind` alongside
+// `modifier_group_ids`, variants carry `tax_rate_id` + `position`, and modifier_groups
+// carry no `position` at all (the query doesn't select or order by one).
+export type CatalogCategory = { id: string; name: string; parent_id: string | null; sort_order: number }
+export type CatalogProduct = {
+  id: string
+  name: string
+  description: string | null
+  category_id: string | null
+  kind: 'goods' | 'service'
+  modifier_group_ids: string[]
+}
+export type CatalogVariant = {
+  id: string
+  product_id: string
+  name: string
+  sku: string
+  barcode: string | null
+  price_cents: number
+  tax_rate_id: string | null
+  track_inventory: boolean
+  position: number
+}
+export type ModifierGroup = { id: string; name: string; min_select: number; max_select: number | null }
+export type Modifier = { id: string; group_id: string; name: string; price_delta_cents: number; position: number }
+export type TaxRate = { id: string; name: string; rate_micros: number }
+
 export type Catalog = {
-  categories: unknown[]
-  products: unknown[]
-  variants: unknown[]
-  modifier_groups: unknown[]
-  modifiers: unknown[]
-  tax_rates: unknown[]
+  categories: CatalogCategory[]
+  products: CatalogProduct[]
+  variants: CatalogVariant[]
+  modifier_groups: ModifierGroup[]
+  modifiers: Modifier[]
+  tax_rates: TaxRate[]
   discounts: Discount[]
 }
 
@@ -302,6 +371,7 @@ export const api = {
     const session = await post<StaffSession>('/staff/login', { pin })
     tokens.setStaff(session.staff_token)
     tokens.setStaffUser(session.user)
+    tokens.setRegisterInfo(session.register)
     return session
   },
   staffLogout: async (): Promise<void> => {
@@ -317,15 +387,24 @@ export const api = {
   // retry would look like a brand-new close to the server.
   closeShift: (shiftId: string, countedCashCents: number, idempotencyKey: string) =>
     post<ShiftCloseResult>(`/shifts/${shiftId}/close`, { counted_cash_cents: countedCashCents }, { 'Idempotency-Key': idempotencyKey }),
+  // A supervisor sign-off on a variance the till closed with. No If-Match: shifts don't
+  // carry a version, and this is a one-shot terminal action, not a concurrent edit.
+  approveVariance: (shiftId: string) =>
+    post<{ shift: Shift }>(`/shifts/${shiftId}/approve-variance`, {}).then((r) => r.shift),
 
   lookupBarcode: (barcode: string) => request<LookedUpVariant>(`/catalog/lookup?barcode=${encodeURIComponent(barcode)}`),
   catalog: () => request<Catalog>('/catalog'),
 
   // The key matters here too: a lost response on the implicit first-scan open would
   // otherwise mint a second, invisible empty order on rescan — and open orders block
-  // shift close. Callers reuse the scan attempt's key.
-  openOrder: (idempotencyKey?: string) =>
-    post<{ order: Order }>('/orders', {}, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}).then((r) => r.order),
+  // shift close. Callers reuse the scan attempt's key. tableRef seats a food-service
+  // order at a table up front (OpenOrderRequest accepts it); omitted, the body is `{}`.
+  openOrder: (opts?: { tableRef?: string; idempotencyKey?: string }) =>
+    post<{ order: Order }>(
+      '/orders',
+      opts?.tableRef ? { table_ref: opts.tableRef } : {},
+      opts?.idempotencyKey ? { 'Idempotency-Key': opts.idempotencyKey } : {},
+    ).then((r) => r.order),
   // Closes a zero-total order (full comp / abandoned empty) without a tender.
   settleOrder: (order: Order) =>
     post<{ order: Order }>(`/orders/${order.id}/settle`, {}, { 'If-Match': String(order.version) }).then((r) => r.order),
@@ -338,14 +417,32 @@ export const api = {
     if (params.status) qs.set('status', params.status)
     return request<{ orders: Order[] }>(`/orders?${qs.toString()}`).then((r) => r.orders)
   },
+  // The floor view (M5): every open order across the location, not just this register's.
+  openOrders: () => api.findOrders({ status: 'open' }),
   // idempotencyKey is optional: retail's implicit "open order on first scan" path
   // doesn't need one, but a caller retrying a specific scan submission should pass one.
-  addLine: (order: Order, variantId: string, qty = '1', idempotencyKey?: string) =>
+  // modifierIds is omitted from the body entirely when empty — AddLineRequest's
+  // `modifiers` rule is `sometimes`, so an empty array and an absent key are equivalent
+  // server-side, but omitting keeps the wire payload the same shape retail always sent.
+  addLine: (order: Order, variantId: string, qty = '1', idempotencyKey?: string, modifierIds?: string[]) =>
     post<{ order: Order; line: OrderLine }>(
       `/orders/${order.id}/lines`,
-      { variant_id: variantId, qty },
+      { variant_id: variantId, qty, ...(modifierIds && modifierIds.length > 0 ? { modifiers: modifierIds } : {}) },
       { 'If-Match': String(order.version), ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
     ).then((r) => r.order),
+  // PATCH lines/{id} — qty change on an existing line (e.g. the guest wants two, not
+  // one). ORDER_LINE_UPDATE-gated server-side; voiding down to zero is a separate action.
+  updateLineQty: (order: Order, lineId: string, qty: string) =>
+    patch<{ order: Order }>(
+      `/orders/${order.id}/lines/${lineId}`,
+      { qty },
+      { 'If-Match': String(order.version) },
+    ).then((r) => r.order),
+  // PATCH lines/{id}/prep — kitchen workflow state. No If-Match: SetLinePrepStateRequest
+  // doesn't take one (rapid-fire taps from the kitchen display shouldn't need a version
+  // round-trip), so this takes bare ids rather than a whole Order.
+  setLinePrep: (orderId: string, lineId: string, state: 'pending' | 'in_progress' | 'ready') =>
+    patch<{ order: Order }>(`/orders/${orderId}/lines/${lineId}/prep`, { state }).then((r) => r.order),
   voidLine: (order: Order, lineId: string, reason: string) =>
     del<{ order: Order }>(
       `/orders/${order.id}/lines/${lineId}`,
@@ -371,6 +468,32 @@ export const api = {
       {},
       { 'If-Match': String(order.version) },
     ).then((r) => r.order),
+  // PATCH /orders/{id} — seats or clears a table (`null` to clear; SetTableRefRequest's
+  // rule is `nullable`).
+  setTableRef: (order: Order, tableRef: string | null) =>
+    patch<{ order: Order }>(
+      `/orders/${order.id}`,
+      { table_ref: tableRef },
+      { 'If-Match': String(order.version) },
+    ).then((r) => r.order),
+  // Hands an open order to another till (a food-service order moving from bar to floor
+  // register, say). No Idempotency-Key: TransferOrderRequest isn't behind the
+  // `idempotent` middleware, unlike split below.
+  transferOrder: (order: Order, registerId: string) =>
+    post<{ order: Order }>(
+      `/orders/${order.id}/transfer`,
+      { register_id: registerId },
+      { 'If-Match': String(order.version) },
+    ).then((r) => r.order),
+  // Splits one order into `ways` new ones (separate checks). Returns all of them — there
+  // is no single "the" resulting order — and, unlike every other mutation here, the
+  // original is not among them (SplitOrderResource wraps a list, not `{ order }`).
+  splitOrder: (order: Order, ways: number, idempotencyKey: string) =>
+    post<{ orders: Order[] }>(
+      `/orders/${order.id}/split`,
+      { ways },
+      { 'If-Match': String(order.version), 'Idempotency-Key': idempotencyKey },
+    ).then((r) => r.orders),
   // idempotencyKey is minted once by the caller (when the tender phase is entered) and
   // reused across retries — see closeShift's note. tenderedCents/reference are options
   // because they're driver-specific: cash tenders (and gets a computed change_cents);
