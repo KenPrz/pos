@@ -40,8 +40,9 @@ Authorization: Bearer <device_token>
 X-Staff-Token: <staff_token>
 ```
 
-The device token alone can read the catalog and list open orders — a terminal showing the
-menu before anyone clocks in is normal. It cannot touch money.
+The device token alone can read the catalog — a terminal showing the menu before anyone
+clocks in is normal. It cannot touch money, and (correction, M4) it cannot look up orders
+either; order lookup needs a staff session, per Orders below.
 
 ```
 POST /api/v1/staff/logout
@@ -71,8 +72,8 @@ One envelope (`01-architecture.md`):
 | 401 | `invalid_device_token`, `invalid_pin`, `staff_session_expired` |
 | 403 | `requires_supervisor`, `wrong_location` |
 | 404 | `not_found` |
-| 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders` |
-| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `modifier_group_required`, `insufficient_tender` |
+| 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders`, `line_already_voided`, `payment_already_voided`, `payment_shift_closed` |
+| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `modifier_group_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch` |
 | 429 | `too_many_pin_attempts` |
 
 `code` is stable forever once shipped; clients branch on it. `message` is for humans and
@@ -104,7 +105,7 @@ mutation returns the incremented `version`.
 
 ```
 GET /api/v1/catalog?location_id=&updated_since=
-  → { categories[], products[], variants[], modifier_groups[], modifiers[], tax_rates[] }
+  → { categories[], products[], variants[], modifier_groups[], modifiers[], tax_rates[], discounts[] }
 ```
 
 **One denormalized payload, not five REST resources.** A register needs the whole menu to
@@ -114,6 +115,10 @@ render, and five round-trips on a cold start is five chances to half-load a menu
 Prices in this payload are already **resolved for the requested location**
 (`variant_location_prices` applied), so the register never implements price resolution.
 Pricing logic living in exactly one place is worth the denormalization.
+
+As of M4, `discounts[]` carries the location's active catalog discounts — what a
+supervisor can apply, not what's already applied. Applied discounts live on the order
+(see Discounts, below).
 
 > **v1 notes:** the location is taken from the enrolled register, never from
 > `location_id` — a device that could choose its pricing location would be a tampering
@@ -165,6 +170,33 @@ close is how you end up with terminals unplugged mid-count and no data at all.
 Closing a shift with open orders → `409` listing them in `details`. Those orders must be
 closed or transferred first; a tab cannot outlive the drawer that's accountable for it.
 
+## Stock
+
+```
+POST /api/v1/stock/adjustments
+  { "variant_id": "...", "qty_delta": "-2.000", "reason": "adjustment", "note": "" }
+  → { movement }                 # supervisor; reason: adjustment | waste
+
+POST /api/v1/stock/receipts
+  { "variant_id": "...", "qty": "24.000", "note": "PO 4471" }
+  → { movement }                 # supervisor
+
+POST /api/v1/stock/counts
+  { "variant_id": "...", "counted_qty": "18.000", "note": "" }
+  → { movement }                 # supervisor
+
+GET  /api/v1/stock/movements?variant_id=
+  → { movements[], level }       # last 50 movements, plus the current level
+```
+
+All location-scoped to the acting register — stock is per-location, and a register only
+ever touches the location it's enrolled at. Every write goes through the stock ledger
+(`02-data-model.md`): movements are inserts, never updates, so the level is always a sum
+of history, never a mutable counter that can drift from it. Gated `supervisor` throughout
+— an adjustment moves sellable value out of the count the same way a void moves cash out
+of the drawer, and letting receiving or counting bypass that would just move the hole
+somewhere less audited.
+
 ## Orders
 
 The lifecycle both retail and food service travel, at different speeds
@@ -180,9 +212,14 @@ Retail opens this implicitly on first scan; the cashier never sees it. Food serv
 it explicitly and names a table. Same endpoint, same row.
 
 ```
-GET  /api/v1/orders?status=open&location_id=     # the tab list / floor view
+GET  /api/v1/orders?number=&status=&location_id=
 GET  /api/v1/orders/{id}
 ```
+
+As of M4 these are a **targeted, location-scoped lookup** — a receipt number for a refund,
+or recovering an order the register lost track of — not the browsing floor view; that's
+still M5 (open tabs, `table_ref`, floor list). Both require a staff session, per Auth
+above.
 
 ### Lines
 
@@ -208,6 +245,10 @@ from the server's — there is no client-side total to be stale.
 
 `DELETE` voids (`voided_at`), per `02-data-model.md`. Removing an already-sent line
 requires `supervisor`.
+
+As of M4, the add-line and void responses also carry the order's applied `discounts` rows
+— `{id, discount_id, order_line_id, name, amount_cents, reason}` — not just totals, so the
+register can offer removal without a separate round-trip.
 
 ### Discounts
 
