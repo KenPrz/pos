@@ -28,6 +28,7 @@ class Register extends Model
         'location_id',
         'name',
         'is_active',
+        'mode',
     ];
 
     /** @return array<string, string> */

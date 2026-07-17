@@ -27,7 +27,7 @@ class Shift extends Model
     protected $fillable = [
         'register_id', 'opened_by', 'opened_at', 'opening_float_cents',
         'closed_by', 'closed_at', 'counted_cash_cents', 'expected_cash_cents',
-        'variance_cents', 'close_note',
+        'variance_cents', 'close_note', 'variance_approved_by', 'variance_approved_at',
     ];
 
     /** @return array<string, string> */
@@ -40,6 +40,7 @@ class Shift extends Model
             'variance_cents' => 'integer',
             'opened_at' => 'datetime',
             'closed_at' => 'datetime',
+            'variance_approved_at' => 'datetime',
         ];
     }
 

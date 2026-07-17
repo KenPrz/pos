@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * One thing sold, with name/SKU/price/tax-rate frozen at add time so a receipt from
@@ -23,7 +24,7 @@ class OrderLine extends Model
         'order_id', 'variant_id', 'name_snapshot', 'sku_snapshot',
         'unit_price_cents', 'tax_rate_micros', 'qty', 'modifiers_total_cents',
         'discount_cents', 'tax_cents', 'line_total_cents', 'position',
-        'voided_at', 'voided_by', 'created_at',
+        'voided_at', 'voided_by', 'created_at', 'prep_state',
     ];
 
     /** @return array<string, string> */
@@ -47,5 +48,11 @@ class OrderLine extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /** @return HasMany<OrderLineModifier, $this> */
+    public function modifiers(): HasMany
+    {
+        return $this->hasMany(OrderLineModifier::class, 'order_line_id');
     }
 }

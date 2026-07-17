@@ -62,7 +62,11 @@ class DatabaseSeeder extends Seeder
             $provisioner->provisionForLocation($location);
 
             foreach (['Till 1', 'Till 2'] as $name) {
-                $register = Register::factory()->create(['location_id' => $location->id, 'name' => $name]);
+                $register = Register::factory()->create([
+                    'location_id' => $location->id,
+                    'name' => $name,
+                    'mode' => $name === 'Till 2' ? 'food' : 'retail',
+                ]);
                 $tokens[] = [
                     $location->code.' / '.$name,
                     $register->createToken("device:{$register->id}", ['device'])->plainTextToken,

@@ -21,6 +21,8 @@ final class ShiftResource extends JsonResource
             'counted_cash_cents' => $this->counted_cash_cents,
             'expected_cash_cents' => $this->expected_cash_cents,
             'variance_cents' => $this->variance_cents,
+            'variance_approved_by' => $this->variance_approved_by,
+            'variance_approved_at' => $this->variance_approved_at?->toIso8601String(),
         ];
     }
 }
