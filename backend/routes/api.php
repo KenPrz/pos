@@ -8,12 +8,28 @@ use App\Http\Controllers\Auth\StaffLogoutController;
 use App\Http\Controllers\Catalog\GetCatalogController;
 use App\Http\Controllers\Catalog\LookupBarcodeController;
 use App\Http\Controllers\Orders\AddLineController;
+use App\Http\Controllers\Orders\ApplyDiscountController;
+use App\Http\Controllers\Orders\GetOrderController;
+use App\Http\Controllers\Orders\ListOrdersController;
 use App\Http\Controllers\Orders\OpenOrderController;
 use App\Http\Controllers\Orders\ReceiptController;
+use App\Http\Controllers\Orders\RemoveDiscountController;
+use App\Http\Controllers\Orders\ReopenOrderController;
+use App\Http\Controllers\Orders\SettleZeroOrderController;
+use App\Http\Controllers\Orders\VoidLineController;
+use App\Http\Controllers\Orders\VoidOrderController;
 use App\Http\Controllers\Payments\TakePaymentController;
+use App\Http\Controllers\Payments\VoidPaymentController;
+use App\Http\Controllers\Refunds\RefundOrderController;
+use App\Http\Controllers\Reports\GetZReportController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
 use App\Http\Controllers\Shifts\OpenShiftController;
+use App\Http\Controllers\Shifts\RecordCashMovementController;
+use App\Http\Controllers\Stock\AdjustStockController;
+use App\Http\Controllers\Stock\CountStockController;
+use App\Http\Controllers\Stock\GetStockMovementsController;
+use App\Http\Controllers\Stock\ReceiveStockController;
 use App\Http\Controllers\System\HealthController;
 use Illuminate\Support\Facades\Route;
 
@@ -52,18 +68,43 @@ Route::prefix('v1')->group(function (): void {
 
             Route::post('/shifts/open', OpenShiftController::class)->name('shifts.open');
             Route::get('/shifts/current', CurrentShiftController::class)->name('shifts.current');
+            Route::post('/shifts/{shift}/cash-movements', RecordCashMovementController::class)
+                ->middleware('idempotent')
+                ->name('shifts.cash-movements.record');
             Route::post('/shifts/{shift}/close', CloseShiftController::class)
                 ->middleware('idempotent')
                 ->name('shifts.close');
 
             Route::post('/orders', OpenOrderController::class)->name('orders.open');
+            Route::get('/orders', ListOrdersController::class)->name('orders.list');
+            Route::get('/orders/{order}', GetOrderController::class)->name('orders.get');
             Route::post('/orders/{order}/lines', AddLineController::class)
                 ->middleware('idempotent')
                 ->name('orders.lines.add');
+            Route::delete('/orders/{order}/lines/{line}', VoidLineController::class)
+                ->name('orders.lines.void');
+            Route::post('/orders/{order}/discounts', ApplyDiscountController::class)
+                ->name('orders.discounts.apply');
+            Route::delete('/orders/{order}/discounts/{discount}', RemoveDiscountController::class)
+                ->name('orders.discounts.remove');
             Route::post('/orders/{order}/payments', TakePaymentController::class)
                 ->middleware('idempotent')
                 ->name('orders.payments.take');
+            Route::post('/payments/{payment}/void', VoidPaymentController::class)->name('payments.void');
+            Route::post('/refunds', RefundOrderController::class)
+                ->middleware('idempotent')
+                ->name('refunds.create');
             Route::get('/orders/{order}/receipt', ReceiptController::class)->name('orders.receipt');
+            Route::post('/orders/{order}/void', VoidOrderController::class)->name('orders.void');
+            Route::post('/orders/{order}/settle', SettleZeroOrderController::class)->name('orders.settle');
+            Route::post('/orders/{order}/reopen', ReopenOrderController::class)->name('orders.reopen');
+
+            Route::get('/reports/z', GetZReportController::class)->name('reports.z');
+
+            Route::post('/stock/adjustments', AdjustStockController::class)->name('stock.adjustments.create');
+            Route::post('/stock/receipts', ReceiveStockController::class)->name('stock.receipts.create');
+            Route::post('/stock/counts', CountStockController::class)->name('stock.counts.create');
+            Route::get('/stock/movements', GetStockMovementsController::class)->name('stock.movements.get');
         });
     });
 });

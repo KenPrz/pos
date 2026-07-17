@@ -1,0 +1,79 @@
+/**
+ * Design tokens — mirrors DESIGN.md 1:1 (colors, spacing, radii) as CSS custom
+ * properties, plus the two load-bearing utility classes the whole register is built
+ * from: `.plate` (the beveled-metal panel) and `.chamfer` (the cut-corner outer edge).
+ *
+ * Depth here is a hard bevel — a bright 1px top edge and a chrome-indigo 2px bottom
+ * edge — never a blurred box-shadow. Corners default to sharp; `.chamfer` is the one
+ * exception, reserved for the outermost register panel.
+ */
+
+:root {
+  /* Brand & accent — warm color means action, nothing else */
+  --color-primary: #e60012;   /* Nintendo Red — POS pill wordmark, errors, VOID */
+  --color-signal: #f68d1f;    /* Signal Orange — forward / submit */
+  --color-amber: #ecab37;     /* Amber — utility buttons */
+  --color-nav-gold: #e48600;  /* Nav Gold — command-bar section words */
+
+  /* Cool chrome */
+  --color-canvas: #7a8aba;
+  --color-canvas-soft: #9fbee7;
+  --color-periwinkle: #8ba1d4;
+  --color-lavender: #acace7;
+  --color-chrome-indigo: #3d4f97;
+  --color-muted-indigo: #60619c;
+  --color-platinum: #dedede;
+  --color-surface: #ffffff;
+  --color-hairline: #5a5f8c;
+
+  /* Command layer */
+  --color-carbon: #21242e;
+
+  /* Text */
+  --color-ink: #21242e;
+  --color-ink-soft: #3d4f97;
+  --color-on-primary: #ffffff;
+  --color-error: #e60012;
+
+  /* Spacing */
+  --space-xxs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-xxl: 32px;
+  --space-section: 48px;
+
+  /* Radii — sharp is the default; roundness is rationed */
+  --r-none: 0px;
+  --r-xs: 2px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-full: 9999px;
+}
+
+/* The beveled metal plate: every region is stamped from this. No border-radius,
+   no blurred shadow — depth is the hard top/bottom edge only. */
+.plate {
+  background: var(--color-canvas);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-left: 1px solid var(--color-chrome-indigo);
+  border-right: 1px solid var(--color-chrome-indigo);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+}
+
+/* Cut (not rounded) corners for the outermost panel — the machined-faceplate edge. */
+.chamfer {
+  clip-path: polygon(
+    10px 0,
+    calc(100% - 10px) 0,
+    100% 10px,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    10px 100%,
+    0 calc(100% - 10px),
+    0 10px
+  );
+}

@@ -49,8 +49,7 @@ final class TakePayment
                 throw new OrderVersionConflict($order->id, $in->expectedVersion, $order->version);
             }
 
-            $shift = Shift::where('register_id', $in->registerId)->whereNull('closed_at')->first()
-                ?? throw new NoOpenShift($in->registerId);
+            $shift = Shift::openFor($in->registerId) ?? throw new NoOpenShift($in->registerId);
 
             $balance = $order->total_cents - $order->paid_cents;
             if ($in->amountCents > $balance) {
@@ -97,7 +96,7 @@ final class TakePayment
                 'amount_cents' => $in->amountCents,
             ], registerId: $in->registerId);
 
-            return $payment->setRelation('order', $order->fresh(['lines']));
+            return $payment->setRelation('order', $order->fresh(['lines', 'discounts']));
         });
     }
 }

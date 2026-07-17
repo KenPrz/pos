@@ -25,13 +25,7 @@ final class StockLedger
     {
         $this->assertInTransaction();
 
-        $level = DB::table('stock_levels')
-            ->where('variant_id', $variantId)
-            ->where('location_id', $locationId)
-            ->lockForUpdate()
-            ->first();
-
-        $available = Quantity::fromString($level->qty ?? '0');
+        $available = Quantity::fromString($this->lockedLevel($variantId, $locationId)?->qty ?? '0');
 
         if ($qty->greaterThan($available)) {
             throw new InsufficientStock($variantId, (string) $qty, (string) $available);
@@ -45,6 +39,72 @@ final class StockLedger
     {
         $this->assertInTransaction();
         $this->move($variantId, $locationId, $qty, 'receive', null, null, $userId, $note);
+    }
+
+    /**
+     * Stock coming back from a sale context: an order line voided before fulfillment, or a
+     * refund line after. `refType` disambiguates the two; both post a positive 'refund' movement.
+     */
+    public function restock(string $variantId, string $locationId, Quantity $qty, string $refType, string $refId, ?string $userId): void
+    {
+        $this->assertInTransaction();
+        $this->move($variantId, $locationId, $qty, 'refund', $refType, $refId, $userId);
+    }
+
+    /**
+     * A signed correction: 'adjustment' (either direction) or 'waste' (always negative — a
+     * caller passing a positive waste delta is a bug, not a client error). Locks the level
+     * like sell() does; never lets it go negative.
+     */
+    public function adjust(string $variantId, string $locationId, Quantity $delta, string $reason, ?string $userId, ?string $note): void
+    {
+        $this->assertInTransaction();
+
+        if (! in_array($reason, ['adjustment', 'waste'], true)) {
+            throw new LogicException("StockLedger::adjust reason must be 'adjustment' or 'waste', got '{$reason}'.");
+        }
+
+        if ($reason === 'waste' && ! $delta->isNegative()) {
+            throw new LogicException('StockLedger::adjust waste deltas must be negative.');
+        }
+
+        $current = Quantity::fromString($this->lockedLevel($variantId, $locationId)?->qty ?? '0');
+        $resulting = $current->plus($delta);
+
+        if ($resulting->isNegative()) {
+            throw new InsufficientStock($variantId, (string) $delta->negated(), (string) $current);
+        }
+
+        $this->move($variantId, $locationId, $delta, $reason, null, null, $userId, $note);
+    }
+
+    /**
+     * A physical count overrides the ledger's belief about the level. Locks the level,
+     * writes at most one movement (reason 'count') for the difference, and skips the write
+     * entirely when the count matches — qty_delta <> 0 is a DB check constraint.
+     */
+    public function countTo(string $variantId, string $locationId, Quantity $counted, ?string $userId, ?string $note): void
+    {
+        $this->assertInTransaction();
+
+        $current = Quantity::fromString($this->lockedLevel($variantId, $locationId)?->qty ?? '0');
+        $delta = $counted->minus($current);
+
+        if ($delta->isZero()) {
+            return;
+        }
+
+        $this->move($variantId, $locationId, $delta, 'count', null, null, $userId, $note);
+    }
+
+    /** Locks the stock_levels row for the duration of the transaction. Null if it doesn't exist yet. */
+    private function lockedLevel(string $variantId, string $locationId): ?object
+    {
+        return DB::table('stock_levels')
+            ->where('variant_id', $variantId)
+            ->where('location_id', $locationId)
+            ->lockForUpdate()
+            ->first();
     }
 
     private function move(string $variantId, string $locationId, Quantity $delta, string $reason, ?string $refType, ?string $refId, ?string $userId, ?string $note = null): void

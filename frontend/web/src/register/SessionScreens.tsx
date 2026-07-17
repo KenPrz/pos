@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, tokens, type StaffSession } from '../lib/api'
 
@@ -5,7 +7,7 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
   const [token, setToken] = useState('')
 
   return (
-    <section className="card">
+    <section className="form-panel">
       <h2>Enroll this terminal</h2>
       <p className="muted">
         Paste a device token — printed by <code>php artisan migrate:fresh --seed</code>, or issued via
@@ -20,7 +22,8 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
         }}
       >
         <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="1|xxxxxxxx…" autoFocus />
-        <button type="submit">Save</button>
+        <hr className="dotted-divider" />
+        <button type="submit" className="btn btn-submit">Save</button>
       </form>
     </section>
   )
@@ -52,14 +55,14 @@ export function PinScreen({ onLoggedIn, onDeviceInvalid }: {
   }
 
   return (
-    <section className="card">
+    <section className="form-panel">
       <h2>Enter PIN</h2>
       <form onSubmit={submit}>
         <input
           type="password" inputMode="numeric" autoComplete="off" autoFocus
           value={pin} onChange={(e) => setPin(e.target.value)} placeholder="••••"
         />
-        <button type="submit">Clock in</button>
+        <button type="submit" className="btn btn-submit">Clock in</button>
       </form>
       {error && <p className="error">{error}</p>}
     </section>

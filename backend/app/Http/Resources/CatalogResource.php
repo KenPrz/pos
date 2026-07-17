@@ -18,6 +18,7 @@ final class CatalogResource extends JsonResource
             'modifier_groups' => $this->modifierGroups,
             'modifiers' => $this->modifiers,
             'tax_rates' => $this->taxRates,
+            'discounts' => $this->discounts,
         ];
     }
 }

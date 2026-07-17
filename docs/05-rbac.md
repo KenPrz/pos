@@ -186,6 +186,20 @@ with no permission is a bug in one of the two documents.
 | `location.manage` | Locations, settings |
 | `register.enroll` | Enroll a terminal |
 
+**Stock**
+
+| Permission | Gates |
+| --- | --- |
+| `stock.adjust` | Manual adjustment (shrinkage, damage, correction) — **money leaves** |
+| `stock.receive` | Record incoming stock |
+| `stock.count` | Record a physical count |
+| `stock.movements.view` | Stock movement history |
+
+All four are `supervisor`. Adjustments are how shrinkage gets hidden — a unit walked off
+the books without a supervisor's sign-off is functionally the same theft as a till void
+nobody signed off on, and receiving/counting are the levers that make an adjustment
+invisible if they aren't held to the same standard.
+
 **Reports**
 
 | Permission | Gates |
@@ -196,12 +210,16 @@ with no permission is a bug in one of the two documents.
 
 Every permission marked **money leaves** is supervisor-or-above. That set is not a
 coincidence or a judgement call — it is the fraud surface from `01-architecture.md`,
-enumerated. When adding a permission, the question that decides its role is "can this be
-used to take money out of the till without a customer noticing?"
+enumerated. The label covers value leaving the *business*, not only cash leaving a
+drawer — a stock adjustment moves sellable inventory out of the count the same way a void
+moves cash out of the till, which is why `stock.adjust` carries the label too. When adding
+a permission, the question that decides its role is "can this be used to take value out of
+the business without a customer noticing?"
 
 ## Roles
 
-Seeded, not user-editable in v1. Three, deliberately coarse.
+Seeded, not user-editable in v1. Two roles, deliberately coarse, plus the `admin` flag
+that sits outside the role system entirely (see the correction above).
 
 **`cashier`** — the shift they can run alone:
 `order.open`, `order.line.add`, `order.line.update`, `payment.take`, `shift.open`,
@@ -210,7 +228,8 @@ Seeded, not user-editable in v1. Three, deliberately coarse.
 **`supervisor`** — everything a cashier can do, plus the fraud surface:
 `order.line.void`, `order.discount.apply`, `order.void`, `order.reopen`,
 `order.transfer`, `payment.void`, `refund.create`, `shift.cash_movement`,
-`shift.approve_variance`, `drawer.no_sale`, `report.sales.view`
+`shift.approve_variance`, `drawer.no_sale`, `report.sales.view`, `stock.adjust`,
+`stock.receive`, `stock.count`, `stock.movements.view`
 
 **`admin`** — not a role. `users.is_admin` + `Gate::before`, per the correction above.
 

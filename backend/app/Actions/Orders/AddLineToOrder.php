@@ -84,7 +84,7 @@ final class AddLineToOrder
                 'order_id' => $order->id, 'sku' => $line->sku_snapshot, 'qty' => $in->qty,
             ], registerId: $in->registerId);
 
-            return $line->setRelation('order', $order->fresh(['lines']));
+            return $line->setRelation('order', $order->fresh(['lines', 'discounts']));
         });
     }
 }

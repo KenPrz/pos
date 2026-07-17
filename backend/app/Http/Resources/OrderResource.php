@@ -18,6 +18,7 @@ final class OrderResource extends JsonResource
         return [
             'id' => $this->id,
             'number' => $this->number,
+            'register_id' => $this->register_id,
             'status' => $this->status->value,
             'table_ref' => $this->table_ref,
             'business_date' => $this->business_date,
@@ -29,6 +30,7 @@ final class OrderResource extends JsonResource
             'paid_cents' => $this->paid_cents,
             'version' => $this->version,
             'lines' => OrderLineResource::collection($this->whenLoaded('lines')),
+            'discounts' => OrderDiscountResource::collection($this->whenLoaded('discounts')),
         ];
     }
 }

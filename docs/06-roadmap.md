@@ -177,6 +177,43 @@ What building it changed, and what to know before M4:
 **Done when:** a retail store could run a full day, including the parts of a day that go
 wrong — returns, voids, miscounts.
 
+**Status: complete.** 346 backend tests, 35 frontend. A retail store can run a full day,
+including the parts that go wrong: voids, discounts, refunds with restock, a standalone
+card tender, stock corrections, and a shift close backed by a Z-report.
+
+What building it changed, and what to know before M5:
+
+- **The register moved mid-milestone**, at the owner's direction: Vite SPA → Next.js 16
+  (app router) + TanStack React Query. The port kept the API client contract intact — one
+  client boundary under a server shell, `/api` rewrites doing the same single-origin job
+  the Vite dev proxy did. Next's built-in type-check can't drive TypeScript 7 (it misreads
+  it as missing), so it's skipped; `tsc --noEmit` gates instead.
+- **`DiscountResolver` review caught a real money bug before merge.** Allocating an
+  order-level discount across lines fed zero-base lines into the penny allocator, and its
+  remainder distribution could push a line's discount past its own base — a negative line
+  total. Fixed by keeping only positive-remaining-base lines in the ratio array plus a
+  clamped overflow walk; line-level discount rows now resolve sequentially against each
+  line's *remaining* base, not its original one.
+- **Piecewise refunds needed the same exact-split discipline M1 built for payments.**
+  Refund amounts derive from qty fractions, and a line whose total doesn't divide evenly
+  invented or lost a penny across several partial refunds — until the amount was *also*
+  capped, with exhaustion taking the exact remainder. "Split sums exactly" turned out to
+  apply to refunds too, not just tenders.
+- **Voided orders keep their frozen totals.** Recalculating them is deliberately skipped,
+  and nothing sums a voided order's totals for reporting — the payments/refunds ledgers
+  are the source of truth there, never the order row.
+- **The Z-report has to be fetched before the shift close lands.** Close revokes the
+  register's staff sessions, so the close screen fetches the — already-final — running Z
+  at mount, before the counted-cash round-trip that ends the session.
+- **The register keeps the sale screen mounted while on Refunds or Close.** Unmounting it
+  stranded an in-progress order server-side with no UI path back: open orders block shift
+  close, and voiding a line needs the order on screen.
+- **`external_card` proved the driver seam.** A new driver plus one validation rule, and
+  zero changes to `TakePayment`, `VoidPayment`, or refunds.
+- **The "money leaves" fraud-surface definition broadened.** It was written around till
+  cash; a stock adjustment moves sellable value out the same way, so `05-rbac.md` now
+  states the definition to cover both instead of treating `stock.adjust` as an exception.
+
 ## M5 — Food service complete
 
 - Open tabs, `table_ref`, floor/tab list view.

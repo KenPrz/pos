@@ -51,9 +51,19 @@ final class Permissions
     public const string REPORT_SALES_VIEW = 'report.sales.view';
     public const string AUDIT_VIEW = 'audit.view';
 
+    // Stock
+    public const string STOCK_ADJUST = 'stock.adjust';
+    public const string STOCK_RECEIVE = 'stock.receive';
+    public const string STOCK_COUNT = 'stock.count';
+    public const string STOCK_MOVEMENTS_VIEW = 'stock.movements.view';
+
     /**
      * Every permission that can be used to remove money from a till without a customer
      * noticing. Supervisor-or-above, always.
+     *
+     * `STOCK_ADJUST` belongs here, not just alongside it: an unsupervised inventory
+     * adjustment is the classic shrinkage cover-up — the same fraud surface as a till
+     * discrepancy, just measured in units instead of cents.
      *
      * @return list<string>
      */
@@ -68,6 +78,7 @@ final class Permissions
             self::REFUND_CREATE,
             self::SHIFT_CASH_MOVEMENT,
             self::DRAWER_NO_SALE,
+            self::STOCK_ADJUST,
         ];
     }
 
@@ -99,6 +110,10 @@ final class Permissions
             self::REPORT_Z_VIEW,
             self::REPORT_SALES_VIEW,
             self::AUDIT_VIEW,
+            self::STOCK_ADJUST,
+            self::STOCK_RECEIVE,
+            self::STOCK_COUNT,
+            self::STOCK_MOVEMENTS_VIEW,
         ];
     }
 
@@ -126,7 +141,15 @@ final class Permissions
         ];
     }
 
-    /** Everything a cashier can do, plus the fraud surface. @return list<string> */
+    /**
+     * Everything a cashier can do, plus the fraud surface.
+     *
+     * `STOCK_RECEIVE` and `STOCK_COUNT` ride along here rather than inventing a fourth
+     * role: they aren't fraud-surface on their own (`STOCK_ADJUST` — in `moneyLeaves()`
+     * — is), but a store with only two roles has nowhere else sensible to put them.
+     *
+     * @return list<string>
+     */
     public static function supervisor(): array
     {
         return [
@@ -135,6 +158,9 @@ final class Permissions
             self::ORDER_TRANSFER,
             self::SHIFT_APPROVE_VARIANCE,
             self::REPORT_SALES_VIEW,
+            self::STOCK_RECEIVE,
+            self::STOCK_COUNT,
+            self::STOCK_MOVEMENTS_VIEW,
         ];
     }
 

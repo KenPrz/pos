@@ -92,6 +92,19 @@ export function parseCents(input: string): Cents {
  * Kept as a string on purpose: `numeric(12,3)` does not survive a round-trip through a JS
  * number, so parsing it to display it would be the one operation guaranteed to corrupt it.
  */
+/**
+ * parseCents for register inputs: null instead of a throw, and negatives rejected —
+ * no drawer field ("tendered", "counted", "float") means anything below zero.
+ */
+export function parseCentsOrNull(input: string): Cents | null {
+  try {
+    const value = parseCents(input)
+    return value < 0 ? null : value
+  } catch {
+    return null
+  }
+}
+
 export type QuantityString = string & { readonly __brand: 'Quantity' }
 
 export function quantity(value: string): QuantityString {
