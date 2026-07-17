@@ -140,7 +140,10 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
   })
 
   const handleMenuPick = (variant: CatalogVariant, _product: CatalogProduct, modifierIds?: string[]) => {
-    if (pick.isPending) return
+    // Mirrors submitScan's guard above: scan and pick both implicitly open an order on a
+    // null `order`, so only one of them may be in flight at a time or a race orphans a
+    // second open order server-side.
+    if (pick.isPending || scan.isPending) return
     setError(null)
     setNotice(null)
     const signature = `${variant.id}:${(modifierIds ?? []).join(',')}`
@@ -229,7 +232,11 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
 
   const submitScan = (e: FormEvent) => {
     e.preventDefault()
-    if (!barcode.trim() || scan.isPending) return
+    // Also blocked while `pick` is in flight: both mutations independently open an order
+    // implicitly when `order` is still null, and letting scan and a grid tap race would let
+    // each see the stale null and each mint its own order — the second one orphaned (open
+    // orders block shift close). One order-opening path in flight at a time.
+    if (!barcode.trim() || scan.isPending || pick.isPending) return
     setError(null)
     setNotice(null)
     const code = barcode.trim()
