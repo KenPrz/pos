@@ -54,6 +54,7 @@ export type Health = {
 
 const DEVICE_TOKEN_KEY = 'pos.device_token'
 const STAFF_TOKEN_KEY = 'pos.staff_token'
+const STAFF_USER_KEY = 'pos.staff_user'
 
 export const tokens = {
   device: () => localStorage.getItem(DEVICE_TOKEN_KEY),
@@ -61,7 +62,22 @@ export const tokens = {
   clearDevice: () => localStorage.removeItem(DEVICE_TOKEN_KEY),
   staff: () => localStorage.getItem(STAFF_TOKEN_KEY),
   setStaff: (t: string) => localStorage.setItem(STAFF_TOKEN_KEY, t),
-  clearStaff: () => localStorage.removeItem(STAFF_TOKEN_KEY),
+  clearStaff: () => {
+    localStorage.removeItem(STAFF_TOKEN_KEY)
+    localStorage.removeItem(STAFF_USER_KEY)
+  },
+  // The signed-in user rides alongside the staff token so a page reload keeps the
+  // name and permission list without a re-login. Same lifetime as the token.
+  setStaffUser: (u: StaffSession['user']) => localStorage.setItem(STAFF_USER_KEY, JSON.stringify(u)),
+  staffUser: (): StaffSession['user'] | null => {
+    const raw = localStorage.getItem(STAFF_USER_KEY)
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as StaffSession['user']
+    } catch {
+      return null
+    }
+  },
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -120,6 +136,16 @@ function post<T>(path: string, body: unknown, extra?: Record<string, string>): P
   })
 }
 
+// DELETE endpoints here all take a JSON body (a reason, mostly) alongside If-Match —
+// this project's void/discount-removal routes are DELETE-with-body, not bodyless.
+function del<T>(path: string, body: unknown, extra?: Record<string, string>): Promise<T> {
+  return request<T>(path, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...extra },
+    body: JSON.stringify(body),
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Wire types — cents are plain integers on the wire (docs/03-api.md); brand them
 // with money.ts's cents() at the display edge, not here.
@@ -160,6 +186,16 @@ export type OrderLine = {
   voided_at: string | null
 }
 
+/** An applied discount row — its id is what removal takes. */
+export type OrderDiscount = {
+  id: string
+  discount_id: string | null
+  order_line_id: string | null
+  name: string
+  amount_cents: number
+  reason: string | null
+}
+
 export type Order = {
   id: string
   number: string
@@ -174,6 +210,7 @@ export type Order = {
   paid_cents: number
   version: number
   lines?: OrderLine[]
+  discounts?: OrderDiscount[]
 }
 
 export type LookedUpVariant = {
@@ -193,6 +230,60 @@ export type PaymentOutcome = {
   order: Order
 }
 
+// Verified against CatalogResource.php / GetCatalog.php: discounts is a global (not
+// location-scoped) catalog. Only `discounts` is consumed by the register today, so the
+// rest of the payload is left loosely typed rather than modeled field-by-field here.
+export type Discount = {
+  id: string
+  name: string
+  kind: 'percent' | 'fixed'
+  percent_micros: number | null
+  amount_cents: number | null
+  scope: 'order' | 'line'
+  requires_supervisor: boolean
+}
+
+export type Catalog = {
+  categories: unknown[]
+  products: unknown[]
+  variants: unknown[]
+  modifier_groups: unknown[]
+  modifiers: unknown[]
+  tax_rates: unknown[]
+  discounts: Discount[]
+}
+
+// Verified against RefundResource.php.
+export type RefundLine = {
+  original_order_line_id: string
+  qty: string
+  amount_cents: number
+  restock: boolean
+}
+
+export type Refund = {
+  id: string
+  original_order_id: string
+  driver: string
+  amount_cents: number
+  reason: string
+  business_date: string
+  lines: RefundLine[]
+}
+
+// Verified against ZReportResource.php / GetZReport.php: sales_by_driver and
+// refunds_by_driver are `driver => cents` maps (only drivers with activity are present);
+// movements always has all three kinds, zero-filled.
+export type ZReport = {
+  shift: Shift
+  sales_by_driver: Record<string, number>
+  refunds_by_driver: Record<string, number>
+  movements: { paid_in: number; payout: number; drop: number }
+  orders_closed: number
+  orders_voided: number
+  expected_cash_cents: number
+}
+
 export type Receipt = {
   business: { name: string; address: string | null; tax_id: string | null }
   location: { name: string; header: string | null; footer: string | null }
@@ -209,6 +300,7 @@ export const api = {
   staffLogin: async (pin: string): Promise<StaffSession> => {
     const session = await post<StaffSession>('/staff/login', { pin })
     tokens.setStaff(session.staff_token)
+    tokens.setStaffUser(session.user)
     return session
   },
   staffLogout: async (): Promise<void> => {
@@ -226,8 +318,18 @@ export const api = {
     post<ShiftCloseResult>(`/shifts/${shiftId}/close`, { counted_cash_cents: countedCashCents }, { 'Idempotency-Key': idempotencyKey }),
 
   lookupBarcode: (barcode: string) => request<LookedUpVariant>(`/catalog/lookup?barcode=${encodeURIComponent(barcode)}`),
+  catalog: () => request<Catalog>('/catalog'),
 
   openOrder: () => post<{ order: Order }>('/orders', {}).then((r) => r.order),
+  getOrder: (id: string) => request<{ order: Order }>(`/orders/${id}`).then((r) => r.order),
+  // A targeted lookup (receipt number for refunds, an open tab), not a browse — mirrors
+  // ListOrdersRequest, which requires at least one of the two.
+  findOrders: (params: { number?: string; status?: 'open' | 'closed' | 'voided' }) => {
+    const qs = new URLSearchParams()
+    if (params.number) qs.set('number', params.number)
+    if (params.status) qs.set('status', params.status)
+    return request<{ orders: Order[] }>(`/orders?${qs.toString()}`).then((r) => r.orders)
+  },
   // idempotencyKey is optional: retail's implicit "open order on first scan" path
   // doesn't need one, but a caller retrying a specific scan submission should pass one.
   addLine: (order: Order, variantId: string, qty = '1', idempotencyKey?: string) =>
@@ -236,14 +338,70 @@ export const api = {
       { variant_id: variantId, qty },
       { 'If-Match': String(order.version), ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
     ).then((r) => r.order),
+  voidLine: (order: Order, lineId: string, reason: string) =>
+    del<{ order: Order }>(
+      `/orders/${order.id}/lines/${lineId}`,
+      { reason },
+      { 'If-Match': String(order.version) },
+    ).then((r) => r.order),
+  // POST, not DELETE — VoidOrderController is mounted on /orders/{order}/void.
+  voidOrder: (order: Order, reason: string) =>
+    post<{ order: Order }>(
+      `/orders/${order.id}/void`,
+      { reason },
+      { 'If-Match': String(order.version) },
+    ).then((r) => r.order),
+  applyDiscount: (order: Order, discountId: string, reason: string, orderLineId?: string) =>
+    post<{ order: Order }>(
+      `/orders/${order.id}/discounts`,
+      { discount_id: discountId, order_line_id: orderLineId ?? null, reason },
+      { 'If-Match': String(order.version) },
+    ).then((r) => r.order),
+  removeDiscount: (order: Order, orderDiscountId: string) =>
+    del<{ order: Order }>(
+      `/orders/${order.id}/discounts/${orderDiscountId}`,
+      {},
+      { 'If-Match': String(order.version) },
+    ).then((r) => r.order),
   // idempotencyKey is minted once by the caller (when the tender phase is entered) and
-  // reused across retries — see closeShift's note.
-  takePayment: (order: Order, amountCents: number, tenderedCents: number, idempotencyKey: string) =>
+  // reused across retries — see closeShift's note. tenderedCents/reference are options
+  // because they're driver-specific: cash tenders (and gets a computed change_cents);
+  // external_card supplies a reference instead, and tenders nothing (TakePaymentRequest
+  // treats tendered_cents as absent when null, not literally zero).
+  takePayment: (
+    order: Order,
+    amountCents: number,
+    driver: 'cash' | 'external_card',
+    idempotencyKey: string,
+    options?: { tenderedCents?: number; reference?: string },
+  ) =>
     post<PaymentOutcome>(
       `/orders/${order.id}/payments`,
-      { driver: 'cash', amount_cents: amountCents, tendered_cents: tenderedCents },
+      {
+        driver,
+        amount_cents: amountCents,
+        tendered_cents: options?.tenderedCents ?? null,
+        reference: options?.reference ?? null,
+      },
       { 'If-Match': String(order.version), 'Idempotency-Key': idempotencyKey },
     ),
 
   receipt: (orderId: string) => request<Receipt>(`/orders/${orderId}/receipt`),
+
+  // original_order_id + lines derive the amount server-side from the original lines'
+  // frozen price/tax snapshot (RefundOrder.php) — the client only chooses qty/restock.
+  refund: (
+    originalOrderId: string,
+    driver: 'cash',
+    reason: string,
+    lines: Array<{ original_order_line_id: string; qty: string; restock: boolean }>,
+    idempotencyKey: string,
+  ) =>
+    post<{ refund: Refund }>(
+      '/refunds',
+      { original_order_id: originalOrderId, driver, reason, lines },
+      { 'Idempotency-Key': idempotencyKey },
+    ).then((r) => r.refund),
+
+  zReport: (shiftId: string) => request<ZReport>(`/reports/z?shift_id=${encodeURIComponent(shiftId)}`),
 }

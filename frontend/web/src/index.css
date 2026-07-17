@@ -481,3 +481,144 @@ form > *:not(:last-child) {
     border: none;
   }
 }
+
+/* ── M4 additions: carbon-bar session controls, void/discount/refund flows, Z-report ──
+   Same rules as everything above: warm = action only, hard bevels, no blur, no new hues. */
+
+.carbon-bar-link {
+  background: transparent;
+  border: none;
+  color: var(--color-nav-gold);
+  font: 700 13px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+}
+
+.carbon-bar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.carbon-bar-user {
+  color: var(--color-canvas-soft);
+  font: 700 11px/1.1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.btn-clockout {
+  border: 1px solid var(--color-hairline);
+}
+
+/* Small in-row action chips (VOID on a cart row, ✕ on a discount row). Red is
+   destructive here — the one non-error use the system allows. */
+.btn-chip {
+  min-height: 32px;
+  min-width: 44px;
+  padding: var(--space-xxs) var(--space-sm);
+  margin-left: var(--space-sm);
+  font-size: 10px;
+}
+
+.inline-reason {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-sm);
+  background: var(--color-canvas-soft);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+}
+
+.inline-reason input {
+  flex: 1;
+}
+
+.discount-picker {
+  padding: var(--space-md);
+  background: var(--color-periwinkle);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.discount-picker input {
+  flex: 1 1 160px;
+}
+
+.picker-label {
+  flex-basis: 100%;
+  margin: 0;
+  font: 700 11px/1.1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-ink);
+}
+
+.discount-row .cart-row-price {
+  color: var(--color-ink-soft);
+}
+
+.refund-row {
+  align-items: center;
+}
+
+.refund-qty {
+  width: 72px;
+  min-height: 44px;
+  margin-left: var(--space-sm);
+}
+
+.restock-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  margin-left: var(--space-sm);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.restock-check input[type='checkbox'] {
+  min-height: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.zreport dl {
+  display: block;
+  margin: 0;
+}
+
+.zreport .zrow {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-xxs) 0;
+  border-bottom: 1px dotted var(--color-muted-indigo);
+}
+
+.zreport dt {
+  font: 700 11px/1.4 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.zreport dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  .carbon-bar-link,
+  .carbon-bar-right {
+    display: none;
+  }
+}
