@@ -323,12 +323,16 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
         return
       }
       const paid = [...split.paid, { outcome, receipt }]
+      // Splice the just-closed child's own post-payment copy (due_cents: 0) back into
+      // `children` at the index that was just paid — without this, the strip's stale
+      // pre-payment snapshot never shows `.settled`/"Paid" for a closed check.
+      const children = split.children.map((c, ix) => (ix === split.activeIx ? outcome.order : c))
       const nextIx = split.activeIx + 1
-      if (nextIx < split.children.length) {
+      if (nextIx < children.length) {
         // Next unpaid child becomes the working order, straight into a fresh tender —
         // same code path every other order goes through, just re-entered per child.
-        setSplit({ ...split, activeIx: nextIx, paid })
-        setOrder(split.children[nextIx])
+        setSplit({ children, activeIx: nextIx, paid })
+        setOrder(children[nextIx])
         setPhase({ name: 'tender', key: crypto.randomUUID() })
       } else {
         setSplit(null)
@@ -458,7 +462,9 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
 
   const lines = order?.lines ?? []
   const appliedDiscounts = order?.discounts ?? []
-  const balance = order ? order.total_cents - order.paid_cents : 0
+  // Server-computed (OrderResource.php: max(0, total_cents - paid_cents)) — never
+  // derived client-side, same rule the split-child strip already follows.
+  const balance = order ? order.due_cents : 0
 
   return (
     <section className="form-panel">

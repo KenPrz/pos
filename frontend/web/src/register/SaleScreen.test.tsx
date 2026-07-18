@@ -126,6 +126,14 @@ describe('SaleScreen split flow', () => {
     await waitFor(() => expect(screen.getByText('Order N-0003')).toBeInTheDocument())
     expect(api.takePayment).toHaveBeenCalledTimes(1)
 
+    // The settled-chip regression this task fixed: check 1's chip must flip to "Paid"
+    // once its payment closes it, not keep showing its stale pre-payment due forever.
+    const chips = document.querySelectorAll('.split-chip')
+    expect(chips[0]).toHaveClass('settled')
+    expect(chips[0]).toHaveTextContent('Paid')
+    expect(chips[1]).toHaveClass('active')
+    expect(chips[1]).toHaveTextContent('$5.00')
+
     fireEvent.change(screen.getByLabelText(/cash tendered/i), { target: { value: '5.00' } })
     fireEvent.click(screen.getByRole('button', { name: /take payment/i }))
 

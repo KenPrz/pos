@@ -126,8 +126,13 @@ describe('CloseShiftScreen — approve variance', () => {
     expect(screen.queryByRole('button', { name: /approve variance/i })).not.toBeInTheDocument()
   })
 
-  it('lets a supervisor approve, swapping the warning for an approved-by line', async () => {
+  it('lets a supervisor approve, swapping the warning for an approved-by line driven by the response', async () => {
+    // Session name and response fields are deliberately made to differ from each other
+    // (a fixed, distinctive timestamp the session couldn't know) so a test that only
+    // checked the session-derived name couldn't mask a bug in what actually gates the
+    // line — the approved_at TEXT asserted below only exists in the mocked response.
     tokens.setStaffUser({ id: 'sup-1', name: 'Supervisor Sam', is_admin: false, permissions: ['shift.approve_variance'] })
+    const approvedAt = '2026-07-18T15:30:00.000Z'
     vi.mocked(api.zReport).mockResolvedValue(makeZReport(12500))
     vi.mocked(api.closeShift).mockResolvedValue(closeResult)
     vi.mocked(api.approveVariance).mockResolvedValue(
@@ -135,7 +140,7 @@ describe('CloseShiftScreen — approve variance', () => {
         closed_at: new Date().toISOString(),
         variance_cents: -500,
         variance_approved_by: 'sup-1',
-        variance_approved_at: new Date().toISOString(),
+        variance_approved_at: approvedAt,
       }),
     )
     renderClose((permission) => permission === 'shift.approve_variance')
@@ -146,8 +151,30 @@ describe('CloseShiftScreen — approve variance', () => {
     fireEvent.click(approveBtn)
 
     await waitFor(() => expect(api.approveVariance).toHaveBeenCalledWith('shift-1'))
-    expect(await screen.findByText(/approved by supervisor sam/i)).toBeInTheDocument()
+    // The timestamp text only exists if it was read from the mocked response, not from
+    // anything the session/tokens mock could have supplied.
+    expect(await screen.findByText(new RegExp(new Date(approvedAt).toLocaleTimeString()))).toBeInTheDocument()
+    expect(screen.getByText(/approved by supervisor sam/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /approve variance/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/needs supervisor approval/i)).not.toBeInTheDocument()
+  })
+
+  it('does not swap to the approved-by line unless the response itself carries variance_approved_at', async () => {
+    // Guards against gating on "got any response back" instead of the authoritative
+    // field — a response that (hypothetically) omitted variance_approved_at must leave
+    // the M4 warning/button in place, not silently treat the click as having succeeded.
+    vi.mocked(api.zReport).mockResolvedValue(makeZReport(12500))
+    vi.mocked(api.closeShift).mockResolvedValue(closeResult)
+    vi.mocked(api.approveVariance).mockResolvedValue(
+      makeShift({ closed_at: new Date().toISOString(), variance_cents: -500, variance_approved_by: null, variance_approved_at: null }),
+    )
+    renderClose(() => true)
+
+    await closeDrawer()
+    fireEvent.click(await screen.findByRole('button', { name: /approve variance/i }))
+
+    await waitFor(() => expect(api.approveVariance).toHaveBeenCalledWith('shift-1'))
+    expect(screen.queryByText(/approved by/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/needs supervisor approval/i)).toBeInTheDocument()
   })
 })

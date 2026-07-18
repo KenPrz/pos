@@ -68,7 +68,13 @@ export function SplitPrompt({ ways, totalCents, onWaysChange, onConfirm, onCance
         <button type="button" className="btn btn-submit" disabled={pending} onClick={onConfirm}>
           {pending ? 'Splitting…' : 'GO'}
         </button>
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+        {/* Disabled while pending, not left clickable: once GO has been submitted the
+            split is already in flight against the server and (on success) irreversible
+            — the original order is voided server-side the moment it lands. Letting
+            Cancel dismiss the prompt while that's still outstanding would let the
+            cashier believe they'd backed out, only for split mode to activate under
+            them anyway when the response arrives. */}
+        <button type="button" className="btn btn-secondary" disabled={pending} onClick={onCancel}>Cancel</button>
       </div>
     </div>
   )

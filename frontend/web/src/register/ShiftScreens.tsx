@@ -160,10 +160,15 @@ export function CloseShiftScreen({ shiftId, can, onClosed, onCancel, onSessionEx
           <dt>Variance</dt><dd>{revealed ? fm(result.variance_cents) : MASK}</dd>
         </dl>
         {result.requires_approval && (
-          approvedShift ? (
+          approvedShift?.variance_approved_at ? (
             <p className="muted">
-              Variance approved by {tokens.staffUser()?.name ?? 'supervisor'}
-              {approvedShift.variance_approved_at && ` at ${new Date(approvedShift.variance_approved_at).toLocaleTimeString()}`}
+              {/* Authoritative state is the response: variance_approved_at non-null is
+                  what gates this line, and its timestamp is what's shown — the API never
+                  resolves variance_approved_by (a user id) to a name, so the name here is
+                  tokens.staffUser()'s own display-only garnish (the currently-signed-in
+                  supervisor is who just clicked Approve), not something the server told us. */}
+              Variance approved by {tokens.staffUser()?.name ?? 'supervisor'} at{' '}
+              {new Date(approvedShift.variance_approved_at).toLocaleTimeString()}
             </p>
           ) : (
             <>

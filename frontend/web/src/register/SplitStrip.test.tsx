@@ -103,4 +103,15 @@ describe('SplitPrompt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onCancel).toHaveBeenCalled()
   })
+
+  it('disables Cancel while the split request is in flight, so it cannot be dismissed out from under an already-irreversible submit', () => {
+    const onCancel = vi.fn()
+    render(
+      <SplitPrompt ways={2} totalCents={1000} onWaysChange={vi.fn()} onConfirm={vi.fn()} onCancel={onCancel} pending={true} />,
+    )
+    const cancelBtn = screen.getByRole('button', { name: 'Cancel' })
+    expect(cancelBtn).toBeDisabled()
+    fireEvent.click(cancelBtn)
+    expect(onCancel).not.toHaveBeenCalled()
+  })
 })
