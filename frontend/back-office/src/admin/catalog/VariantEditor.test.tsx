@@ -77,4 +77,28 @@ describe('VariantEditor', () => {
 
     await waitFor(() => expect(api.variants.update).toHaveBeenCalledWith('var-1', { price_cents: 500 }))
   })
+
+  // Review fix: unchecking Active and hitting Save must not silently archive — the
+  // brief's global "archive behind a confirm" constraint, previously unimplemented.
+  it('does not save an archive when the confirm is cancelled', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderEditor()
+
+    fireEvent.click(screen.getByLabelText(/^active$/i))
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Archive'))
+    expect(api.variants.update).not.toHaveBeenCalled()
+  })
+
+  it('saves the archive once the confirm is accepted', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(api.variants.update).mockResolvedValue({ ...VARIANT, is_active: false })
+    renderEditor()
+
+    fireEvent.click(screen.getByLabelText(/^active$/i))
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => expect(api.variants.update).toHaveBeenCalledWith('var-1', { is_active: false }))
+  })
 })

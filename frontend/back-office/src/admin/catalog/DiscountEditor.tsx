@@ -85,6 +85,11 @@ export function DiscountEditor({
     put('requires_supervisor', requiresSupervisor, discount?.requires_supervisor)
     if (discount) put('is_active', isActive, discount.is_active)
 
+    // Archive behind a confirm (brief's global constraint) — unchecking Active and
+    // hitting Save must not silently archive. UNARCHIVE (the table action) needs none.
+    if (body.is_active === false && !window.confirm(`Archive ${name}? It leaves the register catalog but stays in history.`)) {
+      return
+    }
     save.mutate(body)
   }
 

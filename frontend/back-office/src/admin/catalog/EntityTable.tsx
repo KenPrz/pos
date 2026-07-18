@@ -29,6 +29,12 @@ export function EntityTable<T extends { id: string; is_active?: boolean }>({
   onNew,
   onUnarchive,
   newLabel = 'New',
+  // Warm signal orange by default — the table IS the screen when it's on top level, so
+  // NEW is that screen's one primary action. When this table is nested inside an editor
+  // that already has its own warm Save (ModifierGroupEditor's modifiers list, nested
+  // under the group's own Save), the caller downgrades this to `btn-utility` so only one
+  // warm button exists on screen at a time (DESIGN.md — warm color, one action).
+  newButtonClass = 'btn-submit',
   emptyMessage = 'Nothing here yet.',
 }: {
   title: string
@@ -38,13 +44,14 @@ export function EntityTable<T extends { id: string; is_active?: boolean }>({
   onNew: () => void
   onUnarchive?: (row: T) => void
   newLabel?: string
+  newButtonClass?: string
   emptyMessage?: string
 }) {
   return (
     <section className="form-panel">
       <header className="row">
         <h2>{title}</h2>
-        <button type="button" className="btn btn-submit" onClick={onNew}>
+        <button type="button" className={`btn ${newButtonClass}`} onClick={onNew}>
           {newLabel}
         </button>
       </header>

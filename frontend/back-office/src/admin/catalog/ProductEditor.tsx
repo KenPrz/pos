@@ -79,6 +79,12 @@ export function ProductEditor({
     put('category_id', categoryId || null, product?.category_id)
     put('kind', kind, product?.kind)
     if (product) put('is_active', isActive, product.is_active)
+
+    // Archive behind a confirm (brief's global constraint) — unchecking Active and
+    // hitting Save must not silently archive. UNARCHIVE (the table action) needs none.
+    if (body.is_active === false && !window.confirm(`Archive ${name}? It leaves the register catalog but stays in history.`)) {
+      return
+    }
     save.mutate(body)
   }
 

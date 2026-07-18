@@ -69,6 +69,17 @@ function ModifierForm({
       setError('Enter a valid amount (e.g. -0.50).')
       return
     }
+    // Blank must fail validation, not silently coerce to 0 (`Number('') === 0`) —
+    // same failure class as the money fields.
+    if (position.trim() === '') {
+      setError('Enter a position (e.g. 0).')
+      return
+    }
+    const positionValue = Number(position)
+    if (!Number.isFinite(positionValue)) {
+      setError('Enter a valid position (e.g. 0).')
+      return
+    }
     const body: Record<string, unknown> = {}
     const put = (key: string, value: unknown, original: unknown) => {
       if (modifier === null || value !== original) body[key] = value
@@ -76,8 +87,14 @@ function ModifierForm({
     if (modifier === null) body.group_id = groupId
     put('name', name, modifier?.name)
     put('price_delta_cents', priceDelta, modifier?.price_delta_cents)
-    put('position', Number(position), modifier?.position)
+    put('position', positionValue, modifier?.position)
     if (modifier) put('is_active', isActive, modifier.is_active)
+
+    // Archive behind a confirm (brief's global constraint) — unchecking Active and
+    // hitting Save must not silently archive. UNARCHIVE (the table action) needs none.
+    if (body.is_active === false && !window.confirm(`Archive ${name}? It leaves the register catalog but stays in history.`)) {
+      return
+    }
     save.mutate(body)
   }
 
@@ -161,8 +178,26 @@ export function ModifierGroupEditor({
   const submit = (e: FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    // Blank must fail validation, not silently coerce to 0 (`Number('') === 0`).
+    // Max select's blank IS meaningful ("unlimited" — the field label says so), so only
+    // min select gets the strict blank-is-an-error treatment; both still guard against
+    // non-numeric garbage (`Number('abc')` is NaN, which JSON.stringify would otherwise
+    // silently turn into `null` on the wire — a false "unlimited" for a mistyped max).
+    if (minSelect.trim() === '') {
+      setError('Enter a min select value (e.g. 0).')
+      return
+    }
     const min = Number(minSelect)
+    if (!Number.isFinite(min)) {
+      setError('Enter a valid min select value (e.g. 0).')
+      return
+    }
     const max = maxSelect === '' ? null : Number(maxSelect)
+    if (max !== null && !Number.isFinite(max)) {
+      setError('Enter a valid max select value, or leave it blank for unlimited.')
+      return
+    }
     if (max !== null && max < min) {
       setError('Max select must be >= min select.')
       return
@@ -238,6 +273,10 @@ export function ModifierGroupEditor({
               onNew={() => setEditingModifier('new')}
               onUnarchive={(m) => unarchiveModifier.mutate(m.id)}
               newLabel="New modifier"
+              // Downgraded from the default warm btn-submit (ProductEditor's "Save
+              // modifier groups" precedent) — the group's own Save above is this
+              // screen's one primary action; a nested table can't have a second.
+              newButtonClass="btn-utility"
               emptyMessage="No modifiers in this group yet."
             />
           )}

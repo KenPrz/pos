@@ -82,6 +82,11 @@ export function VariantEditor({
     put('track_inventory', trackInventory, variant?.track_inventory)
     if (variant) put('is_active', isActive, variant.is_active)
 
+    // Archive behind a confirm (brief's global constraint) — unchecking Active and
+    // hitting Save must not silently archive. UNARCHIVE (the table action) needs none.
+    if (body.is_active === false && !window.confirm(`Archive ${name}? It leaves the register catalog but stays in history.`)) {
+      return
+    }
     save.mutate(body)
   }
 
