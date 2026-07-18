@@ -5,14 +5,24 @@ declare(strict_types=1);
 use App\Http\Controllers\Admin\AdminLoginController;
 use App\Http\Controllers\Admin\AdminLogoutController;
 use App\Http\Controllers\Admin\Catalog\CreateCategoryController;
+use App\Http\Controllers\Admin\Catalog\CreateDiscountController;
+use App\Http\Controllers\Admin\Catalog\CreateModifierController;
+use App\Http\Controllers\Admin\Catalog\CreateModifierGroupController;
 use App\Http\Controllers\Admin\Catalog\CreateProductController;
 use App\Http\Controllers\Admin\Catalog\CreateTaxRateController;
 use App\Http\Controllers\Admin\Catalog\CreateVariantController;
 use App\Http\Controllers\Admin\Catalog\ListCategoriesController;
+use App\Http\Controllers\Admin\Catalog\ListDiscountsController;
+use App\Http\Controllers\Admin\Catalog\ListModifierGroupsController;
+use App\Http\Controllers\Admin\Catalog\ListModifiersController;
 use App\Http\Controllers\Admin\Catalog\ListProductsController;
 use App\Http\Controllers\Admin\Catalog\ListTaxRatesController;
 use App\Http\Controllers\Admin\Catalog\ListVariantsController;
+use App\Http\Controllers\Admin\Catalog\SetProductModifierGroupsController;
 use App\Http\Controllers\Admin\Catalog\UpdateCategoryController;
+use App\Http\Controllers\Admin\Catalog\UpdateDiscountController;
+use App\Http\Controllers\Admin\Catalog\UpdateModifierController;
+use App\Http\Controllers\Admin\Catalog\UpdateModifierGroupController;
 use App\Http\Controllers\Admin\Catalog\UpdateProductController;
 use App\Http\Controllers\Admin\Catalog\UpdateTaxRateController;
 use App\Http\Controllers\Admin\Catalog\UpdateVariantController;
@@ -98,6 +108,23 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/variants', ListVariantsController::class)->name('admin.variants.list');
         Route::post('/variants', CreateVariantController::class)->name('admin.variants.create');
         Route::patch('/variants/{variant}', UpdateVariantController::class)->name('admin.variants.update');
+
+        // Modifier groups, modifiers, discounts (M6 task 3), plus the product<->group
+        // attach endpoint. PUT, not PATCH: it replaces the full pivot set.
+        Route::get('/modifier-groups', ListModifierGroupsController::class)->name('admin.modifier-groups.list');
+        Route::post('/modifier-groups', CreateModifierGroupController::class)->name('admin.modifier-groups.create');
+        Route::patch('/modifier-groups/{modifier_group}', UpdateModifierGroupController::class)->name('admin.modifier-groups.update');
+
+        Route::get('/modifiers', ListModifiersController::class)->name('admin.modifiers.list');
+        Route::post('/modifiers', CreateModifierController::class)->name('admin.modifiers.create');
+        Route::patch('/modifiers/{modifier}', UpdateModifierController::class)->name('admin.modifiers.update');
+
+        Route::get('/discounts', ListDiscountsController::class)->name('admin.discounts.list');
+        Route::post('/discounts', CreateDiscountController::class)->name('admin.discounts.create');
+        Route::patch('/discounts/{discount}', UpdateDiscountController::class)->name('admin.discounts.update');
+
+        Route::put('/products/{product}/modifier-groups', SetProductModifierGroupsController::class)
+            ->name('admin.products.modifier-groups.set');
     });
 
     Route::middleware('device')->group(function (): void {

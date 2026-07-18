@@ -23,6 +23,13 @@ final class AdminProductResource extends JsonResource
             'is_active' => $this->is_active,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
+            'modifier_groups' => $this->whenLoaded('modifierGroups', fn () => $this->modifierGroups
+                ->map(fn ($group) => [
+                    'id' => $group->id,
+                    'name' => $group->name,
+                    'position' => (int) $group->pivot->position,
+                ])
+                ->all()),
         ];
     }
 }
