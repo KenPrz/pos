@@ -3,7 +3,7 @@ COMPOSE_DEV  := docker compose -f compose.dev.yml
 COMPOSE_PROD := docker compose -f compose.prod.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help dev dev-down logs ps seed migrate dev-key test test-backend test-web test-bo typecheck clean
+.PHONY: help dev dev-down logs ps seed migrate dev-key test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -63,3 +63,17 @@ typecheck: ## tsgo on both frontend apps
 clean: ## Dev stack down AND volumes destroyed (asks first)
 	@read -p "Destroy dev volumes (db data, vendor, node_modules)? [y/N] " a && [ "$$a" = "y" ]
 	$(COMPOSE_DEV) down -v
+
+build: ## Build all three production images
+	docker build --target prod -t pos-api:latest backend
+	docker build --target runner -t pos-web:latest frontend/web
+	docker build --target runner -t pos-back-office:latest frontend/back-office
+
+prod-up: ## Start the production stack (needs .env — see .env.prod.example)
+	$(COMPOSE_PROD) up -d --build
+
+prod-down: ## Stop the production stack
+	$(COMPOSE_PROD) down
+
+prod-logs: ## Tail production logs
+	$(COMPOSE_PROD) logs -f --tail=100
