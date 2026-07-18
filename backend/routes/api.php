@@ -26,6 +26,13 @@ use App\Http\Controllers\Admin\Catalog\UpdateModifierGroupController;
 use App\Http\Controllers\Admin\Catalog\UpdateProductController;
 use App\Http\Controllers\Admin\Catalog\UpdateTaxRateController;
 use App\Http\Controllers\Admin\Catalog\UpdateVariantController;
+use App\Http\Controllers\Admin\Locations\CreateLocationController;
+use App\Http\Controllers\Admin\Locations\ListLocationsController;
+use App\Http\Controllers\Admin\Locations\UpdateLocationController;
+use App\Http\Controllers\Admin\Registers\CreateRegisterController;
+use App\Http\Controllers\Admin\Registers\ListRegistersController;
+use App\Http\Controllers\Admin\Registers\ReissueDeviceTokenController;
+use App\Http\Controllers\Admin\Registers\UpdateRegisterController;
 use App\Http\Controllers\Admin\Users\CreateUserController;
 use App\Http\Controllers\Admin\Users\ListUsersController;
 use App\Http\Controllers\Admin\Users\UpdateUserController;
@@ -58,6 +65,7 @@ use App\Http\Controllers\Shifts\ApproveVarianceController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
 use App\Http\Controllers\Shifts\OpenShiftController;
+use App\Http\Controllers\Shifts\OpenShiftRegistersController;
 use App\Http\Controllers\Shifts\RecordCashMovementController;
 use App\Http\Controllers\Stock\AdjustStockController;
 use App\Http\Controllers\Stock\CountStockController;
@@ -134,6 +142,22 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/users', ListUsersController::class)->name('admin.users.list');
         Route::post('/users', CreateUserController::class)->name('admin.users.create');
         Route::patch('/users/{user}', UpdateUserController::class)->name('admin.users.update');
+
+        // Location and register settings (M6 task 5). No DELETE routes here either —
+        // archive via PATCH is_active, same as catalog.
+        Route::get('/locations', ListLocationsController::class)->name('admin.locations.list');
+        Route::post('/locations', CreateLocationController::class)->name('admin.locations.create');
+        Route::patch('/locations/{location}', UpdateLocationController::class)->name('admin.locations.update');
+
+        Route::get('/registers', ListRegistersController::class)->name('admin.registers.list');
+        Route::post('/registers', CreateRegisterController::class)->name('admin.registers.create');
+        Route::patch('/registers/{register}', UpdateRegisterController::class)->name('admin.registers.update');
+
+        // Revokes every existing token for the register and mints a fresh one — the
+        // lost/stolen-terminal path. The enrol endpoint below (device tier bootstrap)
+        // is the other legal way to get a register its first token.
+        Route::post('/registers/{register}/token', ReissueDeviceTokenController::class)
+            ->name('admin.registers.token_reissue');
     });
 
     Route::middleware('device')->group(function (): void {
@@ -160,6 +184,12 @@ Route::prefix('v1')->group(function (): void {
                 ->name('shifts.close');
             Route::post('/shifts/{shift}/approve-variance', ApproveVarianceController::class)
                 ->name('shifts.approve-variance');
+
+            // Staff tier, not device tier: this is the register app cross-referencing
+            // sibling tills at the same location (e.g. "approve my variance from another
+            // open register"), which is a staff action even though it touches no money.
+            Route::get('/registers/open-shifts', OpenShiftRegistersController::class)
+                ->name('registers.open-shifts');
 
             Route::post('/orders', OpenOrderController::class)->name('orders.open');
             Route::get('/orders', ListOrdersController::class)->name('orders.list');
