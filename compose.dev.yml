@@ -21,11 +21,16 @@ services:
 
   api:
     build: { context: backend, target: dev }
-    # Dev-only: the image's `USER pos` (Dockerfile) can't write into a freshly
-    # created named volume — Docker creates api_vendor root-owned, and
-    # `composer install` then fails with "vendor/... could not be created".
-    # Root here only touches the anonymous vendor volume, never the host bind
-    # mount; prod (Task 5) keeps the non-root user.
+    # Dev-only: Docker creates a fresh named volume root-owned, and the
+    # image's `USER pos` (Dockerfile) can't write into api_vendor — first
+    # boot's `composer install` fails with "vendor/... could not be created".
+    # `user: root` here only gets the container's *starting* process to root
+    # so the command below can chown api_vendor once; every actual long-running
+    # process (composer install, frankenphp) then runs via `su pos`, which
+    # matches the host user by construction (Dockerfile: `useradd -u 1000 pos`).
+    # That means bootstrap/cache and everything else under the ./backend bind
+    # mount is written as uid 1000, never root — prod (Task 5) is untouched,
+    # it never runs this command.
     user: root
     depends_on:
       db: { condition: service_healthy }
@@ -49,12 +54,21 @@ services:
       - ./backend:/app
       - api_vendor:/app/vendor
     # Bind mount hides the image's vendor; install on boot if absent, then serve.
-    command: ["sh", "-c", "composer install --no-interaction && exec entrypoint.sh frankenphp run --config /etc/frankenphp/Caddyfile"]
+    # Root chowns the volume mountpoint, then `exec su` hands off to pos for
+    # good — no php/composer process, and nothing it writes, ever runs as root.
+    command: ["sh", "-c", "chown -R pos:pos /app/vendor && exec su pos -s /bin/sh -c 'composer install --no-interaction && exec entrypoint.sh frankenphp run --config /etc/frankenphp/Caddyfile'"]
 
   web:
     build: { context: frontend/web, target: dev }
-    # Dev-only: see api's `user: root` note — same root-owned fresh named
-    # volume problem, here for web_node_modules.
+    # Dev-only: same root-owned fresh named volume problem as api, here for
+    # web_node_modules. `user: root` only gets the container's starting
+    # process to root so the command can chown the volume once; the actual
+    # `npm install`/`next dev` run via `su node`. Not `su pos` — the
+    # Dockerfile's own `pos` user is Alpine's next free system uid (100 here),
+    # which does NOT match the host. `node:24-alpine` already ships a `node`
+    # user at uid 1000/gid 1000 (verified: matches this host's uid), so we use
+    # that instead — everything written under the ./frontend/web bind mount
+    # (including .next) lands owned by the host user, never root.
     user: root
     environment:
       API_ORIGIN: http://api:8000
@@ -65,12 +79,13 @@ services:
     volumes:
       - ./frontend/web:/app
       - web_node_modules:/app/node_modules
-    command: ["sh", "-c", "npm install && npm run dev"]
+    command: ["sh", "-c", "chown -R node:node /app/node_modules && exec su node -s /bin/sh -c 'npm install && npm run dev'"]
 
   back-office:
     build: { context: frontend/back-office, target: dev }
-    # Dev-only: see api's `user: root` note — same root-owned fresh named
-    # volume problem, here for bo_node_modules.
+    # Dev-only: see web's note above — same fix, here for bo_node_modules and
+    # the ./frontend/back-office bind mount. `su node`, not `su pos`, for the
+    # same uid-1000-vs-100 reason.
     user: root
     environment:
       API_ORIGIN: http://api:8000
@@ -82,7 +97,7 @@ services:
     volumes:
       - ./frontend/back-office:/app
       - bo_node_modules:/app/node_modules
-    command: ["sh", "-c", "npm install && npm run dev"]
+    command: ["sh", "-c", "chown -R node:node /app/node_modules && exec su node -s /bin/sh -c 'npm install && npm run dev'"]
 
 volumes:
   pgdata:
