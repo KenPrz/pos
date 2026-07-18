@@ -360,6 +360,16 @@ export type ZReport = {
   expected_cash_cents: number
 }
 
+// Verified against ListOpenShiftRegisters.php: other active registers at this
+// register's location that currently have an open shift, plus who opened each one.
+// Excludes the acting register itself — there's no "transfer to me" case.
+export type OpenShiftRegister = {
+  register_id: string
+  register_name: string
+  shift_id: string
+  opened_by_name: string
+}
+
 export type Receipt = {
   business: { name: string; address: string | null; tax_id: string | null }
   location: { name: string; header: string | null; footer: string | null }
@@ -425,6 +435,11 @@ export const api = {
   },
   // The floor view (M5): every open order across the location, not just this register's.
   openOrders: () => api.findOrders({ status: 'open' }),
+  // Other registers at this location with an open shift right now (M6 gap fix): the
+  // transfer picker's target list. Unlike deriving targets from openOrders, this
+  // surfaces a register with an open shift but no open tabs — the exact case the old
+  // inference missed.
+  openShiftRegisters: () => request<{ items: OpenShiftRegister[] }>('/registers/open-shifts').then((r) => r.items),
   // idempotencyKey is optional: retail's implicit "open order on first scan" path
   // doesn't need one, but a caller retrying a specific scan submission should pass one.
   // modifierIds is omitted from the body entirely when empty — AddLineRequest's

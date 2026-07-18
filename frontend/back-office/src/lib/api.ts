@@ -208,6 +208,49 @@ export type Discount = {
   is_active: boolean
 }
 
+// ---------------------------------------------------------------------------
+// Users, locations & registers (Task 10) — verified against
+// app/Http/Resources/Admin/{AdminUserResource,AdminLocationResource,AdminRegisterResource}.php.
+// ---------------------------------------------------------------------------
+
+/**
+ * A user's role at one location. `location_name` rides along on every read (joined
+ * server-side in RoleAssignments::describe) purely for display — writing a user only
+ * ever sends `{ location_id, role }` back (RoleAssignments::sync ignores anything else),
+ * so `location_name` is optional on the way out and simply dropped by the caller.
+ */
+export type RoleAssignment = { location_id: string; location_name: string; role: 'cashier' | 'supervisor' }
+
+// Deliberately not named `AdminUser` — that type already means "the signed-in admin"
+// (AdminSessionResource, no roles/is_active). This is a managed user row.
+export type ManagedUser = {
+  id: string
+  name: string
+  email: string | null
+  is_admin: boolean
+  is_active: boolean
+  roles: RoleAssignment[]
+}
+
+export type Location = {
+  id: string
+  code: string
+  name: string
+  timezone: string
+  prices_include_tax: boolean
+  receipt_header: string | null
+  receipt_footer: string | null
+  is_active: boolean
+}
+
+export type Register = {
+  id: string
+  location_id: string
+  name: string
+  mode: 'retail' | 'food'
+  is_active: boolean
+}
+
 /**
  * One list+create+update trio per catalog entity. Every list endpoint wraps its rows
  * as `{ items: [...] }`; every create/update wraps the single row under the entity's
@@ -255,9 +298,18 @@ export const api = {
       (r) => r.product,
     ),
 
-  // Tasks 10-11 extend from here:
-  // users: list/create/update per Task 4 shapes
-  // locations, registers (+ reissueToken(registerId): Promise<string>)
+  users: catalogEntity<ManagedUser>('users', 'user'),
+  locations: catalogEntity<Location>('locations', 'location'),
+  registers: {
+    ...catalogEntity<Register>('registers', 'register'),
+    // Revokes every existing token for the register and mints a fresh one — the old
+    // till goes dark the instant this succeeds (ReissueDeviceToken.php). 201, not 200:
+    // this mints a new credential, same status class as create.
+    reissueToken: (registerId: string): Promise<string> =>
+      post<{ token: string }>(`/admin/registers/${registerId}/token`, {}).then((r) => r.token),
+  },
+
+  // Task 11 extends from here:
   // salesReport(params): Promise<SalesReport>; stockReport(params)
   // audit(params): Promise<AuditPage>
 }

@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import type { AdminUser } from '../lib/api'
 import { CatalogSection } from './catalog/CatalogSection'
+import { UsersSection } from './users/UsersSection'
+import { PlacesSection } from './places/PlacesSection'
 
 export type Section = 'catalog' | 'users' | 'locations' | 'reports' | 'audit'
 
@@ -14,13 +16,10 @@ const NAV_ITEMS: Array<{ id: Section; label: string }> = [
   { id: 'audit', label: 'Audit' },
 ]
 
-// Placeholder copy per section — Tasks 10-11 replace each with real content (user
-// management, location/register settings, reports, the audit viewer). Catalog (Task 9)
-// is real below. No routes: the section is plain client state, same one-page
-// architecture as the register.
-const SECTION_PLACEHOLDER: Record<Exclude<Section, 'catalog'>, string> = {
-  users: 'User management arrives in a later task.',
-  locations: 'Location and register settings arrive in a later task.',
+// Placeholder copy for the sections Task 11 still owns. Catalog (Task 9), Users and
+// Locations & Registers (Task 10) are real below. No routes: the section is plain
+// client state, same one-page architecture as the register.
+const SECTION_PLACEHOLDER: Record<Exclude<Section, 'catalog' | 'users' | 'locations'>, string> = {
   reports: 'Sales and stock reports arrive in a later task.',
   audit: 'The audit viewer arrives in a later task.',
 }
@@ -72,7 +71,7 @@ export function Shell({
             ))}
           </nav>
 
-          {section === 'catalog' ? (
+          {section === 'catalog' && (
             // CatalogSection renders its own nested menu-grid (section rail vs. catalog
             // tab rail are two independent nav levels) — it needs the same flex:1 the
             // placeholder panel below gets, or it sizes to content instead of filling
@@ -80,7 +79,18 @@ export function Shell({
             <div style={{ flex: 1 }}>
               <CatalogSection onUnauthorized={onUnauthorized} />
             </div>
-          ) : (
+          )}
+          {section === 'users' && (
+            <div style={{ flex: 1 }}>
+              <UsersSection onUnauthorized={onUnauthorized} />
+            </div>
+          )}
+          {section === 'locations' && (
+            <div style={{ flex: 1 }}>
+              <PlacesSection onUnauthorized={onUnauthorized} />
+            </div>
+          )}
+          {section !== 'catalog' && section !== 'users' && section !== 'locations' && (
             <section className="form-panel" style={{ flex: 1 }}>
               <h2>{activeLabel}</h2>
               <p className="muted">{SECTION_PLACEHOLDER[section]}</p>

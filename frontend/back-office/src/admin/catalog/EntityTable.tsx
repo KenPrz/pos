@@ -36,6 +36,11 @@ export function EntityTable<T extends { id: string; is_active?: boolean }>({
   // warm button exists on screen at a time (DESIGN.md — warm color, one action).
   newButtonClass = 'btn-submit',
   emptyMessage = 'Nothing here yet.',
+  // Users (Task 10) reuse this same grey-out-and-reinstate mechanics for "deactivated"
+  // rather than "archived" — different vocabulary, identical is_active PATCH underneath —
+  // so the two labels are overridable rather than hardcoded to the catalog's wording.
+  archivedLabel = 'ARCHIVED',
+  unarchiveLabel = 'Unarchive',
 }: {
   title: string
   columns: Array<EntityColumn<T>>
@@ -46,6 +51,8 @@ export function EntityTable<T extends { id: string; is_active?: boolean }>({
   newLabel?: string
   newButtonClass?: string
   emptyMessage?: string
+  archivedLabel?: string
+  unarchiveLabel?: string
 }) {
   return (
     <section className="form-panel">
@@ -81,14 +88,14 @@ export function EntityTable<T extends { id: string; is_active?: boolean }>({
                       <button type="button" className="btn btn-utility btn-chip" onClick={() => onEdit(row)}>
                         Edit
                       </button>
-                      {archived && <span className="badge-archived">ARCHIVED</span>}
+                      {archived && <span className="badge-archived">{archivedLabel}</span>}
                       {archived && onUnarchive && (
                         <button
                           type="button"
                           className="btn btn-secondary btn-chip"
                           onClick={() => onUnarchive(row)}
                         >
-                          Unarchive
+                          {unarchiveLabel}
                         </button>
                       )}
                     </div>

@@ -1,17 +1,17 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { ApiError, api, type Order } from '../lib/api'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { ApiError, api, type Order, type OpenShiftRegister } from '../lib/api'
 import { cents, formatMoney } from '../lib/money'
 
 const CURRENCY = 'USD'
 const fm = (n: number) => formatMoney(cents(n), CURRENCY)
 
-// A stable reference for the "no data yet" case — `openOrders.data ?? []` would mint a
-// new array every render, which then re-triggers the `targets` useMemo below every time
-// for no reason.
+// Stable references for the "no data yet" case — `.data ?? []` would otherwise mint a
+// new array every render.
 const NO_ORDERS: Order[] = []
+const NO_TARGETS: OpenShiftRegister[] = []
 
 function ageLabel(openedAt: string | undefined): string {
   if (!openedAt) return '—'
@@ -67,11 +67,25 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
     refetchInterval: 10_000,
   })
 
+  // TRANSFER's destination list (M6 gap fix): the location's other registers with an
+  // open shift right now, from a dedicated endpoint rather than inferred from open
+  // orders — the old inference missed a register that opened a shift but has no open
+  // tabs of its own. Only fetched when this staff member can actually transfer; the
+  // cards themselves keep polling openOrders regardless.
+  const openShiftRegisters = useQuery({
+    queryKey: ['open-shift-registers'],
+    queryFn: api.openShiftRegisters,
+    enabled: canTransfer,
+  })
+
   // useQuery (react-query v5) dropped the onError callback — watch the settled error the
   // same way Register.tsx's own shift-load effect does.
   useEffect(() => {
     if (openOrders.error instanceof ApiError && openOrders.error.status === 401) onSessionExpired()
   }, [openOrders.error, onSessionExpired])
+  useEffect(() => {
+    if (openShiftRegisters.error instanceof ApiError && openShiftRegisters.error.status === 401) onSessionExpired()
+  }, [openShiftRegisters.error, onSessionExpired])
 
   const newTab = useMutation({
     mutationFn: (tableRef: string) =>
@@ -99,18 +113,7 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
   })
 
   const orders = openOrders.data ?? NO_ORDERS
-
-  // TRANSFER's destination list: the location's other registers with an open tab right
-  // now, derived from this same payload rather than a separate registers endpoint (per
-  // the brief). Labeled by that order's opened_by_name — Order carries no register name.
-  const targets = useMemo(() => {
-    const seen = new Map<string, string>()
-    for (const o of orders) {
-      if (o.register_id === registerId || seen.has(o.register_id)) continue
-      seen.set(o.register_id, o.opened_by_name ?? 'Unknown')
-    }
-    return Array.from(seen, ([id, label]) => ({ registerId: id, label }))
-  }, [orders, registerId])
+  const targets = openShiftRegisters.data ?? NO_TARGETS
 
   const submitNewTab = (e: FormEvent) => {
     e.preventDefault()
@@ -188,11 +191,11 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
                       <p className="picker-label">Send to</p>
                       {targets.map((t) => (
                         <button
-                          key={t.registerId} type="button" className="btn btn-utility"
+                          key={t.register_id} type="button" className="btn btn-utility"
                           disabled={transfer.isPending}
-                          onClick={() => transfer.mutate({ order: o, targetRegisterId: t.registerId })}
+                          onClick={() => transfer.mutate({ order: o, targetRegisterId: t.register_id })}
                         >
-                          {t.label}
+                          {t.register_name} — {t.opened_by_name}
                         </button>
                       ))}
                     </div>
