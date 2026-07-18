@@ -46,11 +46,26 @@ export class ApiError extends Error {
 // ---------------------------------------------------------------------------
 
 const ADMIN_TOKEN_KEY = 'pos.admin_token'
+const ADMIN_USER_KEY = 'pos.admin_user'
 
 export const adminToken = {
   get: () => localStorage.getItem(ADMIN_TOKEN_KEY),
   set: (t: string) => localStorage.setItem(ADMIN_TOKEN_KEY, t),
   clear: () => localStorage.removeItem(ADMIN_TOKEN_KEY),
+  // The signed-in user rides alongside the token (Task 8 review) so a page reload can
+  // show a name in the carbon bar without waiting on a real query — same idiom as the
+  // register app's tokens.setStaffUser/staffUser.
+  setUser: (u: AdminUser) => localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(u)),
+  user: (): AdminUser | null => {
+    const raw = localStorage.getItem(ADMIN_USER_KEY)
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as AdminUser
+    } catch {
+      return null
+    }
+  },
+  clearUser: () => localStorage.removeItem(ADMIN_USER_KEY),
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -105,6 +120,25 @@ function post<T>(path: string, body: unknown, extra?: Record<string, string>): P
   })
 }
 
+// PATCH: partial update, changed keys only — see docs/03-api.md and every editor's
+// PATCH-discipline note (Task 9).
+function patch<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+// PUT: full-set replace. Only the product<->modifier-group attach endpoint uses this.
+function put<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Wire types — verified against AdminSessionResource.php.
 // ---------------------------------------------------------------------------
@@ -112,10 +146,90 @@ function post<T>(path: string, body: unknown, extra?: Record<string, string>): P
 export type AdminUser = { id: string; name: string; email: string | null; is_admin: boolean }
 export type AdminSession = { token: string; user: AdminUser }
 
+// ---------------------------------------------------------------------------
+// Catalog wire types — verified against app/Http/Resources/Admin/*.php (Task 9).
+// Field names match the models exactly; note the asymmetry the resources actually
+// carry: categories and modifier groups have NO `is_active` (they don't archive —
+// EntityTable's badge simply never renders for those two entities), while products,
+// variants, modifiers, discounts and tax rates all do.
+// ---------------------------------------------------------------------------
+
+export type Category = { id: string; name: string; parent_id: string | null; sort_order: number }
+
+export type TaxRate = { id: string; name: string; rate_micros: number; is_active: boolean }
+
+// Populated only by responses that eager-load the pivot (create/update/set-groups) —
+// AdminProductResource's `modifier_groups` key uses `whenLoaded`, and ListProducts does
+// not eager load it, so a product read back from the plain list has this field absent.
+export type ProductModifierGroupRef = { id: string; name: string; position: number }
+
+export type Product = {
+  id: string
+  name: string
+  description: string | null
+  category_id: string | null
+  kind: 'goods' | 'service'
+  is_active: boolean
+  modifier_groups?: ProductModifierGroupRef[]
+}
+
+export type Variant = {
+  id: string
+  product_id: string
+  name: string
+  sku: string
+  barcode: string | null
+  price_cents: number
+  cost_cents: number | null
+  tax_rate_id: string | null
+  track_inventory: boolean
+  is_active: boolean
+}
+
+export type ModifierGroup = { id: string; name: string; min_select: number; max_select: number | null }
+
+export type Modifier = {
+  id: string
+  group_id: string
+  name: string
+  price_delta_cents: number
+  position: number
+  is_active: boolean
+}
+
+export type Discount = {
+  id: string
+  name: string
+  kind: 'percent' | 'fixed'
+  percent_micros: number | null
+  amount_cents: number | null
+  scope: 'order' | 'line'
+  requires_supervisor: boolean
+  is_active: boolean
+}
+
+/**
+ * One list+create+update trio per catalog entity. Every list endpoint wraps its rows
+ * as `{ items: [...] }`; every create/update wraps the single row under the entity's
+ * own singular key (`{ product: ... }`, `{ tax_rate: ... }`, etc — verified per-resource
+ * against the Admin\Catalog controllers, not guessed from the plural route). `update`
+ * takes a partial body on purpose — callers send only the fields that changed.
+ */
+function catalogEntity<T>(path: string, key: string) {
+  return {
+    list: (): Promise<T[]> => request<{ items: T[] }>(`/admin/${path}`).then((r) => r.items),
+    create: (body: Record<string, unknown>): Promise<T> =>
+      post<Record<string, T>>(`/admin/${path}`, body).then((r) => r[key]),
+    update: (id: string, body: Record<string, unknown>): Promise<T> =>
+      patch<Record<string, T>>(`/admin/${path}/${id}`, body).then((r) => r[key]),
+  }
+}
+
 export const api = {
   login: async (email: string, password: string): Promise<AdminSession> => {
     const session = await post<AdminSession>('/admin/login', { email, password })
     adminToken.set(session.token)
+    adminToken.setUser(session.user)
     return session
   },
   // Best-effort: the token is cleared locally regardless of whether the server round
@@ -123,12 +237,25 @@ export const api = {
   logout: async (): Promise<void> => {
     await post('/admin/logout', {}).catch(() => undefined)
     adminToken.clear()
+    adminToken.clearUser()
   },
 
-  // Tasks 9-11 extend from here:
-  // categories/taxRates/products/variants/modifierGroups/modifiers/discounts:
-  //   list<T>(): Promise<T[]>; create(body): Promise<T>; update(id, body): Promise<T>
-  // setProductModifierGroups(productId, groupIds: string[])
+  categories: catalogEntity<Category>('categories', 'category'),
+  taxRates: catalogEntity<TaxRate>('tax-rates', 'tax_rate'),
+  products: catalogEntity<Product>('products', 'product'),
+  variants: catalogEntity<Variant>('variants', 'variant'),
+  modifierGroups: catalogEntity<ModifierGroup>('modifier-groups', 'modifier_group'),
+  modifiers: catalogEntity<Modifier>('modifiers', 'modifier'),
+  discounts: catalogEntity<Discount>('discounts', 'discount'),
+
+  // Full-set replace, ordered — position is the array index (SetProductModifierGroups.php).
+  // Duplicates 400 server-side (`distinct` rule), so this never de-dupes client-side.
+  setProductModifierGroups: (productId: string, groupIds: string[]): Promise<Product> =>
+    put<{ product: Product }>(`/admin/products/${productId}/modifier-groups`, { group_ids: groupIds }).then(
+      (r) => r.product,
+    ),
+
+  // Tasks 10-11 extend from here:
   // users: list/create/update per Task 4 shapes
   // locations, registers (+ reissueToken(registerId): Promise<string>)
   // salesReport(params): Promise<SalesReport>; stockReport(params)

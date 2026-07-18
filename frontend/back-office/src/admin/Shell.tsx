@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { AdminUser } from '../lib/api'
+import { CatalogSection } from './catalog/CatalogSection'
 
 export type Section = 'catalog' | 'users' | 'locations' | 'reports' | 'audit'
 
@@ -13,19 +14,29 @@ const NAV_ITEMS: Array<{ id: Section; label: string }> = [
   { id: 'audit', label: 'Audit' },
 ]
 
-// Placeholder copy per section — Tasks 9-11 replace each with real content
-// (catalog editors, user management, location/register settings, reports, the audit
-// viewer). No routes: the section is plain client state, same one-page architecture
-// as the register.
-const SECTION_PLACEHOLDER: Record<Section, string> = {
-  catalog: 'Catalog management arrives in a later task.',
+// Placeholder copy per section — Tasks 10-11 replace each with real content (user
+// management, location/register settings, reports, the audit viewer). Catalog (Task 9)
+// is real below. No routes: the section is plain client state, same one-page
+// architecture as the register.
+const SECTION_PLACEHOLDER: Record<Exclude<Section, 'catalog'>, string> = {
   users: 'User management arrives in a later task.',
   locations: 'Location and register settings arrive in a later task.',
   reports: 'Sales and stock reports arrive in a later task.',
   audit: 'The audit viewer arrives in a later task.',
 }
 
-export function Shell({ user, onLogout }: { user: AdminUser | null; onLogout: () => void }) {
+export function Shell({
+  user,
+  onLogout,
+  onUnauthorized,
+}: {
+  user: AdminUser | null
+  onLogout: () => void
+  // Threaded down to every section's queries/mutations (Task 9's CatalogSection first):
+  // any 401 anywhere in the shell drops back to the login screen the same way the
+  // register's onSessionExpired does.
+  onUnauthorized: () => void
+}) {
   const [section, setSection] = useState<Section>('catalog')
   const activeLabel = NAV_ITEMS.find((item) => item.id === section)?.label ?? ''
 
@@ -61,10 +72,20 @@ export function Shell({ user, onLogout }: { user: AdminUser | null; onLogout: ()
             ))}
           </nav>
 
-          <section className="form-panel" style={{ flex: 1 }}>
-            <h2>{activeLabel}</h2>
-            <p className="muted">{SECTION_PLACEHOLDER[section]}</p>
-          </section>
+          {section === 'catalog' ? (
+            // CatalogSection renders its own nested menu-grid (section rail vs. catalog
+            // tab rail are two independent nav levels) — it needs the same flex:1 the
+            // placeholder panel below gets, or it sizes to content instead of filling
+            // the row next to Shell's own rail.
+            <div style={{ flex: 1 }}>
+              <CatalogSection onUnauthorized={onUnauthorized} />
+            </div>
+          ) : (
+            <section className="form-panel" style={{ flex: 1 }}>
+              <h2>{activeLabel}</h2>
+              <p className="muted">{SECTION_PLACEHOLDER[section]}</p>
+            </section>
+          )}
         </div>
       </div>
     </main>

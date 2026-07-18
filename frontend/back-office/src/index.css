@@ -1077,3 +1077,24 @@ form > *:not(:last-child) {
 .bo-table tbody tr:nth-child(even) {
   background: rgba(0, 0, 0, 0.03);
 }
+
+/* Archived rows (`is_active: false`) grey out but stay legible — the row isn't gone,
+   it's parked, and UNARCHIVE is a one-click way back. */
+.bo-table tbody tr.archived-row {
+  opacity: 0.55;
+}
+
+/* Amber, per DESIGN.md's "utility chips/badges" — never signal orange, which stays
+   reserved for the one forward action on a screen (NEW / SAVE). */
+.badge-archived {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-xs);
+  background: var(--color-amber);
+  color: var(--color-ink);
+  border-radius: var(--r-xs);
+  font: bold 10px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

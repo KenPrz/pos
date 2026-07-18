@@ -8,13 +8,11 @@ import { Shell } from './Shell'
 type Stage = { name: 'booting' } | { name: 'login' } | { name: 'shell' }
 
 // Session-expiry convention (mirrors the register app): whichever screen's query or
-// mutation surfaces a 401 is responsible for clearing the token and dropping back to
-// this same 'login' stage — see the register's Register.tsx `sessionExpired`/
-// `onSessionExpired` wiring for the pattern Tasks 9-11 extend as they add real,
-// authenticated queries under Shell's sections. Login and logout (the only two
-// endpoints this task wires up) already satisfy it without extra plumbing: a failed
-// login never leaves the 'login' stage in the first place, and logout clears the
-// token unconditionally, 401 or not.
+// mutation surfaces a 401 calls `handleUnauthorized` below, dropping back to this same
+// 'login' stage — see the register's Register.tsx `sessionExpired`/`onSessionExpired`
+// wiring for the pattern. Threaded into Shell as `onUnauthorized` (Task 9), which passes
+// it to CatalogSection and on into every list query / mutation under it; Tasks 10-11
+// wire their own sections the same way.
 export function AdminApp() {
   // The token lives in localStorage, which does not exist while Next prerenders this
   // tree — so the machine boots neutral and resolves its real stage after mount.
@@ -22,11 +20,29 @@ export function AdminApp() {
   const [user, setUser] = useState<AdminUser | null>(null)
 
   useEffect(() => {
-    setStage(adminToken.get() ? { name: 'shell' } : { name: 'login' })
+    // A reload has no in-memory `user` yet — hydrate it from the cache Task 8's review
+    // added alongside the token, so the carbon bar shows a name immediately rather than
+    // waiting on a real query (there isn't a "who am I" endpoint to ask).
+    if (adminToken.get()) {
+      setUser(adminToken.user())
+      setStage({ name: 'shell' })
+    } else {
+      setStage({ name: 'login' })
+    }
   }, [])
 
   const logout = async () => {
     await api.logout()
+    setUser(null)
+    setStage({ name: 'login' })
+  }
+
+  // The shared 401 convention (register app idiom): whichever screen's query or mutation
+  // hits a 401 calls this, same effect as logout minus the (pointless — the token is
+  // already dead) server round trip.
+  const handleUnauthorized = () => {
+    adminToken.clear()
+    adminToken.clearUser()
     setUser(null)
     setStage({ name: 'login' })
   }
@@ -60,5 +76,5 @@ export function AdminApp() {
     )
   }
 
-  return <Shell user={user} onLogout={logout} />
+  return <Shell user={user} onLogout={logout} onUnauthorized={handleUnauthorized} />
 }
