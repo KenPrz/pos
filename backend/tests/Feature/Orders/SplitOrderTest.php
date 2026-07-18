@@ -111,6 +111,157 @@ it('refuses once money has been taken, and out-of-range ways', function (): void
         ->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
 
+it('freezes a fixed order discount onto children — a later line add does not re-inflate it', function (): void {
+    splitAdd($this, 999);
+    $discount = App\Models\Discount::factory()->fixed(100)->create();
+    $order = Order::findOrFail($this->order->id);
+    app(App\Actions\Orders\ApplyDiscount::class)->execute(new App\Actions\Orders\ApplyDiscountInput(
+        orderId: $order->id, registerId: $this->register->id, discountId: $discount->id,
+        orderLineId: null, reason: 'test', expectedVersion: $order->version,
+        actorId: staffWithRole($this->location, Roles::SUPERVISOR)->id,
+    ));
+    $order->refresh();
+
+    // 100¢ allocated 3 ways → 34/33/33 (earliest absorbs).
+    $children = $this->postJson("/api/v1/orders/{$order->id}/split", ['ways' => 3], ($this->headers)($order->version))
+        ->assertCreated()->json('data.orders');
+    $firstChild = Order::findOrFail($children[0]['id']);
+    expect((int) $firstChild->discounts()->sum('amount_cents'))->toBe(34);
+
+    // Add a latte to the first child (a child is an ordinary open tab). Pre-fix this
+    // re-resolved the cloned row to the FULL live 100¢; the frozen ad-hoc row holds at 34¢
+    // and the resolver never throws.
+    $variant = ProductVariant::factory()->untracked()->create(['price_cents' => 450, 'tax_rate_id' => null]);
+    app(AddLineToOrder::class)->execute(new AddLineInput(
+        orderId: $firstChild->id, registerId: $this->register->id, variantId: $variant->id,
+        qty: '1', expectedVersion: $firstChild->version, actorId: $this->cashier->id,
+    ));
+
+    expect((int) $firstChild->fresh()->discounts()->sum('amount_cents'))->toBe(34)
+        ->and((int) Order::findOrFail($children[1]['id'])->discounts()->sum('amount_cents'))->toBe(33)
+        ->and((int) Order::findOrFail($children[2]['id'])->discounts()->sum('amount_cents'))->toBe(33);
+});
+
+it('freezes a percent order discount onto children — the share does not re-scale on mutation', function (): void {
+    splitAdd($this, 900);
+    $discount = App\Models\Discount::factory()->percent(100_000)->create();   // 10%
+    $order = Order::findOrFail($this->order->id);
+    app(App\Actions\Orders\ApplyDiscount::class)->execute(new App\Actions\Orders\ApplyDiscountInput(
+        orderId: $order->id, registerId: $this->register->id, discountId: $discount->id,
+        orderLineId: null, reason: 'test', expectedVersion: $order->version,
+        actorId: staffWithRole($this->location, Roles::SUPERVISOR)->id,
+    ));
+    $order->refresh();
+
+    // 10% of 900 = 90, split 2 ways → 45/45. A split FREEZES the share: the percentage
+    // does not re-scale on the child, so a bigger base later stays at the allocated cents.
+    $children = $this->postJson("/api/v1/orders/{$order->id}/split", ['ways' => 2], ($this->headers)($order->version))
+        ->assertCreated()->json('data.orders');
+    $child = Order::findOrFail($children[0]['id']);
+    expect((int) $child->discounts()->sum('amount_cents'))->toBe(45);
+
+    $variant = ProductVariant::factory()->untracked()->create(['price_cents' => 900, 'tax_rate_id' => null]);
+    app(AddLineToOrder::class)->execute(new AddLineInput(
+        orderId: $child->id, registerId: $this->register->id, variantId: $variant->id,
+        qty: '1', expectedVersion: $child->version, actorId: $this->cashier->id,
+    ));
+
+    // A live 10% would now be 135¢ on the 1350¢ base; the frozen share is still 45¢.
+    expect((int) $child->fresh()->discounts()->sum('amount_cents'))->toBe(45);
+});
+
+it('freezes a line-level discount onto the child line and holds it across a child qty change', function (): void {
+    splitAdd($this, 1000, '2');
+    $discount = App\Models\Discount::factory()->fixed(200)->line()->create();
+    $order = Order::findOrFail($this->order->id);
+    $parentLineId = $order->lines()->first()->id;
+    app(App\Actions\Orders\ApplyDiscount::class)->execute(new App\Actions\Orders\ApplyDiscountInput(
+        orderId: $order->id, registerId: $this->register->id, discountId: $discount->id,
+        orderLineId: $parentLineId, reason: 'test', expectedVersion: $order->version,
+        actorId: staffWithRole($this->location, Roles::SUPERVISOR)->id,
+    ));
+    $order->refresh();
+
+    // 200¢ allocated 2 ways → 100/100, each cloned onto its own child line.
+    $children = $this->postJson("/api/v1/orders/{$order->id}/split", ['ways' => 2], ($this->headers)($order->version))
+        ->assertCreated()->json('data.orders');
+    $child = Order::findOrFail($children[0]['id']);
+    $childLine = $child->lines()->first();
+    $row = $child->discounts()->first();
+    expect((int) $row->amount_cents)->toBe(100)
+        ->and($row->order_line_id)->toBe($childLine->id);
+
+    // Shrink the child line — its frozen line-level share holds at the allocated 100¢.
+    app(App\Actions\Orders\UpdateLineQty::class)->execute(new App\Actions\Orders\UpdateLineQtyInput(
+        orderId: $child->id, lineId: $childLine->id, registerId: $this->register->id,
+        qty: '0.500', expectedVersion: $child->version, actorId: $this->cashier->id,
+        actorMayVoidLines: true,
+    ));
+
+    expect((int) $child->fresh()->discounts()->sum('amount_cents'))->toBe(100);
+});
+
+it('refuses a split finer than a line qty can divide (split_too_fine)', function (): void {
+    splitAdd($this, 500, '0.005');   // 5 milli — cannot divide into 10 non-zero parts
+    $order = Order::findOrFail($this->order->id);
+    $this->postJson("/api/v1/orders/{$order->id}/split", ['ways' => 10], ($this->headers)($order->version))
+        ->assertStatus(422)->assertJsonPath('error.code', 'split_too_fine');
+});
+
+it('splits an inclusive-tax order so each child total equals its subtotal and they sum to the original', function (): void {
+    $order = Order::factory()->forRegister($this->register)->create([
+        'opened_by' => $this->cashier->id, 'prices_include_tax' => true,
+    ]);
+    foreach ([1099, 750] as $unitCents) {
+        $order->lines()->create([
+            'variant_id' => ProductVariant::factory()->create()->id,
+            'name_snapshot' => 'x', 'sku_snapshot' => 'x',
+            'unit_price_cents' => $unitCents, 'tax_rate_micros' => 88_750, 'qty' => '1',
+            'line_total_cents' => 0, 'position' => $order->lines()->count(), 'created_at' => now(),
+        ]);
+    }
+    app(App\Domain\Pricing\OrderTotals::class)->recalculate($order->refresh());
+    $order->refresh();
+    expect($order->tax_cents)->toBeGreaterThan(0)
+        ->and($order->total_cents)->toBe($order->subtotal_cents);   // inclusive: total carries the tax
+
+    $children = $this->postJson("/api/v1/orders/{$order->id}/split", ['ways' => 3], ($this->headers)($order->version))
+        ->assertCreated()->json('data.orders');
+
+    expect(array_sum(array_column($children, 'total_cents')))->toBe($order->total_cents)
+        ->and(array_sum(array_column($children, 'subtotal_cents')))->toBe($order->subtotal_cents)
+        ->and(array_sum(array_column($children, 'tax_cents')))->toBe($order->tax_cents);
+    foreach ($children as $child) {
+        expect($child['total_cents'])->toBe($child['subtotal_cents']);   // inclusive branch, per child
+    }
+});
+
+it('splits an order with a voided line without leaking its money into any child', function (): void {
+    splitAdd($this, 600);   // line A — kept
+    splitAdd($this, 900);   // line B — voided below
+    $order = Order::findOrFail($this->order->id);
+    [$lineA, $lineB] = $order->lines()->orderBy('position')->get()->all();
+
+    app(App\Actions\Orders\VoidLine::class)->execute(new App\Actions\Orders\VoidLineInput(
+        orderId: $order->id, lineId: $lineB->id, registerId: $this->register->id,
+        reason: 'comp', expectedVersion: $order->version,
+        actorId: staffWithRole($this->location, Roles::SUPERVISOR)->id,
+    ));
+    $order->refresh();
+
+    $children = $this->postJson("/api/v1/orders/{$order->id}/split", ['ways' => 2], ($this->headers)($order->version))
+        ->assertCreated()->json('data.orders');
+
+    // Original total now reflects only line A; children sum to it and each carries exactly
+    // one line — the surviving A, never a clone of the voided B.
+    expect(array_sum(array_column($children, 'total_cents')))->toBe($order->total_cents);
+    foreach ($children as $child) {
+        $childLines = Order::findOrFail($child['id'])->lines()->get();
+        expect($childLines)->toHaveCount(1)
+            ->and($childLines->first()->variant_id)->toBe($lineA->variant_id);
+    }
+});
+
 it('exactness on hostile numbers: odd totals, fractional qty', function (): void {
     // 1089 does not divide by 2; 77×3=231 doesn't either; qty 3.000/2 = 1.500 each
     splitAdd($this, 1089);

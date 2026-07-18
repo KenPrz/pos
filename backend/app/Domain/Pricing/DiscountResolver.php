@@ -161,14 +161,19 @@ final class DiscountResolver
 
     /**
      * A row with no discount_id is ad-hoc (docs/02-data-model.md): there is no reusable
-     * definition to re-resolve against. Ad-hoc discounts have no endpoint until M6 — fail
-     * loudly rather than pinning the row at its stored amount, which would silently
-     * ratchet it down every time the base shrinks and never back up.
+     * definition to re-resolve against, so its stored `amount_cents` is already-resolved
+     * money. It resolves as a fixed constant clamped to the remaining base at its scope —
+     * `min(stored amount_cents, remaining base)` — so the share can never grow above what
+     * was approved, only shrink if the base it sits on shrinks. SplitOrder writes these
+     * when it freezes a parent's discount shares onto its children (which are ordinary
+     * open tabs that would otherwise re-inflate a cloned discount on their next mutation);
+     * there is still no API surface that creates one (ApplyDiscount refuses ad-hoc rows
+     * until M6).
      */
     private function valueObjectFor(OrderDiscount $row): DiscountValueObject
     {
         if ($row->discount_id === null) {
-            throw new \LogicException('Ad-hoc discounts (null discount_id) are not implemented until M6.');
+            return DiscountValueObject::fixed(Money::fromCents($row->amount_cents));
         }
 
         return $row->discount->toValueObject();

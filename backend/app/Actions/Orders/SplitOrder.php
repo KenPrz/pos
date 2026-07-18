@@ -10,6 +10,7 @@ use App\Domain\Money\Quantity;
 use App\Domain\Orders\OpenOrderLock;
 use App\Domain\Orders\OrderNumbers;
 use App\Exceptions\Domain\OrderHasPayments;
+use App\Exceptions\Domain\SplitTooFine;
 use App\Models\Location;
 use App\Models\Order;
 use App\Models\OrderStatus;
@@ -47,6 +48,15 @@ final class SplitOrder
             $location = Location::findOrFail($order->location_id);
             $lines = $order->lines()->whereNull('voided_at')->with('modifiers')->orderBy('position')->get();
             $discountRows = $order->discounts()->get();   // order- and line-level rows
+
+            // A line whose qty in thousandths is smaller than `ways` would allocate a
+            // zero-milli part to at least one child, and a zero-qty line violates the
+            // order_lines_qty_positive CHECK. Refuse before we write anything.
+            foreach ($lines as $line) {
+                if (Quantity::fromString($line->qty)->milli < $in->ways) {
+                    throw new SplitTooFine($line->id, $line->qty, $in->ways);
+                }
+            }
 
             $children = [];
             for ($i = 0; $i < $in->ways; $i++) {
@@ -100,13 +110,18 @@ final class SplitOrder
                             'price_delta_cents' => $mod->price_delta_cents,
                         ]);
                     }
-                    // line-level discount rows follow their line, allocated
+                    // line-level discount rows follow their line, allocated. Cloned as
+                    // ad-hoc rows (discount_id = null): the allocated share is already-
+                    // resolved money that must stay frozen at split, never re-scale off the
+                    // live discount definition when the child is later mutated (a child is
+                    // an ordinary open tab). DiscountResolver treats a null-discount_id row
+                    // as a fixed constant clamped to the remaining base.
                     foreach ($discountRows->where('order_line_id', $line->id) as $row) {
                         $rowParts = Money::fromCents($row->amount_cents)->allocate($in->ways);
                         if ($rowParts[$c]->isPositive()) {
                             $child->discounts()->create([
                                 'order_line_id' => $childLine->id,
-                                'discount_id' => $row->discount_id,
+                                'discount_id' => null,
                                 'name_snapshot' => $row->name_snapshot,
                                 'amount_cents' => $rowParts[$c]->cents,
                                 'applied_by' => $row->applied_by,
@@ -121,9 +136,12 @@ final class SplitOrder
                 $rowParts = Money::fromCents($row->amount_cents)->allocate($in->ways);
                 foreach ($children as $c => $child) {
                     if ($rowParts[$c]->isPositive()) {
+                        // Frozen ad-hoc row (discount_id = null) — see the line-level clone
+                        // above. The share is fixed at its allocated cents and never
+                        // re-resolves off the live discount when the child is mutated.
                         $child->discounts()->create([
                             'order_line_id' => null,
-                            'discount_id' => $row->discount_id,
+                            'discount_id' => null,
                             'name_snapshot' => $row->name_snapshot,
                             'amount_cents' => $rowParts[$c]->cents,
                             'applied_by' => $row->applied_by,

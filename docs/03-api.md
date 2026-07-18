@@ -73,7 +73,7 @@ One envelope (`01-architecture.md`):
 | 403 | `forbidden`, `requires_supervisor`, `wrong_location` (mostly structural — location scoping yields 404s; reserved for record/register location disagreements) |
 | 404 | `not_found` |
 | 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders`, `line_already_voided`, `payment_already_voided`, `payment_shift_closed` |
-| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use` |
+| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use`, `split_too_fine` |
 | 429 | `too_many_pin_attempts` |
 
 `code` is stable forever once shipped; clients branch on it. `message` is for humans and
@@ -341,8 +341,13 @@ untouched — it left the ledger when the lines were first added, and the childr
 that claim — so the original order is closed out **voided without restock**, not through
 `VoidOrder` (which does restock by design). The children are independent orders from the
 moment they're created: each closes on its own tender, and nothing about them refers back
-to the parent except the audit trail. Refused if the order already has payments
-(`422 order_has_payments` — split what's owed, not what's already been paid).
+to the parent except the audit trail. Any applied discounts are frozen at the split: each
+child inherits its allocated *share* of a discount as a fixed amount, so mutating a child
+afterwards (adding a line, changing a qty) does not re-scale it off the live discount —
+the share only ever clamps down if the base it sits on shrinks. Refused if the order
+already has payments (`422 order_has_payments` — split what's owed, not what's already
+been paid), or if any line's qty in thousandths is smaller than `ways` and so cannot
+divide into that many non-zero parts (`422 split_too_fine`).
 
 ### Discounts
 
