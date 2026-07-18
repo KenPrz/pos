@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /** { order } — docs/03-api.md. Every order mutation returns the whole order. */
-final class VoidOrderResource extends JsonResource
+final class OrderEnvelopeResource extends JsonResource
 {
     public function toArray(Request $request): array
     {

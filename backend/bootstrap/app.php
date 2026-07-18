@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Exceptions\ApiErrorEnvelope;
+use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureDeviceToken;
 use App\Http\Middleware\EnsureIdempotency;
 use App\Http\Middleware\EnsureStaffSession;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'device' => EnsureDeviceToken::class,
             'staff' => EnsureStaffSession::class,
             'idempotent' => EnsureIdempotency::class,
+            'admin' => EnsureAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

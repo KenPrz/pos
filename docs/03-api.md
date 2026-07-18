@@ -18,7 +18,8 @@ REST/JSON under `/api/v1`. Laravel 13 + Sanctum 4.3.
 
 ## Auth
 
-Two layers, per `01-architecture.md`.
+Two layers for the register (device, then staff), plus a third, independent tier for
+the back office — see `01-architecture.md`.
 
 ```
 POST /api/v1/registers/enroll        # admin-only, one time per device
@@ -52,6 +53,28 @@ PIN attempts are rate-limited per register: 5 failures → 60s lockout, logged t
 `audit_log`. The PIN keyspace is small, so this limiter is load-bearing rather than
 decorative.
 
+### Back office
+
+A third, independent tier (M6) — no device, no location, no PIN:
+
+```
+POST /api/v1/admin/login
+  { "email": "owner@example.com", "password": "..." }
+  → { token, user: { id, name, email, is_admin } }   # 401 invalid_credentials
+
+POST /api/v1/admin/logout
+```
+
+**Admin-only in v1:** wrong email, wrong password, deactivated, and non-admin all answer
+identically (`401 invalid_credentials`) — the same user-enumeration defense as PIN login,
+extended to the back office. See `05-rbac.md` for why there's no supervisor/bookkeeper
+tier yet. Every request under `/admin/*` (below) carries this token the same way every
+other tier carries its own:
+
+```
+Authorization: Bearer <admin token>
+```
+
 ## Errors
 
 One envelope (`01-architecture.md`):
@@ -69,11 +92,11 @@ One envelope (`01-architecture.md`):
 | HTTP | `code` examples |
 | --- | --- |
 | 400 | `validation_failed` |
-| 401 | `invalid_device_token`, `invalid_pin`, `staff_session_expired` |
+| 401 | `invalid_device_token`, `invalid_pin`, `staff_session_expired`, `invalid_credentials` |
 | 403 | `forbidden`, `requires_supervisor`, `wrong_location` (mostly structural — location scoping yields 404s; reserved for record/register location disagreements) |
 | 404 | `not_found` |
 | 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders`, `line_already_voided`, `payment_already_voided`, `payment_shift_closed` |
-| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use`, `split_too_fine` |
+| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use`, `split_too_fine`, `self_lockout` |
 | 429 | `too_many_pin_attempts` |
 
 `code` is stable forever once shipped; clients branch on it. `message` is for humans and
@@ -140,9 +163,11 @@ GET /api/v1/catalog/lookup?barcode=012345678905&location_id=
 The scanner path. Separate and narrow because it's the hottest read in retail and must
 stay a single indexed lookup.
 
-Back-office CRUD (`admin` role) is conventional and omitted for brevity:
-`GET|POST|PATCH|DELETE /api/v1/products`, `/variants`, `/categories`, `/modifier-groups`,
-`/tax-rates`, `/discounts`, `/users`, `/locations`, `/registers`.
+Back-office catalog CRUD lives under `/api/v1/admin/*` — see Back office, below. (An
+earlier draft of this doc sketched it here as `/api/v1/products` etc. under an `admin`
+role and with `DELETE`; neither survived contact with `05-rbac.md`'s correction that
+admin isn't a role, or with M6's archive-never-delete decision. There is no `DELETE`
+route anywhere in `/admin/*`.)
 
 ## Shifts
 
@@ -450,17 +475,121 @@ is rejected: that money never came through us.
 
 The original order is never modified.
 
+## Back office (`/api/v1/admin/*`, admin-only)
+
+Every route below requires the admin bearer token from Auth, above. All of it is
+conventional CRUD — `GET` lists (unpaginated; v1's tables are seed-sized, not
+production-scale), `POST` creates, `PATCH` applies only the keys it's sent — with one
+deliberate exception: **there is no `DELETE` route anywhere under `/admin/*`.** Catalog
+rows, locations, and registers are **archived, never deleted** — `PATCH { "is_active":
+false }` — because an order line, a receipt, or a report from last month still points at
+that row by id, and a hard delete would either cascade into history or leave a dangling
+reference. Every mutation writes one `audit_log` row (`admin.<entity>.create` /
+`admin.<entity>.update`), which is what the audit viewer below reads.
+
+### Catalog
+
+```
+GET|POST /api/v1/admin/categories        PATCH /api/v1/admin/categories/{id}
+GET|POST /api/v1/admin/tax-rates         PATCH /api/v1/admin/tax-rates/{id}
+GET|POST /api/v1/admin/products          PATCH /api/v1/admin/products/{id}
+GET|POST /api/v1/admin/variants          PATCH /api/v1/admin/variants/{id}
+GET|POST /api/v1/admin/modifier-groups   PATCH /api/v1/admin/modifier-groups/{id}
+GET|POST /api/v1/admin/modifiers         PATCH /api/v1/admin/modifiers/{id}
+GET|POST /api/v1/admin/discounts         PATCH /api/v1/admin/discounts/{id}
+
+PUT /api/v1/admin/products/{id}/modifier-groups
+  { "group_ids": ["<modifier_group_id>", ...] }
+  → { product }
+```
+
+`PUT`, not `PATCH`, on the attach endpoint: it replaces the product's **entire**
+modifier-group set in one call (ordered by array position), the same full-set-replace
+shape as `roles` on Users, below — there is no add-one/remove-one pair. A product
+response's `modifier_group_ids` (a plain ordered id array) is present on every read, not
+only the ones that eager-load the richer `modifier_groups` shape — an attach editor
+seeded from a response that omits it would save back an empty set and silently detach
+everything the product had.
+
+### Users
+
+```
+GET|POST /api/v1/admin/users            PATCH /api/v1/admin/users/{id}
+  { "name": "...", "email": "...", "pin": "...", "is_admin": false,
+    "roles": [ { "location_id": "...", "role": "cashier" } ] }
+```
+
+`roles`, when sent, replaces every existing assignment for that user — full-set-replace,
+never an add/remove pair. Omitting `roles` from a `PATCH` leaves assignments untouched;
+sending `roles: []` clears every one. An admin cannot demote or deactivate **themselves**
+through this endpoint — `422 self_lockout` — because with only one auth tier above
+`admin` (none), there's no guaranteed second admin online to undo it.
+
+### Locations and registers
+
+```
+GET|POST /api/v1/admin/locations        PATCH /api/v1/admin/locations/{id}
+GET|POST /api/v1/admin/registers        PATCH /api/v1/admin/registers/{id}
+  { "mode": "retail" | "food" }                       # picks the register's UI
+
+POST /api/v1/admin/registers/{id}/token
+  → { token }
+```
+
+Reissue is the lost/stolen-terminal path: every existing personal-access token for that
+register is deleted and the replacement minted **in the same transaction**, so there is
+no window where a lost credential and its replacement are both live. `registers.mode` is
+the one schema addition M5 needed (`06-roadmap.md`) and simply picks which UI the
+register app renders.
+
+```
+GET /api/v1/registers/open-shifts        # staff tier, not admin
+  → { items: [ { register_id, register_name, shift_id, opened_by_name }, ... ] }
+```
+
+Not under `/admin` on purpose — this is the register app asking about **other active,
+currently-open-shift** registers at its own location, excluding itself (populating a
+transfer picker, or finding another open register to approve a variance from), which is
+a staff action even though it never touches money or the back office. It needs a staff
+session like any other staff-tier route, not an admin one.
+
 ## Reports
 
 ```
-GET /api/v1/reports/z?shift_id=          # Z-report: the drawer close summary — shipped
-GET /api/v1/reports/sales?location_id=&from=&to=&group_by=day|category|user  # M6 — back office
-GET /api/v1/reports/stock?location_id=&low_only=true                        # M6 — back office
-GET /api/v1/reports/audit?entity_type=&entity_id=&user_id=&from=&to=        # M6 — back office
+GET /api/v1/reports/z?shift_id=                                       # staff tier
+  → { shift, sales_by_driver, refunds_by_driver, movements,
+      orders_closed, orders_voided, orders_split, expected_cash_cents }
+
+GET /api/v1/admin/reports/sales?location_id=&from=&to=&group_by=day|category|user
+  → { rows[], totals, basis }
+
+GET /api/v1/admin/reports/stock?location_id=&low_only=true
+  → { rows[] }
+
+GET /api/v1/admin/audit?entity_type=&entity_id=&user_id=&action=&from=&to=&page=
+  → { rows[], page, has_more }                                        # 50 rows/page
 ```
 
 All date filtering is on `business_date` (`02-data-model.md`), so a report means the same
-thing regardless of the timezone of whoever runs it.
+thing regardless of the timezone of whoever runs it. The Z-report's `orders_split` (M6)
+counts the *originals* `POST /orders/{id}/split` leaves behind (voided, not closed)
+separately from ordinary voids, so a busy split day at the till doesn't read as a wave of
+walkouts.
+
+**`group_by=day` and `group_by=user` are LEDGER-basis** — summed straight from captured
+`payments` and `refunds`, i.e. money that actually moved and who moved it. **`group_by=
+category` is LINE-basis** — summed from non-voided lines of closed orders, joined to the
+**live** catalog for a human-readable category name (a report is allowed to do that join;
+a receipt never is, since it must reprint identically to what it said on the day it was
+made). The response's `basis` field names which kind of number a given `group_by`
+produced. **The two bases are not required to reconcile with each other** — a line-level
+discount changes what a line's total was without changing what tender captured it — and
+that's a fact about what each slice measures, not a bug to chase down.
+
+The audit viewer is read-only (no `audit_log` row for reading the audit log) and
+paginates at 50 rows. `entity_type`/`entity_id`, `user_id`, and `action` are each covered
+by a dedicated index on `audit_log`; only a bare date range with none of those three set
+falls back to a sequential scan, an accepted cost for a back-office read at this scale.
 
 ## Receipts
 

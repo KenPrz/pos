@@ -19,6 +19,7 @@ final class ZReportResource extends JsonResource
             'movements' => $this->movements,
             'orders_closed' => $this->ordersClosed,
             'orders_voided' => $this->ordersVoided,
+            'orders_split' => $this->ordersSplit,
             'expected_cash_cents' => $this->expectedCashCents,
         ];
     }

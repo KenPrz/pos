@@ -2,6 +2,43 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\AdminLoginController;
+use App\Http\Controllers\Admin\AdminLogoutController;
+use App\Http\Controllers\Admin\Audit\ListAuditLogController;
+use App\Http\Controllers\Admin\Catalog\CreateCategoryController;
+use App\Http\Controllers\Admin\Catalog\CreateDiscountController;
+use App\Http\Controllers\Admin\Catalog\CreateModifierController;
+use App\Http\Controllers\Admin\Catalog\CreateModifierGroupController;
+use App\Http\Controllers\Admin\Catalog\CreateProductController;
+use App\Http\Controllers\Admin\Catalog\CreateTaxRateController;
+use App\Http\Controllers\Admin\Catalog\CreateVariantController;
+use App\Http\Controllers\Admin\Catalog\ListCategoriesController;
+use App\Http\Controllers\Admin\Catalog\ListDiscountsController;
+use App\Http\Controllers\Admin\Catalog\ListModifierGroupsController;
+use App\Http\Controllers\Admin\Catalog\ListModifiersController;
+use App\Http\Controllers\Admin\Catalog\ListProductsController;
+use App\Http\Controllers\Admin\Catalog\ListTaxRatesController;
+use App\Http\Controllers\Admin\Catalog\ListVariantsController;
+use App\Http\Controllers\Admin\Catalog\SetProductModifierGroupsController;
+use App\Http\Controllers\Admin\Catalog\UpdateCategoryController;
+use App\Http\Controllers\Admin\Catalog\UpdateDiscountController;
+use App\Http\Controllers\Admin\Catalog\UpdateModifierController;
+use App\Http\Controllers\Admin\Catalog\UpdateModifierGroupController;
+use App\Http\Controllers\Admin\Catalog\UpdateProductController;
+use App\Http\Controllers\Admin\Catalog\UpdateTaxRateController;
+use App\Http\Controllers\Admin\Catalog\UpdateVariantController;
+use App\Http\Controllers\Admin\Locations\CreateLocationController;
+use App\Http\Controllers\Admin\Locations\ListLocationsController;
+use App\Http\Controllers\Admin\Locations\UpdateLocationController;
+use App\Http\Controllers\Admin\Registers\CreateRegisterController;
+use App\Http\Controllers\Admin\Registers\ListRegistersController;
+use App\Http\Controllers\Admin\Registers\ReissueDeviceTokenController;
+use App\Http\Controllers\Admin\Registers\UpdateRegisterController;
+use App\Http\Controllers\Admin\Reports\SalesReportController;
+use App\Http\Controllers\Admin\Reports\StockReportController;
+use App\Http\Controllers\Admin\Users\CreateUserController;
+use App\Http\Controllers\Admin\Users\ListUsersController;
+use App\Http\Controllers\Admin\Users\UpdateUserController;
 use App\Http\Controllers\Auth\EnrollRegisterController;
 use App\Http\Controllers\Auth\StaffLoginController;
 use App\Http\Controllers\Auth\StaffLogoutController;
@@ -31,6 +68,7 @@ use App\Http\Controllers\Shifts\ApproveVarianceController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
 use App\Http\Controllers\Shifts\OpenShiftController;
+use App\Http\Controllers\Shifts\OpenShiftRegistersController;
 use App\Http\Controllers\Shifts\RecordCashMovementController;
 use App\Http\Controllers\Stock\AdjustStockController;
 use App\Http\Controllers\Stock\CountStockController;
@@ -58,6 +96,82 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('auth:sanctum')
         ->name('registers.enroll');
 
+    // Back office: email+password, no device or location context. Every later admin
+    // task (M6 tasks 2-7) adds routes inside the group below.
+    Route::post('/admin/login', AdminLoginController::class)
+        ->middleware('throttle:admin-login')
+        ->name('admin.login');
+
+    Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function (): void {
+        Route::post('/logout', AdminLogoutController::class)->name('admin.logout');
+
+        // Catalog CRUD (M6 task 2). No DELETE routes anywhere — archive via PATCH
+        // is_active. Every mutation audits admin.<entity>.create|update.
+        Route::get('/categories', ListCategoriesController::class)->name('admin.categories.list');
+        Route::post('/categories', CreateCategoryController::class)->name('admin.categories.create');
+        Route::patch('/categories/{category}', UpdateCategoryController::class)->name('admin.categories.update');
+
+        Route::get('/tax-rates', ListTaxRatesController::class)->name('admin.tax-rates.list');
+        Route::post('/tax-rates', CreateTaxRateController::class)->name('admin.tax-rates.create');
+        Route::patch('/tax-rates/{tax_rate}', UpdateTaxRateController::class)->name('admin.tax-rates.update');
+
+        Route::get('/products', ListProductsController::class)->name('admin.products.list');
+        Route::post('/products', CreateProductController::class)->name('admin.products.create');
+        Route::patch('/products/{product}', UpdateProductController::class)->name('admin.products.update');
+
+        Route::get('/variants', ListVariantsController::class)->name('admin.variants.list');
+        Route::post('/variants', CreateVariantController::class)->name('admin.variants.create');
+        Route::patch('/variants/{variant}', UpdateVariantController::class)->name('admin.variants.update');
+
+        // Modifier groups, modifiers, discounts (M6 task 3), plus the product<->group
+        // attach endpoint. PUT, not PATCH: it replaces the full pivot set.
+        Route::get('/modifier-groups', ListModifierGroupsController::class)->name('admin.modifier-groups.list');
+        Route::post('/modifier-groups', CreateModifierGroupController::class)->name('admin.modifier-groups.create');
+        Route::patch('/modifier-groups/{modifier_group}', UpdateModifierGroupController::class)->name('admin.modifier-groups.update');
+
+        Route::get('/modifiers', ListModifiersController::class)->name('admin.modifiers.list');
+        Route::post('/modifiers', CreateModifierController::class)->name('admin.modifiers.create');
+        Route::patch('/modifiers/{modifier}', UpdateModifierController::class)->name('admin.modifiers.update');
+
+        Route::get('/discounts', ListDiscountsController::class)->name('admin.discounts.list');
+        Route::post('/discounts', CreateDiscountController::class)->name('admin.discounts.create');
+        Route::patch('/discounts/{discount}', UpdateDiscountController::class)->name('admin.discounts.update');
+
+        Route::put('/products/{product}/modifier-groups', SetProductModifierGroupsController::class)
+            ->name('admin.products.modifier-groups.set');
+
+        // User management (M6 task 4). Roles are a full-set replace per location; the
+        // self-lockout guard lives in UpdateUser, not here.
+        Route::get('/users', ListUsersController::class)->name('admin.users.list');
+        Route::post('/users', CreateUserController::class)->name('admin.users.create');
+        Route::patch('/users/{user}', UpdateUserController::class)->name('admin.users.update');
+
+        // Location and register settings (M6 task 5). No DELETE routes here either —
+        // archive via PATCH is_active, same as catalog.
+        Route::get('/locations', ListLocationsController::class)->name('admin.locations.list');
+        Route::post('/locations', CreateLocationController::class)->name('admin.locations.create');
+        Route::patch('/locations/{location}', UpdateLocationController::class)->name('admin.locations.update');
+
+        Route::get('/registers', ListRegistersController::class)->name('admin.registers.list');
+        Route::post('/registers', CreateRegisterController::class)->name('admin.registers.create');
+        Route::patch('/registers/{register}', UpdateRegisterController::class)->name('admin.registers.update');
+
+        // Revokes every existing token for the register and mints a fresh one — the
+        // lost/stolen-terminal path. The enrol endpoint below (device tier bootstrap)
+        // is the other legal way to get a register its first token.
+        Route::post('/registers/{register}/token', ReissueDeviceTokenController::class)
+            ->name('admin.registers.token_reissue');
+
+        // Reports (M6 task 6). Reads only — no audit. day/user are ledger-basis (from
+        // payments + refunds); category is line-basis (non-voided lines of closed
+        // orders, joined to the live catalog) — see SalesReportResource's `basis` field.
+        Route::get('/reports/sales', SalesReportController::class)->name('admin.reports.sales');
+        Route::get('/reports/stock', StockReportController::class)->name('admin.reports.stock');
+
+        // Audit-log viewer (M6 task 7). Read-only — no audit-of-the-audit.
+        Route::get('/audit', ListAuditLogController::class)->name('admin.audit.list');
+    });
+
     Route::middleware('device')->group(function (): void {
         Route::post('/staff/login', StaffLoginController::class)
             ->middleware('throttle:pin')
@@ -82,6 +196,12 @@ Route::prefix('v1')->group(function (): void {
                 ->name('shifts.close');
             Route::post('/shifts/{shift}/approve-variance', ApproveVarianceController::class)
                 ->name('shifts.approve-variance');
+
+            // Staff tier, not device tier: this is the register app cross-referencing
+            // sibling tills at the same location (e.g. "approve my variance from another
+            // open register"), which is a staff action even though it touches no money.
+            Route::get('/registers/open-shifts', OpenShiftRegistersController::class)
+                ->name('registers.open-shifts');
 
             Route::post('/orders', OpenOrderController::class)->name('orders.open');
             Route::get('/orders', ListOrdersController::class)->name('orders.list');

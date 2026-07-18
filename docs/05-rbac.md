@@ -253,6 +253,29 @@ for a routine open would mean either a manager tied to the terminal all morning 
 manager's PIN written on a sticky note — and the second is what actually happens.
 Variance *approval* is where the supervisor belongs; that's the moment worth their time.
 
+## Back-office access
+
+`POST /api/v1/admin/login` (`03-api.md`) is **admin-only** in v1 — there is no
+supervisor or bookkeeper tier that can reach `/admin/*` while stopping short of full
+admin. That is a scope decision, not an oversight, and it follows directly from how
+team context works everywhere else in this system: `EnsureStaffSession` reads the
+location off the *register* the request came from, so a role check never has to ask
+the client which location it means. The back office has no register. A supervisor- or
+bookkeeper-scoped back-office login would need to ask the client which location's roles
+to check, which is exactly the client-supplied-scope hole per-location teams exist to
+close (see "Wiring", above). Solving that properly — not bolting a location parameter
+onto `AdminLogin` — is real design work, so it waits.
+
+The deferral has a name and a trigger, from the M6 design spec's deferred table:
+**supervisor/bookkeeper back-office access, revived by the first accountant** who needs
+sales and audit visibility without order-void or user-management power. Until then,
+`admin` is the only way into `/admin/*`, and `AdminLogin` refuses wrong email, wrong
+password, deactivated, and non-admin identically (`401 invalid_credentials`) — the same
+enumeration-safe shape as `StaffLogin`'s PIN refusal, extended to the back office. It's
+also why `user.manage` guards `self_lockout` (`03-api.md`): with exactly one admin tier
+and no location-scoped fallback, an admin who could revoke their own access would have
+no one else able to undo it.
+
 ## Permissions vs Policies
 
 These answer different questions, and conflating them is the standard way RBAC goes

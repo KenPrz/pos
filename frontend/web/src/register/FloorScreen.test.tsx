@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import { FloorScreen } from './FloorScreen'
-import { api, type Order } from '../lib/api'
+import { api, type Order, type OpenShiftRegister } from '../lib/api'
 
 // Same idiom as ModifierSheet.test.tsx: vitest doesn't run with `globals: true`, so
 // @testing-library/react's auto-cleanup never registers itself — do it by hand or DOM
@@ -14,13 +14,17 @@ afterEach(cleanup)
 
 // The mocked api.* fns are module-scoped (the vi.mock factory below runs once), so their
 // call history accumulates across tests unless cleared — bites the retry/key-reuse
-// assertion below, which reads mock.calls positionally.
+// assertion below, which reads mock.calls positionally. openShiftRegisters gets a
+// target-less default every test (matches canTransfer: false being renderFloor's own
+// default) so tests that don't care about transfer targets never see an unhandled
+// rejection from an uncleared mock returning undefined.
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(api.openShiftRegisters).mockResolvedValue([])
 })
 
 // Module mock: keep everything real (ApiError, types, other api.* members) except the
-// three endpoints this screen actually calls, so `err instanceof ApiError` checks inside
+// endpoints this screen actually calls, so `err instanceof ApiError` checks inside
 // FloorScreen still work against the real class.
 vi.mock('../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/api')>()
@@ -31,12 +35,23 @@ vi.mock('../lib/api', async (importOriginal) => {
       openOrders: vi.fn(),
       openOrder: vi.fn(),
       transferOrder: vi.fn(),
+      openShiftRegisters: vi.fn(),
     },
   }
 })
 
 const MINE = 'register-mine'
 const OTHER = 'register-other'
+
+function makeOpenShiftRegister(overrides: Partial<OpenShiftRegister> = {}): OpenShiftRegister {
+  return {
+    register_id: OTHER,
+    register_name: 'Bar',
+    shift_id: 'shift-1',
+    opened_by_name: 'Sam',
+    ...overrides,
+  }
+}
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
   return {
@@ -117,18 +132,36 @@ describe('FloorScreen', () => {
 
   it('shows TRANSFER for my own tabs when permitted, and hands off via api.transferOrder', async () => {
     const mine = makeOrder({ id: 'order-1', register_id: MINE, table_ref: '12' })
-    vi.mocked(api.openOrders).mockResolvedValue([
-      mine,
-      makeOrder({ id: 'order-2', register_id: OTHER, table_ref: '7', opened_by_name: 'Sam' }),
+    vi.mocked(api.openOrders).mockResolvedValue([mine])
+    vi.mocked(api.openShiftRegisters).mockResolvedValue([
+      makeOpenShiftRegister({ register_id: OTHER, register_name: 'Bar', opened_by_name: 'Sam' }),
     ])
     vi.mocked(api.transferOrder).mockResolvedValue({ ...mine, register_id: OTHER })
     renderFloor({ canTransfer: true })
 
     await screen.findByText('12')
     fireEvent.click(screen.getByRole('button', { name: /transfer/i }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Sam' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Bar — Sam' }))
 
     await waitFor(() => expect(api.transferOrder).toHaveBeenCalledWith(mine, OTHER))
+  })
+
+  // The M5 gap this endpoint fixes: a register that opened a shift but has no open tabs
+  // of its own was previously invisible to the transfer picker (targets were inferred
+  // from open orders, so a tabless register never appeared). Now it comes from
+  // openShiftRegisters directly, independent of the open-orders payload.
+  it('lists a register with an open shift but no open tabs as a transfer target', async () => {
+    const mine = makeOrder({ id: 'order-1', register_id: MINE, table_ref: '12' })
+    vi.mocked(api.openOrders).mockResolvedValue([mine])
+    vi.mocked(api.openShiftRegisters).mockResolvedValue([
+      makeOpenShiftRegister({ register_id: OTHER, register_name: 'Bar', opened_by_name: 'Sam' }),
+    ])
+    renderFloor({ canTransfer: true })
+
+    await screen.findByText('12')
+    fireEvent.click(screen.getByRole('button', { name: /transfer/i }))
+
+    expect(await screen.findByRole('button', { name: 'Bar — Sam' })).toBeInTheDocument()
   })
 
   it('disables resume on other tabs while a different order is active on the sale screen', async () => {

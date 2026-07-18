@@ -25,7 +25,7 @@ final class GetReceipt
             'lines.modifiers',
             'payments' => fn ($q) => $q->where('status', 'captured')->orderBy('created_at'),
             'location',
-            'openedBy',
+            'opener',
         ])->findOrFail($orderId);
     }
 }

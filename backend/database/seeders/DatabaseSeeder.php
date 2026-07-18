@@ -103,6 +103,10 @@ class DatabaseSeeder extends Seeder
         $this->command?->newLine();
         $this->command?->info('Device tokens (paste one into the register SPA):');
         $this->command?->table(['Register', 'Device token'], $tokens);
+
+        $this->command?->newLine();
+        $this->command?->info('Back-office login (POST /api/v1/admin/login):');
+        $this->command?->table(['Email', 'Password'], [['admin@pos.test', 'admin-dev-password']]);
     }
 
     private function seedStaff(Location $downtown, Location $london): void
@@ -122,8 +126,8 @@ class DatabaseSeeder extends Seeder
         // Priya has both a PIN (to work a till) and a password (for the back office).
         User::factory()->admin()->withPin('4444')->create([
             'name' => 'Priya Admin',
-            'email' => 'admin@example.com',
-            'password_hash' => Hash::make('password'),
+            'email' => 'admin@pos.test',
+            'password_hash' => Hash::make('admin-dev-password'),
         ]);
 
         // Role assignment is per team, so the team context is set before each one.

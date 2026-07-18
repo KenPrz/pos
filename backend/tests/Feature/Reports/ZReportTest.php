@@ -9,6 +9,10 @@ use App\Actions\Payments\TakePaymentInput;
 use App\Actions\Refunds\RefundLineInput;
 use App\Actions\Refunds\RefundOrder;
 use App\Actions\Refunds\RefundOrderInput;
+use App\Actions\Orders\SplitOrder;
+use App\Actions\Orders\SplitOrderInput;
+use App\Actions\Orders\VoidOrder;
+use App\Actions\Orders\VoidOrderInput;
 use App\Actions\Reports\GetZReport;
 use App\Actions\Shifts\CloseShift;
 use App\Actions\Shifts\CloseShiftInput;
@@ -162,4 +166,34 @@ it("is scoped to the acting register's location, not to the shift's own register
 it('requires shift_id', function (): void {
     $this->getJson('/api/v1/reports/z', staffHeaders($this->register, $this->cashier))
         ->assertStatus(400);
+});
+
+it('separates a split original from a genuine void — orders_voided excludes splits, orders_split counts only them', function (): void {
+    $variant = ProductVariant::factory()->untracked()->create(['price_cents' => 1000]);
+
+    // A split: the original is voided with void_reason "split into ..." and must NOT
+    // count as orders_voided — it must count as orders_split instead.
+    $splitOrder = Order::factory()->forRegister($this->register)->create(['opened_by' => $this->cashier->id]);
+    $splitOrder = t12AddLine($this, $splitOrder->id, $variant->id, '1');
+    app(SplitOrder::class)->execute(new SplitOrderInput(
+        orderId: $splitOrder->id, registerId: $this->register->id, ways: 2,
+        expectedVersion: Order::findOrFail($splitOrder->id)->version, actorId: $this->cashier->id,
+    ));
+
+    // A genuine void — must count as orders_voided, and must NOT count as orders_split.
+    $voidedOrder = Order::factory()->forRegister($this->register)->create(['opened_by' => $this->cashier->id]);
+    $voidedOrder = t12AddLine($this, $voidedOrder->id, $variant->id, '1');
+    app(VoidOrder::class)->execute(new VoidOrderInput(
+        orderId: $voidedOrder->id, registerId: $this->register->id, reason: 'walkout',
+        expectedVersion: $voidedOrder->version, actorId: $this->supervisor->id,
+    ));
+
+    $report = app(GetZReport::class)->execute($this->shift->id, $this->register->id);
+    expect($report->ordersVoided)->toBe(1)
+        ->and($report->ordersSplit)->toBe(1);
+
+    $this->getJson('/api/v1/reports/z?shift_id='.$this->shift->id, staffHeaders($this->register, $this->cashier))
+        ->assertOk()
+        ->assertJsonPath('data.orders_voided', 1)
+        ->assertJsonPath('data.orders_split', 1);
 });

@@ -48,6 +48,14 @@ return [
         'number_format' => '{location}-{date}-{seq}',   // DT-20260715-0042
     ],
 
+    'stock' => [
+        // The back-office stock report flags a variant "low" at or under this many
+        // units on hand, at every location alike. Promote to a per-location column the
+        // day someone asks for a different number per store, same as
+        // shifts.variance_approval_threshold_cents above.
+        'low_threshold' => 5,
+    ],
+
     'rate_limits' => [
         'pin_per_minute'     => 5,
         'catalog_per_minute' => 10,

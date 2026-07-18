@@ -77,6 +77,7 @@ function ZReportPanel({ z }: { z: ReturnType<typeof useZReport> }) {
         <span className="zrow"><dt>Drops</dt><dd>−{fm(r.movements.drop)}</dd></span>
         <span className="zrow"><dt>Orders closed</dt><dd>{r.orders_closed}</dd></span>
         <span className="zrow"><dt>Orders voided</dt><dd>{r.orders_voided}</dd></span>
+        <span className="zrow"><dt>Orders split</dt><dd>{r.orders_split}</dd></span>
       </dl>
     </div>
   )

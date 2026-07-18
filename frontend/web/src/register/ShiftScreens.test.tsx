@@ -57,6 +57,7 @@ function makeZReport(expectedCashCents: number): ZReport {
     movements: { paid_in: 0, payout: 0, drop: 0 },
     orders_closed: 3,
     orders_voided: 0,
+    orders_split: 2,
     expected_cash_cents: expectedCashCents,
   }
 }
@@ -98,6 +99,7 @@ describe('CloseShiftScreen — blind drawer count', () => {
     expect(await screen.findByText('Drawer reconciled')).toBeInTheDocument()
     expect(screen.getAllByText('$123.45').length).toBeGreaterThan(0)
     expect(screen.queryByText('•••••')).not.toBeInTheDocument()
+    expect((await screen.findByText('Orders split')).nextSibling).toHaveTextContent('2')
   })
 })
 

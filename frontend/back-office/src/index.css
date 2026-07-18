@@ -1,0 +1,1109 @@
+@import "./styles/tokens.css";
+
+/**
+ * Register restyle per DESIGN.md — "console chrome": a periwinkle metal chassis
+ * carrying platinum content plates, capped by a carbon command bar. Warm color
+ * (signal orange / amber / nav-gold / red) means action and nothing else. Corners
+ * are sharp by default; the outer register panel is chamfered, not rounded.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font: 12px/1.4 Arial, Helvetica, sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   Chassis
+--------------------------------------------------------------------------- */
+
+.shell {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+}
+
+@media (max-width: 720px) {
+  .shell {
+    padding: var(--space-sm);
+  }
+}
+
+/* Carbon command bar — replaces the plain header. A near-black slab with a faint
+   halftone-dot texture (the speaker-grille cue), carrying the POS pill and the
+   current section word. */
+.carbon-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-lg);
+  background-color: var(--color-carbon);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 4px 4px;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+}
+
+.pos-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 var(--space-md);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-radius: var(--r-full);
+  font-family: "Arial Black", Arial, sans-serif;
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+}
+
+.carbon-bar-section {
+  font: bold 13px/1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-nav-gold);
+}
+
+/* The main register panel — a periwinkle plate with chamfered (cut, not rounded)
+   corners, the one place `.chamfer` is used. Inner content-panels stack inside
+   with an 8px gutter — density is the character, this is not meant to breathe. */
+.register-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  margin-top: var(--space-sm);
+}
+
+/* ---------------------------------------------------------------------------
+   Content plates (form-panel)
+--------------------------------------------------------------------------- */
+
+.form-panel {
+  background: var(--color-platinum);
+  border-top: 1px solid #fff;
+  border-left: 1px solid var(--color-chrome-indigo);
+  border-right: 1px solid var(--color-chrome-indigo);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-md);
+  padding: var(--space-lg);
+}
+
+/* Every panel is capped by a canvas section-label-bar strip — the silkscreen
+   voice: uppercase Arial Bold, 0.5px tracking. Works whether the heading is a
+   bare <h2> or an <h2> paired with a header action (SaleScreen's Close shift). */
+.form-panel > h2,
+.form-panel > header.row {
+  margin: calc(-1 * var(--space-lg)) calc(-1 * var(--space-lg)) var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  min-height: 44px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  display: flex;
+  align-items: center;
+  font: bold 11px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* header.row additionally carries a trailing action button — split it to the far
+   edge. A bare <h2> has no second item, so it stays flex-start (icon + text glued
+   together) rather than space-between, which would otherwise shove the icon
+   pseudo-element and the text to opposite ends of the bar. */
+.form-panel > header.row {
+  justify-content: space-between;
+}
+
+.form-panel > h2::before,
+.form-panel > header.row h2::before {
+  content: "\2261";
+  margin-right: var(--space-xs);
+  opacity: 0.6;
+}
+
+.form-panel > header.row h2 {
+  margin: 0;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  display: flex;
+  align-items: center;
+}
+
+.form-panel.bad {
+  border-left: 4px solid var(--color-error);
+}
+
+/* ---------------------------------------------------------------------------
+   Type & copy
+--------------------------------------------------------------------------- */
+
+.muted {
+  color: var(--color-ink-soft);
+  margin: var(--space-xs) 0 0;
+  font-size: 12px;
+}
+
+.error {
+  color: var(--color-error);
+  font-weight: 700;
+  margin: var(--space-sm) 0 0;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0;
+  font-size: 12px;
+}
+
+dt {
+  color: var(--color-ink-soft);
+  font-weight: 700;
+}
+
+dd {
+  margin: 0;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Dotted divider — the recurring Y2K-chrome detail between form sub-sections
+--------------------------------------------------------------------------- */
+
+.dotted-divider {
+  border: none;
+  border-top: 1px dotted var(--color-muted-indigo);
+  margin: var(--space-md) 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Forms & inputs — modern floor overrides the 2001 20px chassis: 44px minimum.
+--------------------------------------------------------------------------- */
+
+label {
+  display: block;
+  margin-bottom: var(--space-md);
+  font: bold 12px/1.4 Arial, Helvetica, sans-serif;
+  color: var(--color-ink);
+}
+
+label > input {
+  margin-top: var(--space-xs);
+}
+
+input,
+select {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  font: 12px/1.4 Arial, Helvetica, sans-serif;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--r-xs);
+}
+
+form {
+  display: block;
+}
+
+form > *:not(:last-child) {
+  margin-bottom: var(--space-md);
+}
+
+/* ---------------------------------------------------------------------------
+   Buttons — warm color is strictly directional. Signal orange forwards/submits,
+   amber is a utility tool, carbon is the quiet secondary/back action.
+--------------------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 var(--space-lg);
+  font: bold 11px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: none;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.35);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.form-panel > .btn,
+.form-panel > .btn-row {
+  margin-top: var(--space-md);
+}
+
+.btn-submit {
+  background: var(--color-signal);
+  color: var(--color-on-primary);
+}
+
+.btn-utility {
+  background: var(--color-amber);
+  color: var(--color-ink);
+}
+
+.btn-secondary {
+  background: var(--color-carbon);
+  color: var(--color-on-primary);
+  border-radius: var(--r-none);
+}
+
+.btn-void {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Cart — platinum list rows on an inset field
+--------------------------------------------------------------------------- */
+
+.cart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0;
+}
+
+.cart-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--color-platinum);
+  border-top: 1px solid #fff;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-sm);
+  padding: var(--space-sm);
+}
+
+.cart-row-name {
+  flex: 1;
+  font-weight: 700;
+  color: var(--color-ink-soft);
+}
+
+/* Wraps name + modifiers for an order line so the modifier list can stack under the
+   name while price/qty/void stay on the row. `.cart-row-name` keeps its own `flex: 1`
+   for bare use in discount rows (no wrapper there) — reset it to `initial` once nested,
+   since the flex context here is `.cart-row-main`'s column, not `.cart-row`'s row. */
+.cart-row-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.cart-row-main .cart-row-name {
+  flex: initial;
+}
+
+.cart-row-modifiers {
+  margin: 0;
+  padding: 0 0 0 var(--space-md);
+  list-style: none;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--color-ink);
+}
+
+.cart-row-qty {
+  color: var(--color-ink);
+}
+
+.cart-row-price {
+  font-weight: 700;
+}
+
+.totals {
+  grid-template-columns: 1fr auto;
+  margin-top: var(--space-md);
+  align-items: baseline;
+}
+
+.totals dd.grand {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/* ---------------------------------------------------------------------------
+   The one loud element — change due. Outlined Arial Black on a lavender hero
+   field, the box-art treatment. Nothing else on the register gets display type.
+--------------------------------------------------------------------------- */
+
+.hero-panel {
+  background: var(--color-lavender);
+  border-top: 1px solid #fff;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-md);
+  padding: var(--space-lg);
+  margin: var(--space-md) 0;
+  text-align: center;
+}
+
+.hero-eyebrow {
+  margin: 0 0 var(--space-xs);
+  font: bold 11px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink-soft);
+}
+
+.hero-amount {
+  margin: 0;
+  font-family: "Arial Black", Arial, sans-serif;
+  font-weight: 900;
+  font-size: 44px;
+  line-height: 1;
+  color: #fff;
+  -webkit-text-stroke: 2px var(--color-carbon);
+  text-shadow: 3px 3px 0 var(--color-chrome-indigo);
+}
+
+/* ---------------------------------------------------------------------------
+   Receipt (printable)
+--------------------------------------------------------------------------- */
+
+.receipt {
+  margin: var(--space-lg) 0;
+  padding: var(--space-lg);
+  border: 1px dashed var(--color-hairline);
+  background: var(--color-surface);
+}
+
+.receipt table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.receipt td {
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--color-platinum);
+}
+
+.receipt tr.total td {
+  font-weight: 700;
+  border-top: 1px solid var(--color-ink);
+  border-bottom: none;
+}
+
+.receipt h3 {
+  margin: 0 0 var(--space-xs);
+  font-size: 14px;
+}
+
+/* ---------------------------------------------------------------------------
+   Modern floor: focus visibility, reduced motion, print stays plain B&W
+--------------------------------------------------------------------------- */
+
+:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  .carbon-bar,
+  button,
+  .btn,
+  form {
+    display: none;
+  }
+
+  body,
+  .shell,
+  .register-body,
+  .form-panel,
+  .hero-panel,
+  .cart-row {
+    background: none;
+    color: #000;
+    border: none;
+    box-shadow: none;
+    text-shadow: none;
+    -webkit-text-stroke: 0;
+    clip-path: none;
+  }
+
+  .form-panel > h2,
+  .form-panel > header.row {
+    background: none;
+    border: none;
+    margin: 0 0 var(--space-sm);
+    padding: 0;
+    color: #000;
+  }
+
+  .form-panel > h2::before,
+  .form-panel > header.row h2::before {
+    content: "";
+  }
+
+  .hero-amount {
+    color: #000;
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+    font-size: 24px;
+  }
+
+  .receipt {
+    border: none;
+  }
+}
+
+/* ── M4 additions: carbon-bar session controls, void/discount/refund flows, Z-report ──
+   Same rules as everything above: warm = action only, hard bevels, no blur, no new hues. */
+
+.carbon-bar-link {
+  background: transparent;
+  border: none;
+  color: var(--color-nav-gold);
+  font: 700 13px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+}
+
+.carbon-bar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.carbon-bar-user {
+  color: var(--color-canvas-soft);
+  font: 700 11px/1.1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.btn-clockout {
+  border: 1px solid var(--color-hairline);
+}
+
+/* Small in-row action chips (VOID on a cart row, ✕ on a discount row). Red is
+   destructive here — the one non-error use the system allows. */
+.btn-chip {
+  /* Visually compact, but never below the 44px hit-area floor DESIGN.md mandates
+     for a modern port. */
+  min-height: 44px;
+  min-width: 44px;
+  padding: var(--space-xxs) var(--space-sm);
+  margin-left: var(--space-sm);
+  font-size: 10px;
+}
+
+.inline-reason {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-sm);
+  background: var(--color-canvas-soft);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+}
+
+.inline-reason input {
+  flex: 1;
+}
+
+.discount-picker {
+  padding: var(--space-md);
+  background: var(--color-periwinkle);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.discount-picker input {
+  flex: 1 1 160px;
+}
+
+.picker-label {
+  flex-basis: 100%;
+  margin: 0;
+  font: 700 11px/1.1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-ink);
+}
+
+.discount-row .cart-row-price {
+  color: var(--color-ink-soft);
+}
+
+.refund-row {
+  align-items: center;
+}
+
+.refund-qty {
+  width: 72px;
+  min-height: 44px;
+  margin-left: var(--space-sm);
+}
+
+.restock-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  margin-left: var(--space-sm);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  /* The label is the hit area — clicks anywhere on it toggle the checkbox. */
+  min-height: 44px;
+  padding: 0 var(--space-xs);
+  cursor: pointer;
+}
+
+.restock-check input[type='checkbox'] {
+  min-height: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.zreport dl {
+  display: block;
+  margin: 0;
+}
+
+.zreport .zrow {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-xxs) 0;
+  border-bottom: 1px dotted var(--color-muted-indigo);
+}
+
+.zreport dt {
+  font: 700 11px/1.4 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.zreport dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  .carbon-bar-link,
+  .carbon-bar-right {
+    display: none;
+  }
+}
+
+/* ── M5 additions: food-mode menu grid + modifier sheet ──
+   Same rules as everything above: warm = action only, hard bevels, no blur, no new hues.
+   The grid and sheet reuse `.form-panel` chrome (platinum plate, canvas header bar)
+   rather than inventing a second panel language. */
+
+/* Food mode still shows the scan field (Cheddar by weight arrives with a barcode too),
+   but de-emphasized — the grid is the everyday idiom, the scanner is the exception. */
+.scan-form-compact input {
+  max-width: 240px;
+}
+
+.menu-grid {
+  display: flex;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.menu-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  flex: 0 0 120px;
+}
+
+.menu-rail-tab {
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-none);
+  font: bold 11px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Active category is wayfinding, not an action — nav-gold (the primary-nav word color),
+   never signal orange, which stays reserved for ADD. */
+.menu-rail-tab.active {
+  background: var(--color-periwinkle);
+  color: var(--color-nav-gold);
+}
+
+.menu-tiles {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-sm);
+  align-content: start;
+}
+
+.menu-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-xxs);
+  min-height: 64px;
+  padding: var(--space-sm);
+  background: var(--color-platinum);
+  border: none;
+  border-top: 1px solid #fff;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.menu-tile-name {
+  font: bold 11px/1.2 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink-soft);
+}
+
+.menu-tile-price {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/* The modifier sheet — a plate laid over the grid, not a routed screen. No blurred
+   shadow (the system doesn't have one); the backdrop is a flat dim, same as any other
+   inset surface here. */
+.modifier-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 36, 46, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  z-index: 10;
+}
+
+.modifier-sheet {
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.modifier-group {
+  margin-bottom: var(--space-md);
+}
+
+.modifier-group-label {
+  margin: 0 0 var(--space-xs);
+  font: bold 11px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink);
+}
+
+.modifier-required {
+  color: var(--color-ink-soft);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.modifier-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+/* Chips share the `.btn` hit-area floor but never carry warm fill — selection is state,
+   not the till's one action. Selected = periwinkle fill (one step up from the platinum
+   sheet), same cool-chrome vocabulary as the active rail tab. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--r-xs);
+  font: bold 11px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.chip.selected {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+  color: var(--color-ink);
+}
+
+.chip.at-max {
+  opacity: 0.5;
+}
+
+.chip-delta {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip-count {
+  color: var(--color-ink-soft);
+}
+
+.modifier-sheet-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px dotted var(--color-muted-indigo);
+}
+
+.modifier-sheet-total {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
+
+/* ── M5 additions: floor view (tab cards, new tab, transfer, prep chips) ── */
+
+.floor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.tab-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+/* A big platinum plate-button — the "card" IS the resume affordance, tapped directly
+   (no separate Resume button), same touch-first idiom as `.menu-tile`. */
+.tab-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xxs);
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-platinum);
+  border: none;
+  border-top: 1px solid #fff;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tab-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The tab currently in progress on the (hidden) sale screen — wayfinding, not an
+   action, so it's the same periwinkle "active" tone as `.menu-rail-tab.active`. */
+.tab-card.active {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+}
+
+.tab-card-ref {
+  font: bold 16px/1.2 Arial, Helvetica, sans-serif;
+  color: var(--color-ink-soft);
+}
+
+.tab-card-meta {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink);
+  opacity: 0.75;
+}
+
+.tab-card-due {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.tab-card-hint {
+  margin: 0;
+  padding: 0 var(--space-xs);
+  font-size: 10px;
+  color: var(--color-ink-soft);
+}
+
+.tab-card-transfer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.transfer-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--color-periwinkle);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+}
+
+/* Prep chips (cart lines, food mode) — reuse `.chip`'s hit area but colored per kitchen
+   state rather than a plain selected/unselected toggle. Cool for "not started yet" and
+   "being made" (state, not action); signal orange only at `ready`, where tapping means
+   "send it out" — the one point warm color's forward-motion rule genuinely applies. */
+.prep-chip {
+  margin-left: var(--space-sm);
+}
+
+.prep-chip.prep-pending {
+  background: var(--color-surface);
+}
+
+.prep-chip.prep-in_progress {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+}
+
+.prep-chip.prep-ready {
+  background: var(--color-signal);
+  color: var(--color-on-primary);
+  border-color: var(--color-signal);
+}
+
+/* ── M5 additions: split flow (Task 13) ── */
+
+/* One chip per check. Cool periwinkle for the child currently being tendered — state,
+   not action, same vocabulary as `.tab-card.active` — never signal orange, which this
+   file reserves for forward-motion buttons only. */
+.split-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.split-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xxs);
+  min-width: 88px;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-platinum);
+  border-top: 1px solid #fff;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-sm);
+}
+
+.split-chip.active {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+}
+
+.split-chip.settled {
+  opacity: 0.6;
+}
+
+.split-chip-num {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink-soft);
+}
+
+.split-chip-due {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.split-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--color-periwinkle);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  margin: var(--space-sm) 0;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.stepper-value {
+  min-width: 24px;
+  text-align: center;
+  font: bold 16px/1 Arial, Helvetica, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.split-preview {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.split-receipt {
+  margin: var(--space-md) 0;
+  padding-top: var(--space-md);
+  border-top: 1px dotted var(--color-muted-indigo);
+}
+
+.split-receipt > header.row {
+  align-items: center;
+}
+
+/* The blind-count hint below the count form — same muted tone as everything else in
+   `.muted`, just calling out that the masked figure specifically isn't a typo. */
+.blind-count span {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
+}
+
+/* ── M6 addition: back-office table density ──
+   The register optimizes for a thumb at a counter (44px hit targets, roomy rows); the
+   back office is a desk surface driven by mouse and keyboard, so its data tables trade
+   that touch floor for density — 13px rows in a plate-framed grid. Same vocabulary as
+   everywhere else (`.plate`'s chrome-indigo bevel, uppercase 11px labels), no new hues. */
+.bo-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  font-size: 13px;
+}
+
+.bo-table th,
+.bo-table td {
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--color-platinum);
+  text-align: left;
+}
+
+.bo-table th {
+  font: bold 11px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink-soft);
+  background: var(--color-canvas-soft);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+}
+
+.bo-table tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* Archived rows (`is_active: false`) grey out but stay legible — the row isn't gone,
+   it's parked, and UNARCHIVE is a one-click way back. */
+.bo-table tbody tr.archived-row {
+  opacity: 0.55;
+}
+
+/* Amber, per DESIGN.md's "utility chips/badges" — never signal orange, which stays
+   reserved for the one forward action on a screen (NEW / SAVE). */
+.badge-archived {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-xs);
+  background: var(--color-amber);
+  color: var(--color-ink);
+  border-radius: var(--r-xs);
+  font: bold 10px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* StockReportView (Task 11): the one place a report row itself carries signal orange
+   rather than a button — a low variant is the one thing on this screen that's
+   action-worthy (reorder), so it earns the warm accent DESIGN.md otherwise reserves for
+   NEW/SAVE/SEND. */
+.low-stock-row {
+  color: var(--color-signal);
+  font-weight: bold;
+}
