@@ -19,7 +19,10 @@ final class SetProductModifierGroupsRequest extends FormRequest
     {
         return [
             'group_ids' => ['present', 'array'],
-            'group_ids.*' => ['uuid', 'exists:modifier_groups,id'],
+            // 'distinct' turns a repeated id into a clear 400 rather than a silent sync()
+            // collapse (sync() keys the pivot by group id, so [g1, g1] would quietly land
+            // as one row at whichever position won the array-key collision).
+            'group_ids.*' => ['distinct', 'uuid', 'exists:modifier_groups,id'],
         ];
     }
 

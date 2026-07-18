@@ -28,6 +28,8 @@ final class CreateDiscount
 
             $this->audit->record('admin.discount.create', $discount, $in->actorId, [
                 'name' => $in->name, 'kind' => $in->kind, 'scope' => $in->scope,
+                'percent_micros' => $in->percentMicros, 'amount_cents' => $in->amountCents,
+                'requires_supervisor' => $in->requiresSupervisor,
             ]);
 
             return $discount;

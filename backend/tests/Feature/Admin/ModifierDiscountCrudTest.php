@@ -15,6 +15,7 @@ use App\Models\OrderLineModifier;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     $admin = User::factory()->create(['email' => 'a@pos.test', 'password_hash' => 'pw', 'is_admin' => true]);
@@ -98,6 +99,16 @@ it('creates, lists, and updates a discount', function (): void {
 
     $this->assertDatabaseHas('audit_log', ['action' => 'admin.discount.create', 'entity_id' => $id]);
     $this->assertDatabaseHas('audit_log', ['action' => 'admin.discount.update', 'entity_id' => $id]);
+
+    // A money-sensitive entity's creation audit should show what was configured, not
+    // just name/kind/scope.
+    $row = DB::table('audit_log')->where('action', 'admin.discount.create')->where('entity_id', $id)->first();
+    $payload = json_decode($row->payload, true);
+    expect($payload['percent_micros'])->toBe(100_000);
+    expect($payload['amount_cents'])->toBeNull();
+    // Not passed in the create body, so it takes the schema's default (true) — discounts
+    // default to supervisor-gated.
+    expect($payload['requires_supervisor'])->toBeTrue();
 });
 
 it('refuses a percent discount carrying amount_cents on create', function (): void {
@@ -155,6 +166,28 @@ it('replaces a product\'s modifier groups in PUT order, position = array index',
         ->assertJsonPath('data.product.modifier_groups.0.id', $g1->id)
         ->assertJsonCount(1, 'data.product.modifier_groups');
     $this->assertDatabaseCount('product_modifier_groups', 1);
+});
+
+it('refuses a repeated group id in the same PUT', function (): void {
+    $product = Product::factory()->create();
+    $group = ModifierGroup::factory()->create();
+
+    $this->putJson("/api/v1/admin/products/{$product->id}/modifier-groups", ['group_ids' => [$group->id, $group->id]], $this->headers)
+        ->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
+});
+
+it('detaches everything with an empty group_ids array — the doc-comment\'s literal claim', function (): void {
+    $product = Product::factory()->create();
+    $group = ModifierGroup::factory()->create();
+
+    $this->putJson("/api/v1/admin/products/{$product->id}/modifier-groups", ['group_ids' => [$group->id]], $this->headers)
+        ->assertOk();
+    $this->assertDatabaseCount('product_modifier_groups', 1);
+
+    $this->putJson("/api/v1/admin/products/{$product->id}/modifier-groups", ['group_ids' => []], $this->headers)
+        ->assertOk()
+        ->assertJsonCount(0, 'data.product.modifier_groups');
+    $this->assertDatabaseCount('product_modifier_groups', 0);
 });
 
 it('attaches modifier groups to a product with existing order lines without disturbing frozen snapshots', function (): void {
