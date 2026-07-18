@@ -1,5 +1,14 @@
 # compose.prod.yml — single-host production: one FrankenPHP edge, TLS, host routing.
 # Requires an .env beside this file — see .env.prod.example. `make prod-up`.
+#
+# `name: pos` claims the Docker volume/network namespace `pos_*` outright. If
+# this host ever ran the old `infra/docker-compose.yml` (retired, but its
+# project name was also `pos`) or any other stack named `pos`, its `pgdata`
+# volume is the same `pos_pgdata` this file's `db` service will attach to —
+# a real Postgres, not a fresh one. Before a real boot here, either
+# `docker compose -f infra/docker-compose.yml down -v` first, or, for a
+# throwaway/smoke run only, boot with `COMPOSE_PROJECT_NAME=<something-else>`
+# to get an isolated namespace instead.
 name: pos
 
 services:
