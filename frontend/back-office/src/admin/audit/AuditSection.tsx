@@ -10,10 +10,12 @@ import { ApiError, api, type AuditLogEntry } from '../../lib/api'
 const ENTITY_TYPES = [
   'Order',
   'OrderLine',
+  'OrderDiscount',
   'Payment',
   'Refund',
   'Shift',
   'Register',
+  'Location',
   'User',
   'Product',
   'ProductVariant',
@@ -77,6 +79,10 @@ export function AuditSection({ onUnauthorized }: { onUnauthorized: () => void })
   const applyFilters = () => {
     setAppliedFilters(filters)
     setPage(1)
+    // Clear synchronously rather than waiting on the reactive append effect above —
+    // between the click and the response landing (or forever, if it errors), the table
+    // must not go on showing the previous filter's rows as if they matched the new one.
+    setRows([])
   }
 
   const hasMore = query.data?.has_more ?? false

@@ -14,6 +14,10 @@ describe('toCsv', () => {
     expect(toCsv(['h'], [['line1\nline2']])).toBe('h\r\n"line1\nline2"')
   })
 
+  it('quotes a field containing a bare carriage return', () => {
+    expect(toCsv(['h'], [['a\rb']])).toBe('h\r\n"a\rb"')
+  })
+
   it('joins the header and every row with CRLF, never a bare newline', () => {
     const csv = toCsv(['x', 'y'], [
       ['1', '2'],

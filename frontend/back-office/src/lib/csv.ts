@@ -4,18 +4,23 @@
  */
 
 /**
- * Quote a field if it contains a comma, a double quote, or a newline, doubling any
- * inner quotes first — the two rules that make a CSV round-trip through Excel/Sheets
- * without corrupting a cell.
+ * Quote a field if it contains a comma, a double quote, a carriage return, or a
+ * newline, doubling any inner quotes first — the rules that make a CSV round-trip
+ * through Excel/Sheets without corrupting a cell.
  */
 function escapeField(value: string | number): string {
   const s = String(value)
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
 /**
  * Build a CSV document from a header row and data rows. `\r\n` line endings per RFC
  * 4180 — Excel in particular is fussy about a bare `\n`.
+ *
+ * Deliberately not guarding against formula injection (a field starting with
+ * `=`/`+`/`-`/`@` that a spreadsheet app would try to evaluate on open): every field
+ * this app exports is server-controlled report data, never end-user free text, so
+ * there is nothing here for a malicious value to ride in on.
  */
 export function toCsv(headers: string[], rows: Array<Array<string | number>>): string {
   return [headers, ...rows].map((row) => row.map(escapeField).join(',')).join('\r\n')
