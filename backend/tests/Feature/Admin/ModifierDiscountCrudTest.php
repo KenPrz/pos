@@ -41,6 +41,15 @@ it('refuses an inverted select range on create', function (): void {
         ->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
 
+it('accepts a numeric-string max_select on create without a strict_types TypeError', function (): void {
+    // The `integer` validation rule accepts numeric strings; CreateModifierGroupInput's
+    // max_select is a readonly ?int constructor param under strict_types, so an uncast
+    // string here would 500 instead of validate.
+    $this->postJson('/api/v1/admin/modifier-groups', ['name' => 'Milk', 'min_select' => '0', 'max_select' => '1'], $this->headers)
+        ->assertCreated()
+        ->assertJsonPath('data.modifier_group.max_select', 1);
+});
+
 it('refuses an inverted select range on patch, checked against the merged state', function (): void {
     $group = ModifierGroup::factory()->create(['min_select' => 0, 'max_select' => 2]);
     // min_select alone would be fine in isolation; against the existing max_select=2 it inverts.

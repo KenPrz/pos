@@ -43,10 +43,17 @@ final class CreateModifierGroupRequest extends FormRequest
 
     public function toInput(): CreateModifierGroupInput
     {
+        // input() returns null for both "absent" and "present but explicitly null" —
+        // both mean "no max" here, so no separate has() check is needed. Cast only the
+        // non-null case: the `integer` rule above accepts numeric strings ("2"), and a
+        // string would otherwise hit the readonly ?int constructor param under
+        // strict_types and throw instead of validating cleanly.
+        $maxSelect = $this->input('max_select');
+
         return new CreateModifierGroupInput(
             name: $this->string('name')->toString(),
             minSelect: (int) $this->input('min_select', 0),
-            maxSelect: $this->has('max_select') ? $this->input('max_select') : null,
+            maxSelect: $maxSelect !== null ? (int) $maxSelect : null,
             actorId: $this->user()->id,
         );
     }
