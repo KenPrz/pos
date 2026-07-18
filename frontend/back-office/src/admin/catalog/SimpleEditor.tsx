@@ -83,8 +83,11 @@ export function SimpleEditor({
     // Archive behind a confirm (brief's global constraint) — only Tax Rates carry
     // `is_active` through this generic editor (Categories don't), but the check is
     // entity-agnostic: any `is_active: false` in the diff is an archive. UNARCHIVE (the
-    // table action) never goes through here, so it needs no confirm.
-    if (body.is_active === false) {
+    // table action) never goes through here, so it needs no confirm. `initial !== null`
+    // matters too: archiving is an edit-time concept — creating a new row with Active
+    // unchecked isn't "archiving" anything (there's no prior active row to leave), so it
+    // must never pop the confirm (a Cancel there would otherwise silently block create).
+    if (initial !== null && body.is_active === false) {
       const label = typeof values.name === 'string' && values.name ? values.name : 'this record'
       if (!window.confirm(`Archive ${label}? It leaves the register catalog but stays in history.`)) return
     }
