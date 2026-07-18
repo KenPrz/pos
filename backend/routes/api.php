@@ -33,6 +33,8 @@ use App\Http\Controllers\Admin\Registers\CreateRegisterController;
 use App\Http\Controllers\Admin\Registers\ListRegistersController;
 use App\Http\Controllers\Admin\Registers\ReissueDeviceTokenController;
 use App\Http\Controllers\Admin\Registers\UpdateRegisterController;
+use App\Http\Controllers\Admin\Reports\SalesReportController;
+use App\Http\Controllers\Admin\Reports\StockReportController;
 use App\Http\Controllers\Admin\Users\CreateUserController;
 use App\Http\Controllers\Admin\Users\ListUsersController;
 use App\Http\Controllers\Admin\Users\UpdateUserController;
@@ -158,6 +160,12 @@ Route::prefix('v1')->group(function (): void {
         // is the other legal way to get a register its first token.
         Route::post('/registers/{register}/token', ReissueDeviceTokenController::class)
             ->name('admin.registers.token_reissue');
+
+        // Reports (M6 task 6). Reads only — no audit. day/user are ledger-basis (from
+        // payments + refunds); category is line-basis (non-voided lines of closed
+        // orders, joined to the live catalog) — see SalesReportResource's `basis` field.
+        Route::get('/reports/sales', SalesReportController::class)->name('admin.reports.sales');
+        Route::get('/reports/stock', StockReportController::class)->name('admin.reports.stock');
     });
 
     Route::middleware('device')->group(function (): void {
