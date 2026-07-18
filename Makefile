@@ -2,8 +2,14 @@
 COMPOSE_DEV  := docker compose -f compose.dev.yml
 COMPOSE_PROD := docker compose -f compose.prod.yml
 
+# backup/restore/restore-drill target whichever stack COMPOSE points at
+# (COMPOSE=prod switches to the prod stack; default is dev). Both stacks name
+# their db service `db` and their database/user `pos`, so one set of targets
+# covers either.
+COMPOSE_VAR := $(if $(filter prod,$(COMPOSE)),$(COMPOSE_PROD),$(COMPOSE_DEV))
+
 .DEFAULT_GOAL := help
-.PHONY: help dev dev-down logs ps seed migrate dev-key test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs
+.PHONY: help dev dev-down logs ps seed migrate dev-key test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs backup restore restore-drill
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -77,3 +83,39 @@ prod-down: ## Stop the production stack
 
 prod-logs: ## Tail production logs
 	$(COMPOSE_PROD) logs -f --tail=100
+
+# db execs stay unqualified (no --user) like test-backend's above: pg_dump/
+# pg_restore/dropdb/createdb only ever touch Postgres's own data directory,
+# never the bind-mounted host tree, so there is no ownership hazard to dodge.
+# The backup file itself lands on the HOST via shell stdout redirection
+# (`> backups/...`), so it is owned by whoever ran `make`, not the container.
+backup: ## pg_dump -Fc the stack db -> backups/pos-<utc>.dump (COMPOSE=prod for prod)
+	@mkdir -p backups
+	$(COMPOSE_VAR) exec -T db pg_dump -U pos -d pos -Fc > backups/pos-$$(date -u +%Y%m%dT%H%M%SZ).dump
+	@ls -lh backups/ | tail -1
+
+restore: ## Restore FILE=backups/... into the running db (DESTRUCTIVE, asks first)
+	@test -n "$(FILE)" || { echo "usage: make restore FILE=backups/pos-....dump"; exit 1; }
+	@read -p "Overwrite the live 'pos' database with $(FILE)? Type 'restore' to confirm: " a && [ "$$a" = "restore" ]
+	$(COMPOSE_VAR) exec -T db dropdb -U pos --force pos && $(COMPOSE_VAR) exec -T db createdb -U pos pos
+	$(COMPOSE_VAR) exec -T db pg_restore -U pos -d pos --no-owner < $(FILE)
+	@echo "restored $(FILE)"
+
+# Verification counts users/products/registers, not orders/payments/audit_log:
+# a fresh `make seed` never places an order (no sales happen at seed time), so
+# those would read 0 whether or not the restore worked — a passing drill would
+# prove nothing. users/products/registers are populated by every seed and are
+# exactly what this drill has on hand; run one e2e sale first (or use a backup
+# taken after real traffic) to also exercise orders/payments/audit_log.
+restore-drill: ## Prove the newest backup restores: throwaway db, row counts, teardown
+	@test -n "$$(ls backups/*.dump 2>/dev/null)" || { echo "no backups yet - run 'make backup'"; exit 1; }
+	@LATEST=$$(ls -t backups/*.dump | head -1); echo "drilling $$LATEST"; \
+	set -e; \
+	docker run -d --name pos-drill -e POSTGRES_PASSWORD=drill postgres:18-alpine >/dev/null; \
+	trap 'docker rm -f pos-drill >/dev/null 2>&1' EXIT; \
+	until docker exec pos-drill pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done; \
+	docker exec pos-drill createdb -U postgres pos; \
+	docker exec -i pos-drill pg_restore -U postgres -d pos --no-owner < $$LATEST; \
+	docker exec pos-drill psql -U postgres -d pos -tc \
+	  "SELECT 'users: '||count(*) FROM users UNION ALL SELECT 'products: '||count(*) FROM products UNION ALL SELECT 'registers: '||count(*) FROM registers"; \
+	echo "restore drill PASSED - the backup is not a rumor"
