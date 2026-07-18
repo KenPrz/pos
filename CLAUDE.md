@@ -13,17 +13,22 @@ Laravel 13.20 (PHP 8.5) · PostgreSQL 18 · React 19 + TypeScript 7 on Next.js 1
 ## Layout
 
 ```
-backend/        Laravel API. Action-class architecture — see docs/04-backend-conventions.md
-frontend/web/   Next.js register app (back office arrives in M6)
-frontend/native/  Reserved for a desktop shell (Electron/Tauri) — hosts the same SPA and
-                  adds cash drawer + receipt printer access. Empty in v1.
-infra/          docker-compose for local Postgres
-docs/           The design. Start at docs/README.md
+backend/              Laravel API. Action-class architecture — see docs/04-backend-conventions.md
+frontend/web/         Next.js register app
+frontend/back-office/ Next.js back-office app (M6) — catalog/user/location CRUD, reports, audit
+frontend/native/      Reserved for a desktop shell (Electron/Tauri) — hosts the register
+                      app and adds cash drawer + receipt printer access. Empty in v1.
+infra/                docker-compose for local Postgres
+docs/                 The design. Start at docs/README.md
 ```
+
+Two separate frontends, not one app split by route: the register (device-token auth,
+hardware seam) and the back office (email/password auth, no device or location context)
+are different enough sessions that a shared build bought nothing. See `01-architecture.md`.
 
 ## Running it
 
-Three things, in this order.
+Four things, in this order (the fourth only if you need the back office).
 
 **1. Postgres**
 
@@ -56,11 +61,24 @@ Next rewrites `/api` to the API, so the browser sees one origin and CORS never c
 Check it works: <http://127.0.0.1:5174> should say **System healthy** and print the
 Postgres version.
 
+**4. Back office** — http://127.0.0.1:5175
+
+```bash
+cd frontend/back-office
+npm install
+npm run dev
+```
+
+Same `/api` rewrite pattern as the register app, same single-origin story. Log in with
+an admin's email and password (`POST /api/v1/admin/login`) — the seeder prints one; see
+Status, below.
+
 ## Tests
 
 ```bash
 cd backend && ./vendor/bin/pest         # needs Postgres up (creates/uses pos_test)
 cd frontend/web && npm test && npm run typecheck && npm run build
+cd frontend/back-office && npm test && npm run typecheck && npm run build
 ```
 
 The test database is created once:
@@ -133,14 +151,30 @@ registers, three-way-and-more splits, drawer-variance approval. `registers.mode`
 the register UI (menu grid vs. scanner); zero new order-model tables. Seed and run
 `scripts/e2e-lunch-service.sh` for the full story end to end.
 
-Next: **M6 — back office** (`docs/06-roadmap.md`).
+**M6 complete** — back office: catalog CRUD, user management (roles are a full-set
+replace), location and register settings (mode, device-token reissue), sales reports
+(day/user are ledger-basis, category is line-basis — they don't reconcile, and the
+response says which is which), stock/low-stock report, audit log viewer. Admin-only
+auth (`POST /api/v1/admin/login`), archive-never-delete throughout (no `DELETE` route
+anywhere under `/admin/*`). Seed and run `scripts/e2e-admin-day.sh` for the full story
+end to end.
+
+Next: **M7 — production** (`docs/06-roadmap.md`).
 
 ### Gotchas that will cost you an afternoon
 
 - **Never read role assignments through spatie's `roles()` relation.** It applies
   `wherePivot(location_id, currentTeam)`, so it silently answers "roles at the location
   I'm already standing at" rather than "roles". Query `model_has_roles` directly. This
-  has bitten twice.
+  has bitten three times now — most recently the M6 back office's own role writes,
+  which have no register to stand at in the first place.
+- **A Postgres `CHECK` constraint is evaluated after every statement, not once at
+  commit.** A multi-statement transaction that satisfies an invariant only at the very
+  end (e.g. clearing a user's email while a PIN hash is set in the same request) can
+  still fail mid-transaction if an earlier statement leaves the row in a state the
+  CHECK sees and rejects. Order the writes so every intermediate statement already
+  satisfies the constraint on its own — see `UpdateUser`'s roles → PIN → columns
+  ordering.
 - **The permission team context must be set before any `can()` or role load.** A stale or
   absent context returns *silently wrong* answers, never an error. `EnsureStaffSession`
   does it from the register; anything running outside that middleware must do it itself.

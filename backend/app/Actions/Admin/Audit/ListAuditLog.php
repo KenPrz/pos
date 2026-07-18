@@ -12,9 +12,10 @@ use Illuminate\Support\Facades\DB;
  * user's and register's names for display; every filter is optional and applied with
  * `when()` so an empty query is simply "everything, newest first".
  *
- * `entity_type`/`entity_id` and `user_id` filters are covered by the table's own indexes
- * (see the audit_log migration); `action` and the date bounds are not, which is an
- * accepted cost for a back-office read at this scale.
+ * `entity_type`/`entity_id`, `user_id`, and `action` filters are each covered by one of
+ * the table's own indexes (see the audit_log migration); only a bare date range with
+ * none of those three set falls back to a sequential scan, an accepted cost for a
+ * back-office read at this scale.
  *
  * Read-only: no transaction, no audit entry for reading the audit log.
  */

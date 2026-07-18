@@ -293,6 +293,68 @@ What building it changed, and what to know before M6:
 
 **Done when:** an admin never needs `psql`.
 
+**Status: complete.** 462 backend tests, 80 register-app tests, 80 back-office-app
+tests. `scripts/e2e-admin-day.sh` runs a full admin day against a freshly seeded stack:
+build a menu item from nothing (category, tax rate, product, variant, modifier group +
+modifiers, attach), hire a cashier, switch a till to food mode and reissue its device
+token (the old one is dead before the script's next line), ring a sale on the new
+token, reprice the sold variant from the back office and prove the paid order's receipt
+didn't move, read the same sale back through all three sales-report slices and the
+audit log, and close the shift clean.
+
+What building it changed, and what to know before M7:
+
+- **The M2 schema finally earned its keep.** `users.email`/`password_hash`, the
+  `POST /registers/enroll` admin-session precedent, and half the permission catalog
+  (`catalog.manage`, `user.manage`, `location.manage`, `register.enroll`, `audit.view`)
+  were forward-declared four milestones ago and sat unused until now. Nothing about them
+  needed to change to carry the whole back office — the schema and the permission names
+  were right the first time, which is the payoff for having named the fraud surface
+  (`05-rbac.md`) before there was a screen sitting on top of it.
+- **Archive-never-delete is the CRUD spine, not a policy bolted onto it.** There is no
+  `DELETE` route anywhere under `/admin/*` — a category, product, variant, modifier,
+  discount, tax rate, location, or register is retired with `PATCH { "is_active": false
+  }`. Deciding this once, in the first catalog task, gave every later entity (users,
+  locations, registers) the same shape for free instead of relitigating "can we delete
+  this" seven times.
+- **Reports have two honest bases, and they're not required to reconcile.** `sales`
+  grouped by `day`/`user` is *ledger*-basis — summed from captured `payments` and
+  `refunds`, money that actually moved. Grouped by `category` it's *line*-basis —
+  summed from order lines, joined to the *live* catalog for a category name, which a
+  report may do and a receipt never may. The resource's `basis` field says which is
+  which, so the back office never implies a single number both slices would agree on
+  when they have no reason to.
+- **Per-location roles bit again, in exactly the shape M2 warned about.**
+  `RoleAssignments` had to read and write `model_has_roles` directly a second time —
+  spatie's `roles()` relation still only answers "roles at the location I'm standing
+  at," and a back-office write has no register to stand at in the first place. Same
+  gotcha, second implementation, same fix; see CLAUDE.md.
+- **A Postgres `CHECK` is evaluated after every statement, not once at commit.**
+  `UpdateUser` writes roles, then a PIN, then the plain columns, in that order, inside
+  one transaction, because `users_can_authenticate` (email or PIN hash not null) would
+  otherwise see an intermediate state — nulling the email before a PIN hash is on the
+  row fails a constraint that the *finished* transaction would have satisfied. The CHECK
+  doesn't know the transaction isn't done yet.
+- **A resource that only exposes an attach relationship on some responses is an
+  attach-blindness bug.** `AdminProductResource` originally carried `modifier_groups`
+  only where the caller had eager-loaded the pivot; a full-set-replace attach editor
+  seeded from a response that omitted it would save back an empty set and detach every
+  group the product actually had. The fix was a second, unconditionally-present field
+  (`modifier_group_ids`), and the lesson generalizes past this one endpoint: any
+  full-set-replace write needs its read side to expose the current set on every
+  response, not just the ones that happened to eager-load it.
+- **Reissuing a device token kills the old one inside the same transaction.** `POST
+  /admin/registers/{id}/token` deletes every existing personal-access token for that
+  register and mints the replacement before either write commits, so there's no window
+  where a lost terminal's old credential and its replacement are both live.
+- **Admin-only back-office auth was a scope decision, not an oversight.** `/admin/login`
+  has no register and no device, so it has no team context for spatie's per-location
+  roles to hang off — the same reason `admin` isn't a role at all. A read-only
+  supervisor/bookkeeper tier is a named deferral, waiting on the first accountant who
+  needs sales and audit visibility without order-void or user-management power;
+  designing it now, with no real user to shape it around, would be guessing at the
+  wrong problem.
+
 ## M7 — Production
 
 - Deploy topology, TLS, backups (and a **restore drill** — an untested backup is a

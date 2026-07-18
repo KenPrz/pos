@@ -51,10 +51,18 @@ queue; when that day comes, add Redis and Horizon. Adding it now would be scaffo
 with nothing to run on it.
 
 `frontend/web/` is a Next.js app serving one client-boundary register under a server
-shell; `/api` rewrites replace the Vite dev proxy (same single-origin story). Cashier and
-back-office are routes within it, separated by permission, not separate builds — the code
-they share (money formatting, catalog types, the API client) far outweighs what they
-don't.
+shell; `/api` rewrites replace the Vite dev proxy (same single-origin story).
+
+**M6 added a second frontend, not a route inside the first.** `frontend/back-office/`
+is its own Next.js app on its own port (5175), talking to the same API through the same
+`/api` rewrite pattern. The two apps share conventions (money formatting, catalog types,
+the shape of the API client) but not a build or a deployment — a cashier's terminal never
+ships back-office code, and a back-office session never needs the register's offline or
+hardware seams. The original plan called this "routes within one app, separated by
+permission"; building it showed that a device-token-authenticated register and a
+password-authenticated, location-less back office are different enough sessions that
+sharing a build bought nothing and cost a permission check on every route to keep the two
+audiences apart.
 
 `frontend/native/` is reserved for a **desktop shell** (Electron or Tauri) and is empty in
 v1. It is not a second frontend: the plan is that it hosts the same SPA and adds the two
@@ -170,6 +178,16 @@ device on a private network — a PIN alone is never sufficient to reach the API
 PINs are hashed with bcrypt, are never logged, and are rate-limited per register (5
 attempts, then a 60s lockout) to blunt the small keyspace. Back-office users log in with
 a real email and password; they do not get PINs.
+
+3. **Back-office authentication.** A third, independent tier, added in M6: `POST
+   /admin/login` takes an email and password and returns a Sanctum token with no device
+   and no location behind it at all — there is no terminal to trust and no register to
+   read a team id from. This is why the back office is **admin-only** in v1 rather than
+   role-gated like the register: every other permission check in this system gets its
+   location from the physical till that made the request, and a login endpoint with
+   neither a device nor a register has nothing to hang a team-scoped role on. `05-rbac.md`
+   has the full rationale and the named deferral (a read-only bookkeeper role) that
+   revives this decision once there's a real accountant to build it for.
 
 ### Roles
 
