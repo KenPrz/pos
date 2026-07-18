@@ -4,6 +4,18 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AdminLoginController;
 use App\Http\Controllers\Admin\AdminLogoutController;
+use App\Http\Controllers\Admin\Catalog\CreateCategoryController;
+use App\Http\Controllers\Admin\Catalog\CreateProductController;
+use App\Http\Controllers\Admin\Catalog\CreateTaxRateController;
+use App\Http\Controllers\Admin\Catalog\CreateVariantController;
+use App\Http\Controllers\Admin\Catalog\ListCategoriesController;
+use App\Http\Controllers\Admin\Catalog\ListProductsController;
+use App\Http\Controllers\Admin\Catalog\ListTaxRatesController;
+use App\Http\Controllers\Admin\Catalog\ListVariantsController;
+use App\Http\Controllers\Admin\Catalog\UpdateCategoryController;
+use App\Http\Controllers\Admin\Catalog\UpdateProductController;
+use App\Http\Controllers\Admin\Catalog\UpdateTaxRateController;
+use App\Http\Controllers\Admin\Catalog\UpdateVariantController;
 use App\Http\Controllers\Auth\EnrollRegisterController;
 use App\Http\Controllers\Auth\StaffLoginController;
 use App\Http\Controllers\Auth\StaffLogoutController;
@@ -68,6 +80,24 @@ Route::prefix('v1')->group(function (): void {
 
     Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function (): void {
         Route::post('/logout', AdminLogoutController::class)->name('admin.logout');
+
+        // Catalog CRUD (M6 task 2). No DELETE routes anywhere — archive via PATCH
+        // is_active. Every mutation audits admin.<entity>.create|update.
+        Route::get('/categories', ListCategoriesController::class)->name('admin.categories.list');
+        Route::post('/categories', CreateCategoryController::class)->name('admin.categories.create');
+        Route::patch('/categories/{category}', UpdateCategoryController::class)->name('admin.categories.update');
+
+        Route::get('/tax-rates', ListTaxRatesController::class)->name('admin.tax-rates.list');
+        Route::post('/tax-rates', CreateTaxRateController::class)->name('admin.tax-rates.create');
+        Route::patch('/tax-rates/{tax_rate}', UpdateTaxRateController::class)->name('admin.tax-rates.update');
+
+        Route::get('/products', ListProductsController::class)->name('admin.products.list');
+        Route::post('/products', CreateProductController::class)->name('admin.products.create');
+        Route::patch('/products/{product}', UpdateProductController::class)->name('admin.products.update');
+
+        Route::get('/variants', ListVariantsController::class)->name('admin.variants.list');
+        Route::post('/variants', CreateVariantController::class)->name('admin.variants.create');
+        Route::patch('/variants/{variant}', UpdateVariantController::class)->name('admin.variants.update');
     });
 
     Route::middleware('device')->group(function (): void {
