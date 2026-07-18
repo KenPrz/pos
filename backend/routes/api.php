@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\AdminLoginController;
+use App\Http\Controllers\Admin\AdminLogoutController;
 use App\Http\Controllers\Auth\EnrollRegisterController;
 use App\Http\Controllers\Auth\StaffLoginController;
 use App\Http\Controllers\Auth\StaffLogoutController;
@@ -57,6 +59,16 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/registers/enroll', EnrollRegisterController::class)
         ->middleware('auth:sanctum')
         ->name('registers.enroll');
+
+    // Back office: email+password, no device or location context. Every later admin
+    // task (M6 tasks 2-7) adds routes inside the group below.
+    Route::post('/admin/login', AdminLoginController::class)
+        ->middleware('throttle:admin-login')
+        ->name('admin.login');
+
+    Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function (): void {
+        Route::post('/logout', AdminLogoutController::class)->name('admin.logout');
+    });
 
     Route::middleware('device')->group(function (): void {
         Route::post('/staff/login', StaffLoginController::class)

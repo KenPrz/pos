@@ -65,6 +65,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('catalog', fn (Request $request): Limit => Limit::perMinute(
             (int) config('pos.rate_limits.catalog_per_minute')
         )->by($request->bearerToken() ?? $request->ip()));
+
+        // A real security control, like the PIN limiter: a password is guessable at
+        // scale in a way a lunch rush never triggers, so this one is by IP, not by
+        // credential — the login attempt hasn't identified an account yet.
+        RateLimiter::for('admin-login', fn (Request $request): Limit => Limit::perMinute(5)->by($request->ip()));
     }
 
     /**
