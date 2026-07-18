@@ -3,6 +3,7 @@
 // backend/tests/Feature/Admin/UserManagementTest.php
 declare(strict_types=1);
 
+use App\Models\Location;
 use App\Models\Register;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -140,4 +141,39 @@ it('rejects an unknown role name', function (): void {
         'name' => 'Bad Role', 'email' => 'badrole@pos.test',
         'roles' => [['location_id' => $this->location->id, 'role' => 'manager']],
     ], $this->headers)->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
+});
+
+it('refuses to null the only email of a user with no PIN — 422, not a raw DB 500', function (): void {
+    $userId = $this->postJson('/api/v1/admin/users', [
+        'name' => 'Only Email', 'email' => 'onlyemail@pos.test',
+    ], $this->headers)->json('data.user.id');
+
+    $this->patchJson("/api/v1/admin/users/{$userId}", ['email' => null], $this->headers)
+        ->assertStatus(422)->assertJsonPath('error.code', 'email_or_pin_required');
+
+    expect(User::findOrFail($userId)->email)->toBe('onlyemail@pos.test');
+});
+
+it('allows nulling email when a pin is being set in the same request', function (): void {
+    $userId = $this->postJson('/api/v1/admin/users', [
+        'name' => 'Switching To Pin', 'email' => 'switching@pos.test',
+    ], $this->headers)->json('data.user.id');
+
+    $this->patchJson("/api/v1/admin/users/{$userId}", [
+        'email' => null, 'pin' => '5678',
+        'roles' => [['location_id' => $this->location->id, 'role' => 'cashier']],
+    ], $this->headers)->assertOk();
+
+    expect(User::findOrFail($userId)->email)->toBeNull();
+});
+
+it('throws loudly — not a silent no-op — when a role is not provisioned at the given location', function (): void {
+    // A location that exists (passes the exists:locations,id rule) but was never handed
+    // to RoleProvisioner::provisionForLocation() — a seeder/deploy bug, not user input.
+    $unprovisioned = Location::factory()->create(['code' => 'UP']);
+
+    $this->postJson('/api/v1/admin/users', [
+        'name' => 'Bad Provision', 'email' => 'badprov@pos.test',
+        'roles' => [['location_id' => $unprovisioned->id, 'role' => 'cashier']],
+    ], $this->headers)->assertStatus(500);
 });

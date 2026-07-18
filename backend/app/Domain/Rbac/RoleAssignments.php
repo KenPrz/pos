@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * Reads and writes per-location role assignments in `model_has_roles`, directly.
@@ -50,7 +51,14 @@ final class RoleAssignments
                 ->where('name', $assignment['role'])
                 ->where('guard_name', RoleProvisioner::GUARD)
                 ->where('location_id', $assignment['location_id'])
-                ->value('id');
+                ->value('id')
+                // A role that isn't provisioned at this location is a seeder/deploy bug —
+                // RoleProvisioner::provisionForLocation() should have run for every
+                // location before it can take staff. `model_has_roles.role_id` is
+                // NOT NULL, so leaving this unguarded would still fail, just as a
+                // confusing constraint-violation 500 instead of a clear one. Loud beats
+                // silently assigning nothing.
+                ?? throw new RuntimeException("Role \"{$assignment['role']}\" is not provisioned at location {$assignment['location_id']}.");
 
             DB::table('model_has_roles')->insert([
                 'role_id' => $roleId,
