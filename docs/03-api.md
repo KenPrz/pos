@@ -73,7 +73,7 @@ One envelope (`01-architecture.md`):
 | 403 | `forbidden`, `requires_supervisor`, `wrong_location` (mostly structural — location scoping yields 404s; reserved for record/register location disagreements) |
 | 404 | `not_found` |
 | 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders`, `line_already_voided`, `payment_already_voided`, `payment_shift_closed` |
-| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required` (M5), `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use` |
+| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use`, `split_too_fine` |
 | 429 | `too_many_pin_attempts` |
 
 `code` is stable forever once shipped; clients branch on it. `message` is for humans and
@@ -82,10 +82,16 @@ may change freely.
 ## Idempotency
 
 `Idempotency-Key: <uuidv4>` — honored on the routes carrying the idempotent middleware:
-add-line, payments, refunds, and shift close. **Required** on `/payments`, `/refunds`,
-and `/shifts/close`; optional but recommended on add-line. Semantics in
+add-line, payments, refunds, shift close, cash movements, and split. The middleware
+itself is header-presence-driven (it no-ops when the header is absent); **required**,
+enforced by request validation, only on `/payments`, `/refunds`, and `/shifts/close`.
+Add-line, split, and cash movements carry the middleware but validate nothing about the
+header — sending one is honored and recommended, omitting one is accepted. Semantics in
 `01-architecture.md`: replay with a matching body returns the stored response without
-re-executing; replay with a different body is `409 idempotency_key_reused`.
+re-executing; replay with a different body is `409
+idempotency_key_reused`. The key is a **global** primary key, not scoped per route or per
+order — reusing one on a genuinely different request anywhere in the system collides the
+same way (`01-architecture.md`).
 
 ## Optimistic locking
 
@@ -162,11 +168,20 @@ of `02-data-model.md`). If `|variance|` exceeds the threshold,
 `requires_approval: true` comes back and a supervisor confirms via:
 
 ```
-POST /api/v1/shifts/{id}/approve-variance    # supervisor (arrives in M5; the requires_approval flag and permission exist today)
+POST /api/v1/shifts/{id}/approve-variance    # supervisor, location-scoped (not register-scoped)
+  {}
+  → { shift }                    # shift.variance_approved_by / variance_approved_at now set
+                                  # 422 variance_approval_not_required, variance_already_approved
 ```
 
 The shift is already closed by then. Approval is an audit event, not a gate — blocking the
 close is how you end up with terminals unplugged mid-count and no data at all.
+
+**Approving from the register that just closed 401s.** `CloseShift` revokes every staff
+session bound to that register the moment it closes, and approval needs a staff session
+like any other write. In practice this means a supervisor approves from a *different*
+register at the same location — the check is on location, not on the specific register —
+or, later, from the M6 back office. This is expected behaviour, not a bug to route around.
 
 Closing a shift with open orders → `409` listing them in `details`. Those orders must be
 closed or transferred first; a tab cannot outlive the drawer that's accountable for it.
@@ -211,20 +226,31 @@ The lifecycle both retail and food service travel, at different speeds
 POST /api/v1/orders
   { "table_ref": "12", "customer_id": null }     # both optional
   → { order }                                    # status: open, version: 0
+
+PATCH /api/v1/orders/{id}                        # If-Match
+  { "table_ref": "14" }                          # or null to clear
+  → { order }
 ```
 
 Retail opens this implicitly on first scan; the cashier never sees it. Food service opens
-it explicitly and names a table. Same endpoint, same row.
+it explicitly and names a table, and can rename it later — a party moves tables, the tab
+doesn't move with a new order.
 
 ```
 GET  /api/v1/orders?number=&status=&location_id=
 GET  /api/v1/orders/{id}
 ```
 
-As of M4 these are a **targeted, location-scoped lookup** — a receipt number for a refund,
-or recovering an order the register lost track of — not the browsing floor view; that's
-still M5 (open tabs, `table_ref`, floor list). Both require a staff session, per Auth
-above.
+A **targeted, location-scoped lookup** — a receipt number for a refund, recovering an
+order the register lost track of, or (query `status=open`) the set of open tabs a floor
+view renders. There is no separate browsing/paginated endpoint: the floor view is the
+same lookup with `status=open`, capped at the last 20 open orders per location. Both
+routes require a staff session, per Auth above.
+
+Every order in the response carries what a floor view needs to render a tab card without
+a second round-trip: `table_ref`, `opened_by_name`, `opened_at`, and `due_cents`
+(`max(0, total_cents - paid_cents)` — the server does the subtraction so the client never
+computes a balance it then trusts).
 
 ### Lines
 
@@ -233,20 +259,45 @@ POST   /api/v1/orders/{id}/lines                 # If-Match
   { "variant_id": "...", "qty": "1", "modifiers": ["<modifier_id>", ...] }
   → { order, line }
 
-PATCH  /api/v1/orders/{id}/lines/{lineId}        # If-Match (arrives in M5 — not yet shipped)
+PATCH  /api/v1/orders/{id}/lines/{lineId}        # If-Match
   { "qty": "3" }
+  → { order, line }
+
+PATCH  /api/v1/orders/{id}/lines/{lineId}/prep   # no If-Match — see below
+  { "state": "pending" | "in_progress" | "ready" }
+  → { order, line }
 
 DELETE /api/v1/orders/{id}/lines/{lineId}        # If-Match — voids, never deletes
   { "reason": "Customer changed mind" }
 ```
 
 Adding a line does all of this **in one transaction**: resolve the location price, snapshot
-name/SKU/price/tax-rate onto the line, validate modifier group `min_select`/`max_select`
-(M5), lock and decrement stock if tracked, recompute order totals, bump `version`.
+name/SKU/price/tax-rate onto the line, validate modifier group `min_select`/`max_select`,
+lock and decrement stock if tracked, recompute order totals, bump `version`. `modifiers`
+is a flat list of modifier IDs — **repeats are legal** (a double shot is the same modifier
+twice, not a distinct "double shot" catalog entry) and order is preserved. A modifier
+that doesn't belong to the variant's product is `422 modifier_not_applicable`; a group
+whose `min_select`/`max_select` isn't satisfied by the selection is
+`422 modifier_group_required`; a selection whose deltas would take the line negative is
+`422 line_total_negative` rather than a negative receipt line.
 
 The whole order comes back on every line mutation. It's slightly more bytes than
 returning the line alone, and it means the register's totals are **incapable** of drifting
 from the server's — there is no client-side total to be stale.
+
+`PATCH .../lines/{lineId}` sets the line's **absolute** quantity (not a delta); the stock
+ledger sees only the difference. **Shrinking a line already fired to the kitchen is the
+same fraud surface as voiding a sent line and takes the same permission** — decreasing
+`qty` on a line whose `prep_state` is `in_progress` or `ready` without the void-a-line
+permission is `403 forbidden`. Increasing a fired line's quantity needs no such gate; a
+kitchen wanting a bigger portion isn't a fraud path. An already-voided line is
+`409 line_already_voided`.
+
+`PATCH .../prep` is the coursing verb the kitchen taps: `pending` (held) →
+`in_progress` (fired) → `ready` (on the pass). Deliberately **no `If-Match` and no
+`version` bump** — the kitchen marking food ready must never invalidate a till mid-tender,
+and prep state is a KDS concern orthogonal to money. `order_lines.prep_state` was reserved
+in the schema back at M2; this is the first action that writes it.
 
 `DELETE` voids (`voided_at`), per `02-data-model.md`. Removing an already-sent line
 requires `supervisor`.
@@ -254,6 +305,49 @@ requires `supervisor`.
 As of M4, the add-line and void responses also carry the order's applied `discounts` rows
 — `{id, discount_id, order_line_id, name, amount_cents, reason}` — not just totals, so the
 register can offer removal without a separate round-trip.
+
+### Transfer and split
+
+```
+POST /api/v1/orders/{id}/transfer                # If-Match, supervisor
+  { "register_id": "<target register>" }
+  → { order }                                    # register_id and shift_id now the target's
+                                                  # 422 transfer_target_no_shift, transfer_same_shift
+```
+
+Hands a tab to another drawer — the accountability unit is the *shift*, not the person, so
+transferring moves the order onto the target register's **open shift**. The acting
+register doesn't have to be either side of the transfer: a supervisor at any register in
+the location can move a tab between two others. The target register must have an open
+shift to receive it (`422 transfer_target_no_shift`); transferring onto the shift the
+order is already on is a no-op refused rather than silently accepted
+(`422 transfer_same_shift`). Payments already taken keep the `shift_id` that physically
+took them — a transfer never rewrites history, only where the *rest* of the tab is going.
+This is also why closing a shift with open orders lists them: they have to be transferred
+or closed first, per Shifts above.
+
+```
+POST /api/v1/orders/{id}/split                   # If-Match, Idempotency-Key recommended
+  { "ways": 3 }                                   # 2..10
+  → { orders: [ ... ] }                           # N new open orders; the original is voided
+```
+
+Splits **evenly**: every line's qty, tax, discount, and modifier total is divided into
+`ways` parts with `Money::allocate`/the milli-quantity equivalent — the same
+earliest-absorbs-the-remainder rule as any other split in this system
+(`01-architecture.md`), never a per-child recompute (recomputing 1/N of a tax would mint
+pennies that don't sum back). Child totals always sum exactly to the original. Stock is
+untouched — it left the ledger when the lines were first added, and the children inherit
+that claim — so the original order is closed out **voided without restock**, not through
+`VoidOrder` (which does restock by design). The children are independent orders from the
+moment they're created: each closes on its own tender, and nothing about them refers back
+to the parent except the audit trail. Any applied discounts are frozen at the split: each
+child inherits its allocated *share* of a discount as a fixed amount, so mutating a child
+afterwards (adding a line, changing a qty) does not re-scale it off the live discount —
+the share only ever clamps down if the base it sits on shrinks. Refused if the order
+already has payments (`422 order_has_payments` — split what's owed, not what's already
+been paid), or if any line's qty in thousandths is smaller than `ways` and so cannot
+divide into that many non-zero parts (`422 split_too_fine`).
 
 ### Discounts
 

@@ -8,6 +8,8 @@ use App\Actions\Orders\ApplyDiscount;
 use App\Actions\Orders\ApplyDiscountInput;
 use App\Actions\Orders\RemoveDiscount;
 use App\Actions\Orders\RemoveDiscountInput;
+use App\Actions\Orders\VoidLine;
+use App\Actions\Orders\VoidLineInput;
 use App\Domain\Rbac\Roles;
 use App\Exceptions\Domain\DiscountScopeMismatch;
 use App\Models\Discount;
@@ -81,6 +83,24 @@ it('applies a line-scoped discount to a valid line target', function (): void {
     expect($order->lines->first()->discount_cents)->toBe(200)
         ->and($order->discount_cents)->toBe(200)
         ->and($order->total_cents)->toBe(1800);
+});
+
+it('refuses a line discount aimed at a voided line', function (): void {
+    $discount = Discount::factory()->percent(100_000)->line()->create(['name' => '10% off this item']);
+
+    app(VoidLine::class)->execute(new VoidLineInput(
+        orderId: $this->order->id, lineId: $this->line->id, registerId: $this->register->id,
+        reason: 'Kitchen error', expectedVersion: Order::findOrFail($this->order->id)->version,
+        actorId: $this->supervisor->id,
+    ));
+
+    $url = "/api/v1/orders/{$this->order->id}/discounts";
+    $body = ['discount_id' => $discount->id, 'order_line_id' => $this->line->id, 'reason' => 'Manager comp'];
+
+    $this->postJson($url, $body,
+        staffHeaders($this->register, $this->supervisor) + ['If-Match' => (string) Order::findOrFail($this->order->id)->version])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'line_already_voided');
 });
 
 it('rejects an order-scoped discount sent with an order_line_id as a scope mismatch', function (): void {

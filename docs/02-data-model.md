@@ -121,6 +121,7 @@ create table registers (
   id          uuid primary key default uuidv7(),
   location_id uuid not null references locations(id),
   name        text not null,
+  mode        text not null default 'retail' check (mode in ('retail','food')),
   is_active   boolean not null default true,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
@@ -130,6 +131,12 @@ create table registers (
 
 The device's long-lived Sanctum token is polymorphic on `registers` — the register *is*
 the token's owner.
+
+**`mode` is the entire register-UI seam M5 needed** — one column and one check
+constraint, no new order-model table. It ships on the login response
+(`03-api.md`) and picks the register's screen (menu grid + tabs vs. barcode scanner);
+the order lifecycle underneath is identical either way. A register can be re-enrolled
+into a different mode without touching a single order row.
 
 ---
 
@@ -150,7 +157,11 @@ create table shifts (
   variance_cents      bigint,
   close_note          text,
 
-  check ((closed_at is null) = (counted_cash_cents is null))
+  variance_approved_by uuid references users(id),
+  variance_approved_at timestamptz,
+
+  check ((closed_at is null) = (counted_cash_cents is null)),
+  check ((variance_approved_by is null) = (variance_approved_at is null))
 );
 
 create unique index one_open_shift_per_register
@@ -163,6 +174,13 @@ check and no lock. Prefer this shape wherever an invariant can be expressed stru
 
 The paired `check` makes "closed" and "counted" inseparable — you cannot close a drawer
 without counting it, at the schema level.
+
+`variance_approved_by`/`variance_approved_at` were forward-declared nullable at M2, before
+`ApproveVariance` (M5) existed to write them; the second paired `check` — added in M5
+alongside `registers.mode` — makes "approved" and "approved by whom, when" inseparable the
+same way. Approval never blocks the close itself (`03-api.md`): the shift is already
+closed by the time a supervisor signs off, and the pair is written together or not at
+all.
 
 ```sql
 create table cash_movements (
@@ -508,8 +526,11 @@ reprint byte-identical. Joining to `product_variants` for the name at print time
 silently rewrite history. The FK to `variant_id` stays for reporting ("how many of this
 SKU did we sell"), but it is never the source of display or price data.
 
-`prep_state` is the KDS seam named in `00-overview.md` — nullable, unused in v1, costs
-one column now versus a migration over a live orders table later.
+`prep_state` is the KDS seam named in `00-overview.md`. Reserved nullable at M2; M5 is the
+first thing that writes it, via `PATCH .../lines/{id}/prep` (`03-api.md`) driving the
+register's own coursing chips. There is still no separate kitchen-display screen — that
+non-goal stands — but the column earned its keep at one migration's cost instead of a
+schema change over a live `orders` table later.
 
 Lines are **voided, never deleted** (`voided_at`), because "what did the cashier remove
 from this order, and when" is a fraud question.

@@ -28,6 +28,11 @@ final class StaffSessionResource extends JsonResource
                 // renders from this rather than guessing from a role name.
                 'permissions' => $session->user->getAllPermissions()->pluck('name')->values(),
             ],
+            'register' => [
+                'id' => $session->register->id,
+                'name' => $session->register->name,
+                'mode' => $session->register->mode,
+            ],
         ];
     }
 }

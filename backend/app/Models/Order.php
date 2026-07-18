@@ -92,4 +92,10 @@ class Order extends Model
     {
         return $this->belongsTo(User::class, 'opened_by');
     }
+
+    /** @return BelongsTo<User, $this> */
+    public function opener(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'opened_by');
+    }
 }

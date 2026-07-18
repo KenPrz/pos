@@ -105,6 +105,30 @@ export function parseCentsOrNull(input: string): Cents | null {
   }
 }
 
+/**
+ * Split into `parts` amounts that sum exactly back to `amount` — mirrors the backend's
+ * `Money::allocate` (docs/01-architecture.md): the earliest part absorbs the remainder.
+ * 1000 split 3 ways is 334, 333, 333, never 333.33 rounded three independent ways, which
+ * would invent or destroy a penny. Frontend use is display-only (the SPLIT stepper's
+ * even-split preview) — the server is what actually splits the order.
+ */
+export function allocate(amount: Cents, parts: number): Cents[] {
+  if (!Number.isInteger(parts) || parts < 1) {
+    throw new TypeError(`Cannot split money into ${parts} parts.`)
+  }
+
+  const base = Math.trunc(amount / parts)
+  const shares = new Array<number>(parts).fill(base)
+  const remainder = amount - base * parts
+  const step = remainder >= 0 ? 1 : -1
+
+  for (let i = 0; i < Math.abs(remainder); i++) {
+    shares[i % parts] += step
+  }
+
+  return shares.map((s) => cents(s))
+}
+
 export type QuantityString = string & { readonly __brand: 'Quantity' }
 
 export function quantity(value: string): QuantityString {

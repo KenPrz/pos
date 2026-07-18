@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   add,
+  allocate,
   cents,
   formatMoney,
   formatQuantity,
@@ -106,6 +107,32 @@ describe('formatMoney', () => {
       const expected = `$${Math.floor(value / 100)}.${String(value % 100).padStart(2, '0')}`
       expect(formatted).toBe(expected)
     }
+  })
+})
+
+describe('allocate', () => {
+  it('has the earliest part absorb the remainder', () => {
+    // The exact case from M1's backend semantics (docs/01-architecture.md).
+    expect(allocate(cents(1000), 3)).toEqual([334, 333, 333])
+  })
+
+  it('sums exactly back to the original for a spread of amounts and part counts', () => {
+    for (let parts = 2; parts <= 10; parts++) {
+      for (const amount of [0, 1, 7, 100, 999, 100_000_099]) {
+        const shares = allocate(cents(amount), parts)
+        expect(shares).toHaveLength(parts)
+        expect(shares.reduce((a, b) => a + b, 0)).toBe(amount)
+      }
+    }
+  })
+
+  it('rejects fewer than 1 part', () => {
+    expect(() => allocate(cents(100), 0)).toThrow(TypeError)
+    expect(() => allocate(cents(100), -1)).toThrow(TypeError)
+  })
+
+  it('rejects a non-integer part count', () => {
+    expect(() => allocate(cents(100), 2.5)).toThrow(TypeError)
   })
 })
 

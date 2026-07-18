@@ -22,6 +22,7 @@ final class GetReceipt
 
         return Order::where('location_id', $locationId)->with([
             'lines' => fn ($q) => $q->whereNull('voided_at'),
+            'lines.modifiers',
             'payments' => fn ($q) => $q->where('status', 'captured')->orderBy('created_at'),
             'location',
             'openedBy',

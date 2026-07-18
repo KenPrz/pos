@@ -315,7 +315,7 @@ form > *:not(:last-child) {
 
 .cart-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-sm);
   background: var(--color-platinum);
   border-top: 1px solid #fff;
@@ -328,6 +328,30 @@ form > *:not(:last-child) {
   flex: 1;
   font-weight: 700;
   color: var(--color-ink-soft);
+}
+
+/* Wraps name + modifiers for an order line so the modifier list can stack under the
+   name while price/qty/void stay on the row. `.cart-row-name` keeps its own `flex: 1`
+   for bare use in discount rows (no wrapper there) — reset it to `initial` once nested,
+   since the flex context here is `.cart-row-main`'s column, not `.cart-row`'s row. */
+.cart-row-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.cart-row-main .cart-row-name {
+  flex: initial;
+}
+
+.cart-row-modifiers {
+  margin: 0;
+  padding: 0 0 0 var(--space-md);
+  list-style: none;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--color-ink);
 }
 
 .cart-row-qty {
@@ -627,4 +651,397 @@ form > *:not(:last-child) {
   .carbon-bar-right {
     display: none;
   }
+}
+
+/* ── M5 additions: food-mode menu grid + modifier sheet ──
+   Same rules as everything above: warm = action only, hard bevels, no blur, no new hues.
+   The grid and sheet reuse `.form-panel` chrome (platinum plate, canvas header bar)
+   rather than inventing a second panel language. */
+
+/* Food mode still shows the scan field (Cheddar by weight arrives with a barcode too),
+   but de-emphasized — the grid is the everyday idiom, the scanner is the exception. */
+.scan-form-compact input {
+  max-width: 240px;
+}
+
+.menu-grid {
+  display: flex;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.menu-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  flex: 0 0 120px;
+}
+
+.menu-rail-tab {
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-none);
+  font: bold 11px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Active category is wayfinding, not an action — nav-gold (the primary-nav word color),
+   never signal orange, which stays reserved for ADD. */
+.menu-rail-tab.active {
+  background: var(--color-periwinkle);
+  color: var(--color-nav-gold);
+}
+
+.menu-tiles {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-sm);
+  align-content: start;
+}
+
+.menu-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-xxs);
+  min-height: 64px;
+  padding: var(--space-sm);
+  background: var(--color-platinum);
+  border: none;
+  border-top: 1px solid #fff;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.menu-tile-name {
+  font: bold 11px/1.2 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink-soft);
+}
+
+.menu-tile-price {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/* The modifier sheet — a plate laid over the grid, not a routed screen. No blurred
+   shadow (the system doesn't have one); the backdrop is a flat dim, same as any other
+   inset surface here. */
+.modifier-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 36, 46, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  z-index: 10;
+}
+
+.modifier-sheet {
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.modifier-group {
+  margin-bottom: var(--space-md);
+}
+
+.modifier-group-label {
+  margin: 0 0 var(--space-xs);
+  font: bold 11px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink);
+}
+
+.modifier-required {
+  color: var(--color-ink-soft);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.modifier-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+/* Chips share the `.btn` hit-area floor but never carry warm fill — selection is state,
+   not the till's one action. Selected = periwinkle fill (one step up from the platinum
+   sheet), same cool-chrome vocabulary as the active rail tab. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--r-xs);
+  font: bold 11px/1.1 Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.chip.selected {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+  color: var(--color-ink);
+}
+
+.chip.at-max {
+  opacity: 0.5;
+}
+
+.chip-delta {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip-count {
+  color: var(--color-ink-soft);
+}
+
+.modifier-sheet-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px dotted var(--color-muted-indigo);
+}
+
+.modifier-sheet-total {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
+
+/* ── M5 additions: floor view (tab cards, new tab, transfer, prep chips) ── */
+
+.floor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.tab-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+/* A big platinum plate-button — the "card" IS the resume affordance, tapped directly
+   (no separate Resume button), same touch-first idiom as `.menu-tile`. */
+.tab-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xxs);
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-platinum);
+  border: none;
+  border-top: 1px solid #fff;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tab-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The tab currently in progress on the (hidden) sale screen — wayfinding, not an
+   action, so it's the same periwinkle "active" tone as `.menu-rail-tab.active`. */
+.tab-card.active {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+}
+
+.tab-card-ref {
+  font: bold 16px/1.2 Arial, Helvetica, sans-serif;
+  color: var(--color-ink-soft);
+}
+
+.tab-card-meta {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink);
+  opacity: 0.75;
+}
+
+.tab-card-due {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.tab-card-hint {
+  margin: 0;
+  padding: 0 var(--space-xs);
+  font-size: 10px;
+  color: var(--color-ink-soft);
+}
+
+.tab-card-transfer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.transfer-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--color-periwinkle);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+}
+
+/* Prep chips (cart lines, food mode) — reuse `.chip`'s hit area but colored per kitchen
+   state rather than a plain selected/unselected toggle. Cool for "not started yet" and
+   "being made" (state, not action); signal orange only at `ready`, where tapping means
+   "send it out" — the one point warm color's forward-motion rule genuinely applies. */
+.prep-chip {
+  margin-left: var(--space-sm);
+}
+
+.prep-chip.prep-pending {
+  background: var(--color-surface);
+}
+
+.prep-chip.prep-in_progress {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+}
+
+.prep-chip.prep-ready {
+  background: var(--color-signal);
+  color: var(--color-on-primary);
+  border-color: var(--color-signal);
+}
+
+/* ── M5 additions: split flow (Task 13) ── */
+
+/* One chip per check. Cool periwinkle for the child currently being tendered — state,
+   not action, same vocabulary as `.tab-card.active` — never signal orange, which this
+   file reserves for forward-motion buttons only. */
+.split-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.split-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xxs);
+  min-width: 88px;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-platinum);
+  border-top: 1px solid #fff;
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  border-radius: var(--r-sm);
+}
+
+.split-chip.active {
+  background: var(--color-periwinkle);
+  border-color: var(--color-chrome-indigo);
+}
+
+.split-chip.settled {
+  opacity: 0.6;
+}
+
+.split-chip-num {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-ink-soft);
+}
+
+.split-chip-due {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.split-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--color-periwinkle);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid var(--color-chrome-indigo);
+  margin: var(--space-sm) 0;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.stepper-value {
+  min-width: 24px;
+  text-align: center;
+  font: bold 16px/1 Arial, Helvetica, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.split-preview {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.split-receipt {
+  margin: var(--space-md) 0;
+  padding-top: var(--space-md);
+  border-top: 1px dotted var(--color-muted-indigo);
+}
+
+.split-receipt > header.row {
+  align-items: center;
+}
+
+/* The blind-count hint below the count form — same muted tone as everything else in
+   `.muted`, just calling out that the masked figure specifically isn't a typo. */
+.blind-count span {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
 }

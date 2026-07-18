@@ -226,20 +226,32 @@ it('resolves stacked line-level rows sequentially so they never jointly exceed t
         ->and($line->fresh()->line_total_cents)->toBe(0);
 });
 
-it('throws when an ad-hoc (null discount_id) row is resolved', function (): void {
+it('resolves an ad-hoc (null discount_id) row as a fixed constant clamped to the base', function (): void {
+    // Ad-hoc rows are the frozen discount shares SplitOrder clones onto children: the
+    // stored amount_cents is already-resolved money, so it resolves as a fixed constant —
+    // min(stored, remaining base) — never re-scaling off a live definition, and never
+    // throwing the way it used to before children could carry these.
     $order = Order::factory()->create(['prices_include_tax' => false]);
-    discountLine($order, 500, 0);
+    $line = discountLine($order, 500, 0);
 
-    OrderDiscount::create([
+    $row = OrderDiscount::create([
         'order_id' => $order->id,
         'order_line_id' => null,
         'discount_id' => null,
-        'name_snapshot' => 'Manager comp',
+        'name_snapshot' => 'Split share',
         'amount_cents' => 100,
         'applied_by' => User::factory()->create()->id,
         'created_at' => now(),
     ]);
 
-    expect(fn () => app(OrderTotals::class)->recalculate($order))
-        ->toThrow(LogicException::class, 'Ad-hoc discounts (null discount_id) are not implemented until M6.');
+    app(OrderTotals::class)->recalculate($order);
+    expect($row->fresh()->amount_cents)->toBe(100)
+        ->and($order->fresh()->discount_cents)->toBe(100)
+        ->and($order->fresh()->total_cents)->toBe(400);
+
+    // Base shrinks below the stored share → clamps to what's left, never negative.
+    $line->forceFill(['qty' => '0.100'])->save();   // base now 50
+    app(OrderTotals::class)->recalculate($order);
+    expect($row->fresh()->amount_cents)->toBe(50)
+        ->and($order->fresh()->total_cents)->toBe(0);
 });

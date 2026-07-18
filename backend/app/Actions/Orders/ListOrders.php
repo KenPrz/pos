@@ -22,7 +22,7 @@ final class ListOrders
         return Order::where('location_id', $locationId)
             ->when($number !== null, fn ($q) => $q->where('number', $number))
             ->when($status !== null, fn ($q) => $q->where('status', $status))
-            ->with(['lines', 'discounts'])
+            ->with(['lines', 'discounts', 'opener'])
             ->orderByDesc('opened_at')
             ->limit(20)
             ->get();

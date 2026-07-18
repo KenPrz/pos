@@ -43,6 +43,10 @@ final class ReceiptResource extends JsonResource
                 'unit_price_cents' => $line->unit_price_cents,
                 'line_total_cents' => $line->line_total_cents,
                 'tax_cents' => $line->tax_cents,
+                'modifiers' => $line->modifiers->map(fn ($m): array => [
+                    'name' => $m->name_snapshot,
+                    'price_delta_cents' => $m->price_delta_cents,
+                ])->values()->all(),
             ])->values()->all(),
             'totals' => [
                 'subtotal_cents' => $this->subtotal_cents,

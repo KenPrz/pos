@@ -15,13 +15,19 @@ use App\Http\Controllers\Orders\OpenOrderController;
 use App\Http\Controllers\Orders\ReceiptController;
 use App\Http\Controllers\Orders\RemoveDiscountController;
 use App\Http\Controllers\Orders\ReopenOrderController;
+use App\Http\Controllers\Orders\SetLinePrepStateController;
+use App\Http\Controllers\Orders\SetTableRefController;
 use App\Http\Controllers\Orders\SettleZeroOrderController;
+use App\Http\Controllers\Orders\SplitOrderController;
+use App\Http\Controllers\Orders\TransferOrderController;
+use App\Http\Controllers\Orders\UpdateLineQtyController;
 use App\Http\Controllers\Orders\VoidLineController;
 use App\Http\Controllers\Orders\VoidOrderController;
 use App\Http\Controllers\Payments\TakePaymentController;
 use App\Http\Controllers\Payments\VoidPaymentController;
 use App\Http\Controllers\Refunds\RefundOrderController;
 use App\Http\Controllers\Reports\GetZReportController;
+use App\Http\Controllers\Shifts\ApproveVarianceController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
 use App\Http\Controllers\Shifts\OpenShiftController;
@@ -74,13 +80,20 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/shifts/{shift}/close', CloseShiftController::class)
                 ->middleware('idempotent')
                 ->name('shifts.close');
+            Route::post('/shifts/{shift}/approve-variance', ApproveVarianceController::class)
+                ->name('shifts.approve-variance');
 
             Route::post('/orders', OpenOrderController::class)->name('orders.open');
             Route::get('/orders', ListOrdersController::class)->name('orders.list');
+            Route::patch('/orders/{order}', SetTableRefController::class)->name('orders.update');
             Route::get('/orders/{order}', GetOrderController::class)->name('orders.get');
             Route::post('/orders/{order}/lines', AddLineController::class)
                 ->middleware('idempotent')
                 ->name('orders.lines.add');
+            Route::patch('/orders/{order}/lines/{line}/prep', SetLinePrepStateController::class)
+                ->name('orders.lines.prep');
+            Route::patch('/orders/{order}/lines/{line}', UpdateLineQtyController::class)
+                ->name('orders.lines.update');
             Route::delete('/orders/{order}/lines/{line}', VoidLineController::class)
                 ->name('orders.lines.void');
             Route::post('/orders/{order}/discounts', ApplyDiscountController::class)
@@ -98,6 +111,10 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/orders/{order}/void', VoidOrderController::class)->name('orders.void');
             Route::post('/orders/{order}/settle', SettleZeroOrderController::class)->name('orders.settle');
             Route::post('/orders/{order}/reopen', ReopenOrderController::class)->name('orders.reopen');
+            Route::post('/orders/{order}/transfer', TransferOrderController::class)->name('orders.transfer');
+            Route::post('/orders/{order}/split', SplitOrderController::class)
+                ->middleware('idempotent')
+                ->name('orders.split');
 
             Route::get('/reports/z', GetZReportController::class)->name('reports.z');
 

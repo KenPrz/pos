@@ -2,25 +2,76 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ApiError, api, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
+import { ApiError, api, tokens, type CatalogProduct, type CatalogVariant, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
 import { cents, formatMoney, parseCentsOrNull, subtract } from '../lib/money'
+import { MenuGrid } from './MenuGrid'
+import { SplitPrompt, SplitStrip } from './SplitStrip'
 
 const CURRENCY = 'USD'
 const fm = (n: number) => formatMoney(cents(n), CURRENCY)
 
 type Driver = 'cash' | 'external_card'
 
+// One paid-off child, kept for the combined done plate once every check has closed.
+type PaidChild = { outcome: PaymentOutcome; receipt: Receipt | null }
+
+// Split-into-N-checks (Task 13): `children` are ordinary orders returned by
+// api.splitOrder — the original order is voided server-side and is not among them.
+// `activeIx` is which child is currently the working `order` for the tender flow;
+// `paid` accumulates as each one closes, in order, for the combined done plate.
+type SplitState = { children: Order[]; activeIx: number; paid: PaidChild[] }
+
 type Phase =
   | { name: 'scanning' }
   // Minted once when tender is entered and reused for every submit while in this phase,
   // so a re-click after a lost-response timeout replays the same payment instead of
-  // risking a double charge. A fresh key is minted each time tender is re-entered.
+  // risking a double charge. A fresh key is minted each time tender is re-entered
+  // (including advancing to the next split child — each child's payment is its own
+  // idempotent attempt, distinct from the one key minted per confirmed split itself).
   | { name: 'tender'; key: string }
   | { name: 'done'; outcome: PaymentOutcome; receipt: Receipt | null }
+  | { name: 'split-done'; paid: PaidChild[] }
 
-export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: {
+/** The lines/discount/tax/total table shared by the single-order and split done plates. */
+function ReceiptCard({ receipt }: { receipt: Receipt }) {
+  return (
+    <div className="receipt">
+      <h3>{receipt.location.header ?? receipt.business.name}</h3>
+      <p className="muted">
+        {receipt.order.number} · {receipt.order.business_date} · {receipt.order.cashier}
+      </p>
+      <table>
+        <tbody>
+          {receipt.lines.map((l, i) => (
+            <tr key={i}>
+              <td>{l.name}</td>
+              <td>{l.qty === '1.000' ? '' : l.qty}</td>
+              <td className="num">{fm(l.line_total_cents)}</td>
+            </tr>
+          ))}
+          {receipt.totals.discount_cents > 0 && (
+            <tr><td>Discount</td><td /><td className="num">−{fm(receipt.totals.discount_cents)}</td></tr>
+          )}
+          <tr><td>Tax</td><td /><td className="num">{fm(receipt.totals.tax_cents)}</td></tr>
+          <tr className="total"><td>Total</td><td /><td className="num">{fm(receipt.totals.total_cents)}</td></tr>
+        </tbody>
+      </table>
+      {receipt.location.footer && <p className="muted">{receipt.location.footer}</p>}
+    </div>
+  )
+}
+
+export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onCloseShift, onSessionExpired }: {
   can: (permission: string) => boolean
   registerId: string
+  // Set by the floor screen (Task 12) when staff resume a tab: seeds `order` on the
+  // sale screen that stays mounted-hidden underneath it. Identity-compared, not
+  // deep-compared — a fresh object with the same id (e.g. a floor re-poll) must NOT
+  // re-seed and stomp whatever the till has done to the order since.
+  initialOrder?: Order
+  // Lifted so the floor screen can tell "my own tab, already in progress elsewhere"
+  // apart from every other card and disable resuming it out from under itself.
+  onOrderChange?: (order: Order | null) => void
   onCloseShift: () => void
   onSessionExpired: () => void
 }) {
@@ -37,7 +88,38 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
   const [voidingOrder, setVoidingOrder] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [split, setSplit] = useState<SplitState | null>(null)
+  const [splitPromptOpen, setSplitPromptOpen] = useState(false)
+  const [splitWays, setSplitWays] = useState(2)
+  // Same idiom as scanKeyRef/pickKeyRef: minted once when GO is confirmed and reused
+  // across a lost-response retry of that SAME split, so it can't mint a second one.
+  const splitKeyRef = useRef<string | null>(null)
   const scanRef = useRef<HTMLInputElement>(null)
+  // Read once per render, not cached in state: SaleScreen only ever mounts after
+  // Register's own bootstrap effect has already resolved tokens client-side (it's gated
+  // behind stage transitions that themselves require a mount), so there's no SSR/hydration
+  // mismatch to guard against here the way Register.tsx has to for its own first paint.
+  const foodMode = tokens.registerInfo()?.mode === 'food'
+
+  // Resuming a tab from the floor screen (Task 12): seed `order` whenever a NEW
+  // initialOrder arrives. Keyed on id, not object identity — the floor list re-polls
+  // every 10s and hands a fresh Order object with the SAME id on every tick; only an
+  // actual "you tapped a different card" transition should reset scanning/phase here.
+  const initialOrderId = initialOrder?.id ?? null
+  useEffect(() => {
+    if (!initialOrder) return
+    setOrder(initialOrder)
+    setPhase({ name: 'scanning' })
+    setError(null)
+    setNotice(`Resumed order ${initialOrder.number}.`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed on the id (see comment above), not the initialOrder object
+  }, [initialOrderId])
+
+  // The floor screen (mounted alongside this, hidden) needs to know whether a DIFFERENT
+  // order is already in progress here, to disable resuming other tabs out from under it.
+  useEffect(() => {
+    onOrderChange?.(order)
+  }, [order, onOrderChange])
 
   const fail = (err: unknown, fallback: string) => {
     if (err instanceof ApiError && err.status === 401) return onSessionExpired()
@@ -85,7 +167,7 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
       const { variant } = await api.lookupBarcode(code)
       let current = order // retail opens implicitly on first scan
       if (!current) {
-        current = await api.openOrder(key) // same key: a lost response won't mint a twin
+        current = await api.openOrder({ idempotencyKey: key }) // same key: a lost response won't mint a twin
         setOrder(current)
       }
       return api.addLine(current, variant.id, '1', key)
@@ -104,6 +186,49 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
     onSettled: () => scanRef.current?.focus(),
   })
 
+  // Same idiom as `scan` above (implicit open-order-on-first-pick, keyed addLine so a
+  // lost-response retry replays instead of double-adding) — signature-keyed rather than
+  // barcode-keyed, since the grid has no barcode. A second tap of the *same* variant with
+  // the *same* modifiers right after one is still read as a fresh replay attempt, exactly
+  // like a rescanned barcode; a genuinely new order for the same item mints its own key
+  // once the previous attempt has settled (scanKeyRef's own comment explains why: a
+  // deliberate repeat pick must be a new line, not a merge).
+  const pickKeyRef = useRef<{ signature: string; key: string } | null>(null)
+
+  const pick = useMutation({
+    mutationFn: async ({ variant, modifierIds, key }: { variant: CatalogVariant; modifierIds?: string[]; key: string }) => {
+      let current = order
+      if (!current) {
+        current = await api.openOrder({ idempotencyKey: key })
+        setOrder(current)
+      }
+      return api.addLine(current, variant.id, '1', key, modifierIds)
+    },
+    onSuccess: (next) => {
+      pickKeyRef.current = null
+      setOrder(next)
+      setError(null)
+    },
+    onError: (err) => {
+      if (!(err instanceof ApiError && err.code === 'network_unreachable')) pickKeyRef.current = null
+      fail(err, 'Could not add item.')
+    },
+  })
+
+  const handleMenuPick = (variant: CatalogVariant, _product: CatalogProduct, modifierIds?: string[]) => {
+    // Mirrors submitScan's guard above: scan and pick both implicitly open an order on a
+    // null `order`, so only one of them may be in flight at a time or a race orphans a
+    // second open order server-side.
+    if (pick.isPending || scan.isPending) return
+    setError(null)
+    setNotice(null)
+    const signature = `${variant.id}:${(modifierIds ?? []).join(',')}`
+    const previous = pickKeyRef.current
+    const key = previous && previous.signature === signature ? previous.key : crypto.randomUUID()
+    pickKeyRef.current = { signature, key }
+    pick.mutate({ variant, modifierIds, key })
+  }
+
   const voidLine = useMutation({
     mutationFn: ({ lineId, reason }: { lineId: string; reason: string }) =>
       api.voidLine(order as Order, lineId, reason),
@@ -114,6 +239,26 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
       setError(null)
     },
     onError: (err) => fail(err, 'Void failed.'),
+  })
+
+  // Kitchen prep chips (Task 12, food mode only). No If-Match: the server doesn't bump
+  // the order's version for a prep-state change (SetLinePrepStateRequest carries none —
+  // see api.ts's setLinePrep comment), so the response is applied directly.
+  const PREP_CYCLE = { pending: 'in_progress', in_progress: 'ready', ready: 'pending' } as const
+  // ready → pending is a downgrade out of a fired state; the server gates it on
+  // order.line.void (mirrors UpdateLineQty's fired-line rule). Without that permission the
+  // cycle stops at ready rather than wrapping back to pending — a supervisor keeps the
+  // full loop. `null` means the chip is a dead end for this user (rendered disabled).
+  const nextPrep = (state: 'pending' | 'in_progress' | 'ready') =>
+    state === 'ready' && !can('order.line.void') ? null : PREP_CYCLE[state]
+  const setPrep = useMutation({
+    mutationFn: ({ lineId, state }: { lineId: string; state: 'pending' | 'in_progress' | 'ready' }) =>
+      api.setLinePrep((order as Order).id, lineId, state),
+    onSuccess: (next) => {
+      setOrder(next)
+      setError(null)
+    },
+    onError: (err) => fail(err, 'Could not update prep status.'),
   })
 
   const voidOrder = useMutation({
@@ -171,19 +316,73 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
       const receipt = await api.receipt(outcome.order.id).catch(() => null)
       return { outcome, receipt }
     },
+    // Split children always close in one shot: the tender form always submits the
+    // child's FULL due (never a partial amount the cashier typed), so a successful
+    // payment here always means this child is done — never "partially paid, still open".
     onSuccess: ({ outcome, receipt }) => {
-      setPhase({ name: 'done', outcome, receipt })
-      setOrder(null)
       setTendered('')
       setReference('')
       setError(null)
+      if (!split) {
+        setPhase({ name: 'done', outcome, receipt })
+        setOrder(null)
+        return
+      }
+      const paid = [...split.paid, { outcome, receipt }]
+      // Splice the just-closed child's own post-payment copy (due_cents: 0) back into
+      // `children` at the index that was just paid — without this, the strip's stale
+      // pre-payment snapshot never shows `.settled`/"Paid" for a closed check.
+      const children = split.children.map((c, ix) => (ix === split.activeIx ? outcome.order : c))
+      const nextIx = split.activeIx + 1
+      if (nextIx < children.length) {
+        // Next unpaid child becomes the working order, straight into a fresh tender —
+        // same code path every other order goes through, just re-entered per child.
+        setSplit({ children, activeIx: nextIx, paid })
+        setOrder(children[nextIx])
+        setPhase({ name: 'tender', key: crypto.randomUUID() })
+      } else {
+        setSplit(null)
+        setOrder(null)
+        setPhase({ name: 'split-done', paid })
+      }
     },
     onError: (err) => fail(err, 'Payment failed.'),
   })
 
+  // Splits the working order into `ways` new ones (SplitOrderRequest: 2–10). Only ever
+  // called on the pre-split original — a child can't be re-split (the tender-phase SPLIT
+  // control is hidden once `split` is set), and the server itself refuses once
+  // paid_cents > 0, so this only ever runs before any money has been taken.
+  const splitOrderMut = useMutation({
+    mutationFn: async (ways: number) => {
+      const key = splitKeyRef.current ?? crypto.randomUUID()
+      splitKeyRef.current = key
+      return api.splitOrder(order as Order, ways, key)
+    },
+    onSuccess: (children) => {
+      splitKeyRef.current = null
+      setSplit({ children, activeIx: 0, paid: [] })
+      setOrder(children[0])
+      setSplitPromptOpen(false)
+      setSplitWays(2)
+      setPhase({ name: 'tender', key: crypto.randomUUID() })
+      setTendered('')
+      setReference('')
+      setError(null)
+    },
+    onError: (err) => {
+      if (!(err instanceof ApiError && err.code === 'network_unreachable')) splitKeyRef.current = null
+      fail(err, 'Could not split the order.')
+    },
+  })
+
   const submitScan = (e: FormEvent) => {
     e.preventDefault()
-    if (!barcode.trim() || scan.isPending) return
+    // Also blocked while `pick` is in flight: both mutations independently open an order
+    // implicitly when `order` is still null, and letting scan and a grid tap race would let
+    // each see the stale null and each mint its own order — the second one orphaned (open
+    // orders block shift close). One order-opening path in flight at a time.
+    if (!barcode.trim() || scan.isPending || pick.isPending) return
     setError(null)
     setNotice(null)
     const code = barcode.trim()
@@ -204,6 +403,9 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
   const newSale = () => {
     setPhase({ name: 'scanning' })
     setDriver('cash')
+    setSplit(null)
+    setSplitPromptOpen(false)
+    setSplitWays(2)
     setError(null)
     setTimeout(() => scanRef.current?.focus(), 0)
   }
@@ -230,31 +432,7 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
             ? `${fm(payment.amount_cents)} paid on ${fm(payment.tendered_cents ?? payment.amount_cents)} tendered`
             : `${fm(payment.amount_cents)} recorded on the card terminal`}
         </p>
-        {phase.receipt && (
-          <div className="receipt">
-            <h3>{phase.receipt.location.header ?? phase.receipt.business.name}</h3>
-            <p className="muted">
-              {phase.receipt.order.number} · {phase.receipt.order.business_date} · {phase.receipt.order.cashier}
-            </p>
-            <table>
-              <tbody>
-                {phase.receipt.lines.map((l, i) => (
-                  <tr key={i}>
-                    <td>{l.name}</td>
-                    <td>{l.qty === '1.000' ? '' : l.qty}</td>
-                    <td className="num">{fm(l.line_total_cents)}</td>
-                  </tr>
-                ))}
-                {phase.receipt.totals.discount_cents > 0 && (
-                  <tr><td>Discount</td><td /><td className="num">−{fm(phase.receipt.totals.discount_cents)}</td></tr>
-                )}
-                <tr><td>Tax</td><td /><td className="num">{fm(phase.receipt.totals.tax_cents)}</td></tr>
-                <tr className="total"><td>Total</td><td /><td className="num">{fm(phase.receipt.totals.total_cents)}</td></tr>
-              </tbody>
-            </table>
-            {phase.receipt.location.footer && <p className="muted">{phase.receipt.location.footer}</p>}
-          </div>
-        )}
+        {phase.receipt && <ReceiptCard receipt={phase.receipt} />}
         <div className="btn-row">
           <button className="btn btn-utility" onClick={() => window.print()}>Print</button>
           <button className="btn btn-submit" onClick={newSale}>New sale</button>
@@ -263,9 +441,36 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
     )
   }
 
+  if (phase.name === 'split-done') {
+    return (
+      <section className="form-panel ok">
+        <h2>All checks settled — {phase.paid.length} {phase.paid.length === 1 ? 'check' : 'checks'}</h2>
+        {phase.paid.map(({ outcome, receipt }, ix) => (
+          <div className="split-receipt" key={outcome.order.id}>
+            <header className="row">
+              <h3>Check {ix + 1} — order {outcome.order.number}</h3>
+              {receipt && <button className="btn btn-utility" onClick={() => window.print()}>Print</button>}
+            </header>
+            <p className="muted">
+              {outcome.payment.driver === 'cash'
+                ? `${fm(outcome.payment.amount_cents)} paid on ${fm(outcome.payment.tendered_cents ?? outcome.payment.amount_cents)} tendered`
+                : `${fm(outcome.payment.amount_cents)} recorded on the card terminal`}
+            </p>
+            {receipt && <ReceiptCard receipt={receipt} />}
+          </div>
+        ))}
+        <div className="btn-row">
+          <button className="btn btn-submit" onClick={newSale}>New sale</button>
+        </div>
+      </section>
+    )
+  }
+
   const lines = order?.lines ?? []
   const appliedDiscounts = order?.discounts ?? []
-  const balance = order ? order.total_cents - order.paid_cents : 0
+  // Server-computed (OrderResource.php: max(0, total_cents - paid_cents)) — never
+  // derived client-side, same rule the split-child strip already follows.
+  const balance = order ? order.due_cents : 0
 
   return (
     <section className="form-panel">
@@ -274,20 +479,66 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
         <button type="button" className="btn btn-secondary" onClick={onCloseShift}>Close shift</button>
       </header>
 
-      <form onSubmit={submitScan}>
+      {/* Visible through scanning AND tender for the active child — the active child's
+          own due tracks the live `order` (not the split snapshot), so an edit made to
+          its cart before it's paid shows up here immediately. */}
+      {split && (
+        <SplitStrip
+          orders={split.children.map((c, ix) => (ix === split.activeIx ? (order ?? c) : c))}
+          activeIx={split.activeIx}
+        />
+      )}
+
+      <form onSubmit={submitScan} className={foodMode ? 'scan-form-compact' : undefined}>
         <input
           ref={scanRef} autoFocus placeholder="Scan or type a barcode…"
           value={barcode} onChange={(e) => setBarcode(e.target.value)}
         />
       </form>
 
+      {/* Food mode keeps the scan field above (a case of Cheddar arrives with a barcode
+          too), but the grid — not the barcode reader — is the everyday food-order idiom.
+          It reuses the exact keyed addLine/open-order-implicit path the scan form uses. */}
+      {foodMode && phase.name === 'scanning' && <MenuGrid onPick={handleMenuPick} />}
+
       {lines.length > 0 && (
         <div className="cart">
           {lines.filter((l) => !l.voided_at).map((l) => (
             <div className="cart-row" key={l.id}>
-              <span className="cart-row-name">{l.name}</span>
+              {/* A <div>, not a <span>: it wraps the modifier <ul> below, and <ul> is
+                  flow content — invalid inside a <span>, which only permits phrasing
+                  content. */}
+              <div className="cart-row-main">
+                <span className="cart-row-name">{l.name}</span>
+                {l.modifiers && l.modifiers.length > 0 && (
+                  <ul className="cart-row-modifiers">
+                    {l.modifiers.map((m, i) => (
+                      <li key={i}>
+                        {m.name}
+                        {m.price_delta_cents !== 0 && <span className="num"> {fm(m.price_delta_cents)}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               {l.qty !== '1.000' && <span className="cart-row-qty">{l.qty}</span>}
               <span className="cart-row-price num">{fm(l.line_total_cents)}</span>
+              {/* Prep chip: pending → in_progress → ready → pending, one tap per step. Lines
+                  with no prep tracking (prep_state null — e.g. a bagged retail add-on rung
+                  up on a food-mode till) get no chip at all. */}
+              {foodMode && l.prep_state !== null && phase.name === 'scanning' && (() => {
+                const next = nextPrep(l.prep_state)
+                return (
+                  <button
+                    type="button"
+                    className={`chip prep-chip prep-${l.prep_state}`}
+                    disabled={setPrep.isPending || next === null}
+                    onClick={() => next !== null && setPrep.mutate({ lineId: l.id, state: next })}
+                  >
+                    {l.prep_state === 'pending' ? 'Pending' : l.prep_state === 'in_progress' ? 'Cooking' : 'Ready'}
+                  </button>
+                )
+              })()}
               {can('order.line.void') && phase.name === 'scanning' && voidingLineId !== l.id && (
                 <button type="button" className="btn btn-void btn-chip" onClick={() => { setVoidingLineId(l.id); setVoidReason('') }}>
                   Void
@@ -406,7 +657,29 @@ export function SaleScreen({ can, registerId, onCloseShift, onSessionExpired }: 
         </>
       )}
 
-      {order && phase.name === 'tender' && (
+      {/* SPLIT ×N: only offered on the pre-split original (never a child — the server
+          itself refuses once paid_cents > 0, and re-splitting a child isn't a supported
+          shape here) and only before any tender is entered for it. */}
+      {order && phase.name === 'tender' && !split && (
+        splitPromptOpen ? (
+          <SplitPrompt
+            ways={splitWays}
+            totalCents={order.total_cents}
+            onWaysChange={setSplitWays}
+            onConfirm={() => splitOrderMut.mutate(splitWays)}
+            onCancel={() => setSplitPromptOpen(false)}
+            pending={splitOrderMut.isPending}
+          />
+        ) : (
+          <div className="btn-row">
+            <button type="button" className="btn btn-secondary" onClick={() => setSplitPromptOpen(true)}>
+              Split bill
+            </button>
+          </div>
+        )
+      )}
+
+      {order && phase.name === 'tender' && !splitPromptOpen && (
         <form onSubmit={submitPay}>
           <div className="btn-row" role="group" aria-label="Payment method">
             <button

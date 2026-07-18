@@ -20,6 +20,11 @@ final class OrderLineResource extends JsonResource
             'tax_cents' => $this->tax_cents,
             'line_total_cents' => $this->line_total_cents,
             'voided_at' => $this->voided_at?->toIso8601String(),
+            'prep_state' => $this->prep_state,
+            'modifiers' => $this->modifiers()->get()->map(fn ($m) => [
+                'name' => $m->name_snapshot,
+                'price_delta_cents' => $m->price_delta_cents,
+            ])->all(),
         ];
     }
 }

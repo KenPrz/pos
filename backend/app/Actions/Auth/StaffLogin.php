@@ -76,7 +76,7 @@ final class StaffLogin
 
         $this->audit->record('staff.login', $user, $user->id, [], $in->register->id);
 
-        return new StaffSession($user, $token->plainTextToken, $expiresAt);
+        return new StaffSession($user, $token->plainTextToken, $expiresAt, $in->register);
     }
 
     private function throttleKey(string $registerId): string
