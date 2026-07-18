@@ -349,7 +349,8 @@ export type Refund = {
 
 // Verified against ZReportResource.php / GetZReport.php: sales_by_driver and
 // refunds_by_driver are `driver => cents` maps (only drivers with activity are present);
-// movements always has all three kinds, zero-filled.
+// movements always has all three kinds, zero-filled. orders_voided excludes a split's
+// original order (voided with void_reason "split into ..."); that count is orders_split.
 export type ZReport = {
   shift: Shift
   sales_by_driver: Record<string, number>
@@ -357,6 +358,7 @@ export type ZReport = {
   movements: { paid_in: number; payout: number; drop: number }
   orders_closed: number
   orders_voided: number
+  orders_split: number
   expected_cash_cents: number
 }
 
