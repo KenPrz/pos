@@ -26,6 +26,9 @@ use App\Http\Controllers\Admin\Catalog\UpdateModifierGroupController;
 use App\Http\Controllers\Admin\Catalog\UpdateProductController;
 use App\Http\Controllers\Admin\Catalog\UpdateTaxRateController;
 use App\Http\Controllers\Admin\Catalog\UpdateVariantController;
+use App\Http\Controllers\Admin\Users\CreateUserController;
+use App\Http\Controllers\Admin\Users\ListUsersController;
+use App\Http\Controllers\Admin\Users\UpdateUserController;
 use App\Http\Controllers\Auth\EnrollRegisterController;
 use App\Http\Controllers\Auth\StaffLoginController;
 use App\Http\Controllers\Auth\StaffLogoutController;
@@ -125,6 +128,12 @@ Route::prefix('v1')->group(function (): void {
 
         Route::put('/products/{product}/modifier-groups', SetProductModifierGroupsController::class)
             ->name('admin.products.modifier-groups.set');
+
+        // User management (M6 task 4). Roles are a full-set replace per location; the
+        // self-lockout guard lives in UpdateUser, not here.
+        Route::get('/users', ListUsersController::class)->name('admin.users.list');
+        Route::post('/users', CreateUserController::class)->name('admin.users.create');
+        Route::patch('/users/{user}', UpdateUserController::class)->name('admin.users.update');
     });
 
     Route::middleware('device')->group(function (): void {
