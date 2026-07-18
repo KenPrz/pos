@@ -113,7 +113,7 @@ restore-drill: ## Prove the newest backup restores: throwaway db, row counts, te
 	set -e; \
 	docker run -d --name pos-drill -e POSTGRES_PASSWORD=drill postgres:18-alpine >/dev/null; \
 	trap 'docker rm -f pos-drill >/dev/null 2>&1' EXIT; \
-	until docker exec pos-drill pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done; \
+	tries=0; until docker exec pos-drill pg_isready -U postgres >/dev/null 2>&1; do tries=$$((tries+1)); [ "$$tries" -lt 60 ] || { echo "pos-drill never became ready"; exit 1; }; sleep 1; done; \
 	docker exec pos-drill createdb -U postgres pos; \
 	docker exec -i pos-drill pg_restore -U postgres -d pos --no-owner < $$LATEST; \
 	docker exec pos-drill psql -U postgres -d pos -tc \
