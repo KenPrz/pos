@@ -38,7 +38,9 @@ function renderEditor(props: Partial<ComponentProps<typeof VariantEditor>> = {})
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   const merged: ComponentProps<typeof VariantEditor> = {
     variant: VARIANT,
-    products: [{ id: 'prod-1', name: 'Latte', description: null, category_id: null, kind: 'goods', is_active: true }],
+    products: [
+      { id: 'prod-1', name: 'Latte', description: null, category_id: null, kind: 'goods', is_active: true, modifier_group_ids: [] },
+    ],
     taxRates: [],
     onDone: vi.fn(),
     onCancel: vi.fn(),

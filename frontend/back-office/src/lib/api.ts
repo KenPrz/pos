@@ -158,11 +158,6 @@ export type Category = { id: string; name: string; parent_id: string | null; sor
 
 export type TaxRate = { id: string; name: string; rate_micros: number; is_active: boolean }
 
-// Populated only by responses that eager-load the pivot (create/update/set-groups) —
-// AdminProductResource's `modifier_groups` key uses `whenLoaded`, and ListProducts does
-// not eager load it, so a product read back from the plain list has this field absent.
-export type ProductModifierGroupRef = { id: string; name: string; position: number }
-
 export type Product = {
   id: string
   name: string
@@ -170,7 +165,12 @@ export type Product = {
   category_id: string | null
   kind: 'goods' | 'service'
   is_active: boolean
-  modifier_groups?: ProductModifierGroupRef[]
+  // Ordered ids of the product's attached modifier groups, always present (Task 9 gap
+  // fix) — AdminProductResource computes this from the loaded relation when eager-loaded
+  // (ListProducts does) or a one-off query otherwise (create/update), so every response
+  // that returns a Product carries it, unlike the older `modifier_groups` (name+position)
+  // field it replaces for the client's purposes.
+  modifier_group_ids: string[]
 }
 
 export type Variant = {

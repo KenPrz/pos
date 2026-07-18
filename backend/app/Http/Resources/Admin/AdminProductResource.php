@@ -30,6 +30,18 @@ final class AdminProductResource extends JsonResource
                     'position' => (int) $group->pivot->position,
                 ])
                 ->all()),
+            // Plain ordered ids, always present (unlike `modifier_groups` above, which
+            // only appears when the caller eager-loaded the pivot) — the back office's
+            // attach editor needs this on every list row to seed its checkboxes, not
+            // just on create/update/set-groups responses. `relationLoaded` reuses
+            // ListProducts' eager load (N+1-free); anything that didn't eager-load
+            // (Create/UpdateProduct return a bare model) falls back to one explicit
+            // query per row — a method call on the relation, not property access, so it
+            // never trips `Model::preventLazyLoading()` in non-production.
+            'modifier_group_ids' => ($this->relationLoaded('modifierGroups')
+                ? $this->modifierGroups
+                : $this->modifierGroups()->orderBy('product_modifier_groups.position')->get()
+            )->pluck('id')->all(),
         ];
     }
 }

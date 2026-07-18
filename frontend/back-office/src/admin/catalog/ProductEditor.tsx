@@ -12,14 +12,11 @@ import { ApiError, api, type Category, type ModifierGroup, type Product } from '
  * touches the other's endpoint, so a staff member can fix a typo in the name without
  * accidentally re-sending (and thus reordering) the attach list, and vice versa.
  *
- * The attach checkboxes can only show what THIS load of the product actually carries in
- * `modifier_groups` — populated after create/update/attach responses (they eager-load
- * the pivot) but absent from the plain list (ListProducts doesn't eager load it; see the
- * `Product` type in lib/api.ts). A product opened straight from the list therefore starts
- * with every box unchecked even if it already has groups attached — attaching is a
- * full-set replace, so leaving the list alone (never clicking a checkbox) never
- * overwrites anything; the gap only bites if staff open the attach list purely to LOOK
- * at what's set today.
+ * The attach checkboxes seed from `product.modifier_group_ids` (Task 9 gap fix —
+ * AdminProductResource now always carries this, ordered, on every product response
+ * including the plain list), so opening an existing product's editor shows exactly
+ * what's attached today rather than starting blank and risking a silent full-set wipe
+ * on save.
  */
 export function ProductEditor({
   product,
@@ -42,7 +39,7 @@ export function ProductEditor({
   const [categoryId, setCategoryId] = useState(product?.category_id ?? '')
   const [kind, setKind] = useState<'goods' | 'service'>(product?.kind ?? 'goods')
   const [isActive, setIsActive] = useState(product?.is_active ?? true)
-  const [attachedIds, setAttachedIds] = useState<string[]>(product?.modifier_groups?.map((g) => g.id) ?? [])
+  const [attachedIds, setAttachedIds] = useState<string[]>(product?.modifier_group_ids ?? [])
   const [error, setError] = useState<string | null>(null)
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'products'] })

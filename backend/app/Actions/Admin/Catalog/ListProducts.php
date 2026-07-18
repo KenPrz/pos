@@ -13,7 +13,9 @@ final class ListProducts
     public function execute(): Collection
     {
         // Include archived — the back office sees everything; the register's GetCatalog
-        // is what filters is_active.
-        return Product::query()->orderBy('name')->get();
+        // is what filters is_active. Eager-load modifierGroups so AdminProductResource's
+        // `modifier_group_ids` reads the preloaded (already position-ordered) collection
+        // instead of running one query per row.
+        return Product::query()->with('modifierGroups')->orderBy('name')->get();
     }
 }

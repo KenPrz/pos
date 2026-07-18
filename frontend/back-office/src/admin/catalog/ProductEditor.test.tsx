@@ -32,6 +32,7 @@ const PRODUCT: Product = {
   category_id: 'cat-1',
   kind: 'goods',
   is_active: true,
+  modifier_group_ids: [],
 }
 
 function renderEditor(props: Partial<ComponentProps<typeof ProductEditor>> = {}) {
@@ -103,5 +104,24 @@ describe('ProductEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: /save modifier groups/i }))
 
     await waitFor(() => expect(api.setProductModifierGroups).toHaveBeenCalledWith('prod-1', ['grp-2']))
+  })
+
+  // Task 9 gap fix: modifier_group_ids is now always present (AdminProductResource),
+  // so a product that already has groups attached must show them pre-checked, and an
+  // untouched save must PUT that same set back — never a silent full-set wipe.
+  it('shows already-attached groups checked when opening an existing product', () => {
+    renderEditor({ product: { ...PRODUCT, modifier_group_ids: ['grp-2', 'grp-1'] } })
+
+    expect(screen.getByRole('checkbox', { name: /size/i })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /milk/i })).toBeChecked()
+  })
+
+  it('saving the attach list untouched PUTs the same set the product already carried', async () => {
+    vi.mocked(api.setProductModifierGroups).mockResolvedValue(PRODUCT)
+    renderEditor({ product: { ...PRODUCT, modifier_group_ids: ['grp-2', 'grp-1'] } })
+
+    fireEvent.click(screen.getByRole('button', { name: /save modifier groups/i }))
+
+    await waitFor(() => expect(api.setProductModifierGroups).toHaveBeenCalledWith('prod-1', ['grp-2', 'grp-1']))
   })
 })

@@ -3,6 +3,7 @@
 // backend/tests/Feature/Admin/CatalogCrudTest.php
 declare(strict_types=1);
 
+use App\Models\ModifierGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
@@ -85,6 +86,23 @@ it('keeps tax rates in micros and refuses out-of-range', function (): void {
         ->assertStatus(400);
     $this->postJson('/api/v1/admin/tax-rates', ['name' => 'VAT', 'rate_micros' => 200_000], $this->headers)
         ->assertCreated()->assertJsonPath('data.tax_rate.rate_micros', 200000);
+});
+
+it('exposes a product\'s attached modifier groups as ordered ids on list and on attach', function (): void {
+    $product = Product::factory()->create();
+    $g1 = ModifierGroup::factory()->create(['name' => 'G1']);
+    $g2 = ModifierGroup::factory()->create(['name' => 'G2']);
+
+    // Attach in [g2, g1] order — the PUT response reflects it immediately (it eager
+    // loads the pivot itself), and so should a completely fresh GET /products list,
+    // which is what ProductEditor actually seeds its checkboxes from.
+    $this->putJson("/api/v1/admin/products/{$product->id}/modifier-groups", ['group_ids' => [$g2->id, $g1->id]], $this->headers)
+        ->assertOk()
+        ->assertJsonPath('data.product.modifier_group_ids', [$g2->id, $g1->id]);
+
+    $list = $this->getJson('/api/v1/admin/products', $this->headers)->assertOk();
+    $row = collect($list->json('data.items'))->firstWhere('id', $product->id);
+    expect($row['modifier_group_ids'])->toBe([$g2->id, $g1->id]);
 });
 
 it('a non-admin token gets 403 on every admin catalog route', function (): void {
