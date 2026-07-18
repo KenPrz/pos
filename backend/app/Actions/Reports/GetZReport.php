@@ -66,7 +66,12 @@ final class GetZReport
                 'drop' => (int) ($movementsByKind['drop'] ?? 0),
             ],
             ordersClosed: DB::table('orders')->where('shift_id', $shift->id)->where('status', 'closed')->count(),
-            ordersVoided: DB::table('orders')->where('shift_id', $shift->id)->where('status', 'voided')->count(),
+            // A split's original is voided with void_reason "split into ..." (SplitOrder)
+            // — that is bookkeeping, not a genuine void, so it is counted separately.
+            ordersVoided: DB::table('orders')->where('shift_id', $shift->id)->where('status', 'voided')
+                ->where('void_reason', 'not like', 'split into%')->count(),
+            ordersSplit: DB::table('orders')->where('shift_id', $shift->id)->where('status', 'voided')
+                ->where('void_reason', 'like', 'split into%')->count(),
             expectedCashCents: $this->totals->expectedCashCents($shift),
         );
     }

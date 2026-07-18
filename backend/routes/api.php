@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AdminLoginController;
 use App\Http\Controllers\Admin\AdminLogoutController;
+use App\Http\Controllers\Admin\Audit\ListAuditLogController;
 use App\Http\Controllers\Admin\Catalog\CreateCategoryController;
 use App\Http\Controllers\Admin\Catalog\CreateDiscountController;
 use App\Http\Controllers\Admin\Catalog\CreateModifierController;
@@ -166,6 +167,9 @@ Route::prefix('v1')->group(function (): void {
         // orders, joined to the live catalog) — see SalesReportResource's `basis` field.
         Route::get('/reports/sales', SalesReportController::class)->name('admin.reports.sales');
         Route::get('/reports/stock', StockReportController::class)->name('admin.reports.stock');
+
+        // Audit-log viewer (M6 task 7). Read-only — no audit-of-the-audit.
+        Route::get('/audit', ListAuditLogController::class)->name('admin.audit.list');
     });
 
     Route::middleware('device')->group(function (): void {

@@ -33,7 +33,7 @@ final class ReceiptResource extends JsonResource
                 'opened_at' => $this->opened_at?->toIso8601String(),
                 'closed_at' => $this->closed_at?->toIso8601String(),
                 'table_ref' => $this->table_ref,
-                'cashier' => $this->openedBy->name,
+                'cashier' => $this->opener->name,
                 'prices_include_tax' => $this->prices_include_tax,
             ],
             'lines' => $this->lines->map(fn ($line): array => [

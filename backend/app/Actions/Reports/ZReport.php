@@ -26,6 +26,7 @@ final readonly class ZReport
         public array $movements,
         public int $ordersClosed,
         public int $ordersVoided,
+        public int $ordersSplit,
         public int $expectedCashCents,
     ) {}
 }
