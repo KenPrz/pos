@@ -53,9 +53,14 @@ jobs:
           key: composer-${{ hashFiles('backend/composer.lock') }}
           restore-keys: composer-
 
+      # .env must exist before composer install: post-autoload-dump runs
+      # `artisan package:discover`, which boots the app into the required-config
+      # guard (AppServiceProvider). key:generate needs vendor/, so it comes after.
+      - run: cp .env.example .env
+
       - run: composer install --no-interaction --prefer-dist --no-progress
 
-      - run: cp .env.example .env && php artisan key:generate
+      - run: php artisan key:generate
 
       - name: Migrate
         run: php artisan migrate --force
@@ -91,12 +96,41 @@ jobs:
       - run: npm ci
 
       - name: Typecheck
-        run: npx tsc -b --force
+        run: npm run typecheck
 
       - run: npx oxlint src
 
       # The money primitives are tested on both sides of the wire. If the two parsers
       # ever disagree, a price typed in the back office is not the price rung up.
+      - name: Vitest
+        run: npm run test
+
+      - run: npm run build
+
+  back-office:
+    name: Back office (tsgo + build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend/back-office
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/back-office/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - run: npx oxlint src
+
       - name: Vitest
         run: npm run test
 

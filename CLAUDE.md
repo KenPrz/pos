@@ -186,8 +186,10 @@ Next: **M7 — production** (`docs/06-roadmap.md`).
   `->refresh()`.
 - **`jsonb` reorders keys** — idempotency replays are content-identical, not
   byte-identical (`toEqual`, never `toBe`).
-- **Next's type-check step can't drive TypeScript 7** — it's disabled in
-  `next.config.ts`; `npm run typecheck` is the gate.
+- **Next can't drive TypeScript 7, and without a stable `typescript` it
+  self-heals with a mid-build `npm install` that breaks on CI runners.** Both apps
+  therefore carry stable `typescript` (for Next) plus `@typescript/native-preview`
+  (tsgo); `npm run typecheck` is the gate, Next's own check stays disabled.
 - **The Z-report is fetched before close** — closing revokes the register's staff
   sessions.
 - **Approving a variance from the register that just closed will 401** — `CloseShift`

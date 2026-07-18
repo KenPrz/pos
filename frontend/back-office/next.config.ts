@@ -1,10 +1,11 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  // This repo uses TypeScript 7 (the native compiler), whose API Next's built-in
-  // type-check step can't drive — it misreads it as "typescript not installed" and
-  // crashes the build worker. Type-checking still gates the build: `npm run typecheck`
-  // runs tsc --noEmit directly and CI runs it alongside the tests.
+  // Type-checking is deliberately not Next's job here: the gate is `npm run
+  // typecheck` (tsgo --noEmit, the native TS7 compiler), run locally and in CI.
+  // The stable `typescript` devDep exists so Next's build-time TS detection is
+  // satisfied — without it, Next falls back to a mid-build `npm install` that
+  // breaks on CI runners. Keeping ignoreBuildErrors avoids double type-checking.
   typescript: { ignoreBuildErrors: true },
   // Same single-origin trick the Vite proxy provided: the browser talks to Next, Next
   // forwards /api to Laravel, and CORS never enters the picture.
