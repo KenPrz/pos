@@ -52,7 +52,10 @@ export function VariantEditor({
     },
   })
 
-  const priceCents = parseCentsOrNull(priceInput || '0')
+  // Blank must fail validation, not silently save as $0 — price_cents is required (and
+  // never nullable) on the wire, so an empty field has to block submission rather than
+  // coerce to a value the staff member never typed.
+  const priceCents = parseCentsOrNull(priceInput)
   const costCents = costInput === '' ? null : parseCentsOrNull(costInput)
   const priceInvalid = priceCents === null
   const costInvalid = costInput !== '' && costCents === null
@@ -61,7 +64,7 @@ export function VariantEditor({
     e.preventDefault()
     setError(null)
     if (priceInvalid || costInvalid) {
-      setError('Enter a valid amount (e.g. 4.25).')
+      setError('Enter a valid price (e.g. 4.25).')
       return
     }
 

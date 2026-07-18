@@ -234,7 +234,10 @@ function CategoriesPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
           setError(null)
           save.mutate({ id: current?.id ?? null, body })
         }}
-        onCancel={() => setEditing(null)}
+        onCancel={() => {
+          setError(null)
+          setEditing(null)
+        }}
       />
     )
   }
@@ -377,7 +380,10 @@ function TaxRatesPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
           setError(null)
           save.mutate({ id: current?.id ?? null, body })
         }}
-        onCancel={() => setEditing(null)}
+        onCancel={() => {
+          setError(null)
+          setEditing(null)
+        }}
       />
     )
   }

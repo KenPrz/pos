@@ -60,8 +60,10 @@ export function DiscountEditor({
     e.preventDefault()
     setError(null)
 
+    // Blank must fail validation rather than silently save as $0/0% — both fields are
+    // required for their respective kind server-side (discounts_kind_matches_value).
     const finalPercent = kind === 'percent' ? percentToMicros(percentInput) : null
-    const finalAmount = kind === 'fixed' ? parseCentsOrNull(amountInput || '0') : null
+    const finalAmount = kind === 'fixed' ? parseCentsOrNull(amountInput) : null
     if (kind === 'percent' && finalPercent === null) {
       setError('Enter a valid percent (e.g. 8.25).')
       return
