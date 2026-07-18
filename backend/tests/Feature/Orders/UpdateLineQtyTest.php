@@ -75,7 +75,10 @@ it('needs a supervisor to shrink a fired line', function (): void {
         ->assertOk();
 });
 
-it('refuses a voided line and a stale version', function (): void {
+it('refuses a voided line', function (): void {
+    // Split from the stale-version case below: the voided-line 409 aborts the Postgres
+    // transaction (see CLAUDE.md), so a second assert in the same test would run against
+    // a broken connection and never really exercise.
     $this->line->forceFill(['voided_at' => now()])->save();
     $this->patchJson("/api/v1/orders/{$this->order->id}/lines/{$this->line->id}", ['qty' => '1'],
         staffHeaders($this->register, $this->cashier) + ['If-Match' => '1'])
@@ -83,6 +86,14 @@ it('refuses a voided line and a stale version', function (): void {
         // with order_version_conflict); the brief's own draft said 422, but that
         // contradicts both the docs and the existing LineAlreadyVoided::httpStatus().
         ->assertStatus(409)->assertJsonPath('error.code', 'line_already_voided');
+});
+
+it('refuses a stale If-Match version', function (): void {
+    // The add in beforeEach bumped the order to version 1, so If-Match: 0 is stale — the
+    // optimistic-lock check in OpenOrderLock rejects it before any qty change lands.
+    $this->patchJson("/api/v1/orders/{$this->order->id}/lines/{$this->line->id}", ['qty' => '1'],
+        staffHeaders($this->register, $this->cashier) + ['If-Match' => '0'])
+        ->assertStatus(409)->assertJsonPath('error.code', 'order_version_conflict');
 });
 
 it('rescales modifier money from frozen snapshots', function (): void {

@@ -60,7 +60,12 @@ const REGISTER_INFO_KEY = 'pos.register_info'
 export const tokens = {
   device: () => localStorage.getItem(DEVICE_TOKEN_KEY),
   setDevice: (t: string) => localStorage.setItem(DEVICE_TOKEN_KEY, t),
-  clearDevice: () => localStorage.removeItem(DEVICE_TOKEN_KEY),
+  // Un-enrolling the terminal drops its identity, so the stored register info (which
+  // register this device is) goes with it — a re-enrolment writes it fresh at login.
+  clearDevice: () => {
+    localStorage.removeItem(DEVICE_TOKEN_KEY)
+    localStorage.removeItem(REGISTER_INFO_KEY)
+  },
   staff: () => localStorage.getItem(STAFF_TOKEN_KEY),
   setStaff: (t: string) => localStorage.setItem(STAFF_TOKEN_KEY, t),
   clearStaff: () => {
@@ -80,9 +85,10 @@ export const tokens = {
     }
   },
   // The register this staff session logged into — its mode ('retail' | 'food') decides
-  // which screens the SPA shows. Same lifetime as the staff token, but not cleared by
-  // clearStaff(): a re-login at the same register redundantly overwrites it anyway, and
-  // keeping it around between logins costs nothing.
+  // which screens the SPA shows. Not cleared by clearStaff(): a re-login at the same
+  // register redundantly overwrites it anyway, and keeping it around between logins costs
+  // nothing. It IS cleared by clearDevice(), since un-enrolling drops the terminal's whole
+  // identity, this register info included.
   setRegisterInfo: (r: RegisterInfo) => localStorage.setItem(REGISTER_INFO_KEY, JSON.stringify(r)),
   registerInfo: (): RegisterInfo | null => {
     const raw = localStorage.getItem(REGISTER_INFO_KEY)

@@ -143,6 +143,16 @@ describe('tokens.registerInfo', () => {
 
     expect(tokens.registerInfo()).toEqual({ id: 'register-1', name: 'Bar 1', mode: 'food' })
   })
+
+  it('is dropped by clearDevice (the terminal identity goes with the device token)', () => {
+    tokens.setDevice('device-abc')
+    tokens.setRegisterInfo({ id: 'register-1', name: 'Bar 1', mode: 'food' })
+
+    tokens.clearDevice()
+
+    expect(tokens.device()).toBeNull()
+    expect(tokens.registerInfo()).toBeNull()
+  })
 })
 
 describe('openOrder', () => {
