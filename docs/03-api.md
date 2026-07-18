@@ -82,10 +82,13 @@ may change freely.
 ## Idempotency
 
 `Idempotency-Key: <uuidv4>` — honored on the routes carrying the idempotent middleware:
-add-line, payments, refunds, shift close, cash movements, and split. **Required** on
-`/payments`, `/refunds`, and `/shifts/close`; optional but recommended on add-line and
-split. Semantics in `01-architecture.md`: replay with a matching body returns the stored
-response without re-executing; replay with a different body is `409
+add-line, payments, refunds, shift close, cash movements, and split. The middleware
+itself is header-presence-driven (it no-ops when the header is absent); **required**,
+enforced by request validation, only on `/payments`, `/refunds`, and `/shifts/close`.
+Add-line, split, and cash movements carry the middleware but validate nothing about the
+header — sending one is honored and recommended, omitting one is accepted. Semantics in
+`01-architecture.md`: replay with a matching body returns the stored response without
+re-executing; replay with a different body is `409
 idempotency_key_reused`. The key is a **global** primary key, not scoped per route or per
 order — reusing one on a genuinely different request anywhere in the system collides the
 same way (`01-architecture.md`).

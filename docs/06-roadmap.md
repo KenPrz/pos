@@ -238,12 +238,14 @@ clean reconciling close.
 
 What building it changed, and what to know before M6:
 
-- **The thesis held.** `registers.mode` plus two `text check` columns
-  (`variance_approved_by`/`_at`) is the entire schema cost of food service on top of
-  retail — zero new order-model tables. `table_ref` (M2), `prep_state` (M2, unused until
-  now), and the whole order/line/payment lineage from M3–M4 needed no shape change at
-  all, only new actions reading and writing the columns already there. The risk this
-  milestone existed to retire — "food service needs a parallel model" — didn't
+- **The thesis held.** M5's entire schema cost is **one new column**
+  (`registers.mode`, plus its own `check`) and **one new constraint** — a paired
+  `check` on `shifts.variance_approved_by`/`_at`, columns that already existed,
+  forward-declared nullable at M2. Zero new order-model tables. `table_ref` (M2),
+  `prep_state` (M2, unused until now), and the whole order/line/payment lineage from
+  M3–M4 needed no shape change at all, only new actions reading and writing the columns
+  already there. The risk this milestone existed to retire — "food service needs a
+  parallel model" — didn't
   materialize.
 - **Split's exactness discipline is the same one M1 built for payments, applied per
   child.** Every allocated column (qty in milli, line total, tax, modifiers, each
@@ -335,6 +337,7 @@ Not "maybe someday" — each has a specific condition that should promote it.
 - **Tax complexity.** Inclusive/exclusive is handled. Multi-jurisdiction US sales tax is
   *not*, and would be a real project.
 - **Penny allocation.** Contained, and tested in M1 rather than discovered in M5.
-- **The unified model breaking down.** Retired: M5 shipped as two columns and a paired
-  check constraint, zero new order-model tables (see M5's Status block). The hedge — M5
+- **The unified model breaking down.** Retired: M5 shipped as one new column
+  (`registers.mode`) and one new constraint (a paired `check` on shift columns that
+  already existed), zero new order-model tables (see M5's Status block). The hedge — M5
   late, M4 early — paid off by not paying off; the risk simply didn't materialize.
