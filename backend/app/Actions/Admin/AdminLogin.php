@@ -7,6 +7,7 @@ namespace App\Actions\Admin;
 use App\Domain\Audit\AuditLogger;
 use App\Exceptions\Domain\InvalidCredentials;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -32,10 +33,16 @@ final class AdminLogin
             throw new InvalidCredentials;
         }
 
-        $token = $user->createToken("admin:{$user->id}", ['admin']);
+        return DB::transaction(function () use ($user, $in): AdminSession {
+            // 'admin' here is a label for what this token is, not an enforcement
+            // mechanism: createToken()'s ability list gates nothing on its own (Sanctum
+            // grants any unspecified createToken() the wildcard ['*']), and EnsureAdmin
+            // deliberately never checks it. See EnsureAdmin for why.
+            $token = $user->createToken("admin:{$user->id}", ['admin']);
 
-        $this->audit->record('admin.login', $user, $user->id, ip: $in->ip);
+            $this->audit->record('admin.login', $user, $user->id, ip: $in->ip);
 
-        return new AdminSession($user, $token->plainTextToken);
+            return new AdminSession($user, $token->plainTextToken);
+        });
     }
 }
