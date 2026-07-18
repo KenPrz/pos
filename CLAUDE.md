@@ -127,7 +127,13 @@ open/close with variance. Seeder prints development device tokens for the regist
 movements, stock ops, Z-report; register UI restyled to DESIGN.md console chrome and
 ported to Next.js + React Query.
 
-Next: **M5 — food service** (`docs/06-roadmap.md`).
+**M5 complete** — food service: open tabs with `table_ref`, modifiers end-to-end
+(repeats legal), fired-course coursing (`prep_state`), qty edits, transfer between
+registers, three-way-and-more splits, drawer-variance approval. `registers.mode` picks
+the register UI (menu grid vs. scanner); zero new order-model tables. Seed and run
+`scripts/e2e-lunch-service.sh` for the full story end to end.
+
+Next: **M6 — back office** (`docs/06-roadmap.md`).
 
 ### Gotchas that will cost you an afternoon
 
@@ -150,3 +156,11 @@ Next: **M5 — food service** (`docs/06-roadmap.md`).
   `next.config.ts`; `npm run typecheck` is the gate.
 - **The Z-report is fetched before close** — closing revokes the register's staff
   sessions.
+- **Approving a variance from the register that just closed will 401** — `CloseShift`
+  revokes every staff session bound to that register, and approval needs a session like
+  any other write. Approve from a *different* register at the same location instead (the
+  check is on location, not the specific terminal) — see `scripts/e2e-lunch-service.sh`.
+- **Idempotency keys are a global primary key, not scoped per route or per order.**
+  Reusing one on a genuinely different request anywhere in the system is
+  `409 idempotency_key_reused`, even across unrelated endpoints. Don't assume "different
+  path, same key" is safe.

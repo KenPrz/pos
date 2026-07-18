@@ -230,6 +230,59 @@ whole thesis in `00-overview.md` is that this milestone adds *screens*, not tabl
 turns out to need a schema change, the thesis was wrong and we want to learn that with M4
 already earning.
 
+**Status: complete.** 387 backend tests, 78 frontend. `scripts/e2e-lunch-service.sh` runs
+a full lunch service against a freshly seeded stack: two tabs on two registers, modifiers
+including a repeated one, a fired course, a qty bump on that fired line, a transfer, a
+three-way split paid across cash and card, a forced-and-approved drawer variance, and a
+clean reconciling close.
+
+What building it changed, and what to know before M6:
+
+- **The thesis held.** `registers.mode` plus two `text check` columns
+  (`variance_approved_by`/`_at`) is the entire schema cost of food service on top of
+  retail — zero new order-model tables. `table_ref` (M2), `prep_state` (M2, unused until
+  now), and the whole order/line/payment lineage from M3–M4 needed no shape change at
+  all, only new actions reading and writing the columns already there. The risk this
+  milestone existed to retire — "food service needs a parallel model" — didn't
+  materialize.
+- **Split's exactness discipline is the same one M1 built for payments, applied per
+  child.** Every allocated column (qty in milli, line total, tax, modifiers, each
+  discount row) runs through the earliest-absorbs-the-remainder allocator once, and
+  children's totals are *summed* from those allocated parts afterward, never
+  recomputed independently — recomputing 1/N of a tax would mint or lose pennies that
+  the sum-of-parts approach can't. The original order is closed out **voided, without
+  restock** — stock left the ledger when the lines were first added and the children
+  inherit that claim, so restocking on split would double the stock and understate the
+  sale.
+- **Prep state deliberately carries no `If-Match` and bumps no `version`.** A kitchen
+  tapping "fired" or "ready" races nothing at the till — a version bump there would
+  invalidate an in-flight tender for a reason the cashier can't see. The trade is a
+  known, accepted one: `SetLinePrepState` is lock-free, so a prep update racing a
+  same-line void can land after the void. Order-line financial writes still lock and
+  version as before; only the coursing verb is exempt, because it isn't money.
+- **The blind-count screen from M4 needed a correction, not an addition.** M4's close
+  screen showed the expected cash before the count, which lets a lazy cashier just
+  retype the number back. M5's variance-approval flow only has teeth if the count is
+  real, so the close screen now asks for the counted amount *first* and reveals
+  expected/variance only after — the same UI, a different order of two fields, and a
+  fix that belongs to M4's feature even though M5 is what surfaced the gap.
+- **The idempotency-key invariant is stricter than the plan assumed, and better.** The
+  plan brief guessed a key could be scoped "per path" so the same key on two different
+  endpoints would both execute. It can't: `idempotency_keys.key` is a bare primary key
+  with no path or order in it, so reusing one anywhere in the system for a genuinely
+  different request is `409 idempotency_key_reused`, full stop. `01-architecture.md`
+  already documented the real shape; the plan brief was the thing that drifted, and
+  this is the correction landing in the one place a client actually reads it.
+- **Approving a variance from the register that just closed 401s**, because closing
+  revokes every staff session bound to that register. Not a bug: approval happens from
+  a different register at the same location (the check is on location, not the specific
+  terminal), or from the M6 back office once that exists. `scripts/e2e-lunch-service.sh`
+  approves from the terminal that's still open for exactly this reason.
+- **Decreasing a fired line's quantity shares its permission with voiding a sent
+  line**, decided inside `UpdateLineQty` rather than as a new named permission —
+  shrinking a course the kitchen already started is the same fraud surface as pulling
+  it off the ticket outright. Increasing needs no such gate.
+
 ## M6 — Back office
 
 - Catalog CRUD; user management; location and register settings.
@@ -282,6 +335,6 @@ Not "maybe someday" — each has a specific condition that should promote it.
 - **Tax complexity.** Inclusive/exclusive is handled. Multi-jurisdiction US sales tax is
   *not*, and would be a real project.
 - **Penny allocation.** Contained, and tested in M1 rather than discovered in M5.
-- **The unified model breaking down.** If food service turns out to need schema changes
-  rather than screens, M5 is where we learn it. That risk is why M5 is late and M4 is
-  early — the ordering is a hedge.
+- **The unified model breaking down.** Retired: M5 shipped as two columns and a paired
+  check constraint, zero new order-model tables (see M5's Status block). The hedge — M5
+  late, M4 early — paid off by not paying off; the risk simply didn't materialize.

@@ -156,7 +156,17 @@ with no permission is a bug in one of the two documents.
 | `order.discount.apply` | Apply a discount — **money leaves** |
 | `order.void` | Void a whole order — **money leaves** |
 | `order.reopen` | Reopen a closed order — **money leaves** |
-| `order.transfer` | Hand a tab to another server (M5) |
+| `order.transfer` | Hand a tab to another server's shift |
+
+`order.line.update` covers a quantity change either direction, with one carve-out:
+**decreasing the quantity of a line already fired to the kitchen** (`prep_state` in
+`in_progress` or `ready`) needs `order.line.void` too — shrinking a sent line is the same
+fraud surface as voiding one, so it takes the same permission rather than a new one.
+Increasing a fired line's quantity is not gated this way; a kitchen wanting more of
+something isn't a fraud path. This is decided inside the action, not by the route's
+`can()` — the flat permission can't express "only when decreasing and only when fired,"
+which is the same shape as the ownership checks in Permissions vs Policies below, just
+resolved in the action rather than a policy class.
 
 **Payments and refunds**
 
