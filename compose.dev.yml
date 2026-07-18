@@ -54,9 +54,21 @@ services:
       - ./backend:/app
       - api_vendor:/app/vendor
     # Bind mount hides the image's vendor; install on boot if absent, then serve.
-    # Root chowns the volume mountpoint, then `exec su` hands off to pos for
-    # good — no php/composer process, and nothing it writes, ever runs as root.
-    command: ["sh", "-c", "chown -R pos:pos /app/vendor && exec su pos -s /bin/sh -c 'composer install --no-interaction && exec entrypoint.sh frankenphp run --config /etc/frankenphp/Caddyfile'"]
+    # Root chowns the volume mountpoint ONCE (skipped on restart — the check
+    # below is a single stat, not a walk of every file composer installed),
+    # then `exec su` hands off to pos for good — no php/composer process, and
+    # nothing it writes, ever runs as root.
+    command:
+      - sh
+      - -c
+      - |
+        if [ "$(stat -c %u /app/vendor)" = "$(id -u pos)" ]; then
+          echo "api_vendor already owned by pos — skipping chown"
+        else
+          echo "api_vendor not owned by pos yet — chowning (first boot only)"
+          chown -R pos:pos /app/vendor
+        fi
+        exec su pos -s /bin/sh -c 'composer install --no-interaction && exec entrypoint.sh frankenphp run --config /etc/frankenphp/Caddyfile'
 
   web:
     build: { context: frontend/web, target: dev }
@@ -79,7 +91,18 @@ services:
     volumes:
       - ./frontend/web:/app
       - web_node_modules:/app/node_modules
-    command: ["sh", "-c", "chown -R node:node /app/node_modules && exec su node -s /bin/sh -c 'npm install && npm run dev'"]
+    # Chown the volume ONCE (skipped on restart, see api's comment above).
+    command:
+      - sh
+      - -c
+      - |
+        if [ "$(stat -c %u /app/node_modules)" = "$(id -u node)" ]; then
+          echo "web_node_modules already owned by node — skipping chown"
+        else
+          echo "web_node_modules not owned by node yet — chowning (first boot only)"
+          chown -R node:node /app/node_modules
+        fi
+        exec su node -s /bin/sh -c 'npm install && npm run dev'
 
   back-office:
     build: { context: frontend/back-office, target: dev }
@@ -97,7 +120,18 @@ services:
     volumes:
       - ./frontend/back-office:/app
       - bo_node_modules:/app/node_modules
-    command: ["sh", "-c", "chown -R node:node /app/node_modules && exec su node -s /bin/sh -c 'npm install && npm run dev'"]
+    # Chown the volume ONCE (skipped on restart, see api's comment above).
+    command:
+      - sh
+      - -c
+      - |
+        if [ "$(stat -c %u /app/node_modules)" = "$(id -u node)" ]; then
+          echo "bo_node_modules already owned by node — skipping chown"
+        else
+          echo "bo_node_modules not owned by node yet — chowning (first boot only)"
+          chown -R node:node /app/node_modules
+        fi
+        exec su node -s /bin/sh -c 'npm install && npm run dev'
 
 volumes:
   pgdata:

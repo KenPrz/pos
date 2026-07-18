@@ -11,3 +11,9 @@
 # `make dev` instead.
 #
 # infra/.env* are untouched and still apply if you bring this file back up.
+
+# `services: {}` (not just comments): a Compose file with nothing but comments
+# is invalid — both `up` and this file's own suggested `down` fail on it
+# ("empty compose file"). An explicit empty services map keeps both commands
+# a graceful no-op instead.
+services: {}
