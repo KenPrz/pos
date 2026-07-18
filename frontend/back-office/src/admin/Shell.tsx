@@ -5,6 +5,8 @@ import type { AdminUser } from '../lib/api'
 import { CatalogSection } from './catalog/CatalogSection'
 import { UsersSection } from './users/UsersSection'
 import { PlacesSection } from './places/PlacesSection'
+import { ReportsSection } from './reports/ReportsSection'
+import { AuditSection } from './audit/AuditSection'
 
 export type Section = 'catalog' | 'users' | 'locations' | 'reports' | 'audit'
 
@@ -15,14 +17,6 @@ const NAV_ITEMS: Array<{ id: Section; label: string }> = [
   { id: 'reports', label: 'Reports' },
   { id: 'audit', label: 'Audit' },
 ]
-
-// Placeholder copy for the sections Task 11 still owns. Catalog (Task 9), Users and
-// Locations & Registers (Task 10) are real below. No routes: the section is plain
-// client state, same one-page architecture as the register.
-const SECTION_PLACEHOLDER: Record<Exclude<Section, 'catalog' | 'users' | 'locations'>, string> = {
-  reports: 'Sales and stock reports arrive in a later task.',
-  audit: 'The audit viewer arrives in a later task.',
-}
 
 export function Shell({
   user,
@@ -37,7 +31,6 @@ export function Shell({
   onUnauthorized: () => void
 }) {
   const [section, setSection] = useState<Section>('catalog')
-  const activeLabel = NAV_ITEMS.find((item) => item.id === section)?.label ?? ''
 
   return (
     <main className="shell">
@@ -90,11 +83,15 @@ export function Shell({
               <PlacesSection onUnauthorized={onUnauthorized} />
             </div>
           )}
-          {section !== 'catalog' && section !== 'users' && section !== 'locations' && (
-            <section className="form-panel" style={{ flex: 1 }}>
-              <h2>{activeLabel}</h2>
-              <p className="muted">{SECTION_PLACEHOLDER[section]}</p>
-            </section>
+          {section === 'reports' && (
+            <div style={{ flex: 1 }}>
+              <ReportsSection onUnauthorized={onUnauthorized} />
+            </div>
+          )}
+          {section === 'audit' && (
+            <div style={{ flex: 1 }}>
+              <AuditSection onUnauthorized={onUnauthorized} />
+            </div>
           )}
         </div>
       </div>

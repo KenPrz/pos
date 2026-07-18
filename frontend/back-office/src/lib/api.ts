@@ -251,6 +251,88 @@ export type Register = {
   is_active: boolean
 }
 
+// ---------------------------------------------------------------------------
+// Reports & audit wire types (Task 11) — verified against
+// app/Http/Resources/Admin/{SalesReportResource,StockReportResource}.php and
+// app/Actions/Admin/Audit/ListAuditLog.php.
+// ---------------------------------------------------------------------------
+
+export type SalesReportParams = {
+  location_id: string
+  from: string // 'YYYY-MM-DD', inclusive
+  to: string // 'YYYY-MM-DD', inclusive
+  group_by: 'day' | 'category' | 'user'
+}
+
+/**
+ * One row shape covers both bases: `day`/`user` (ledger) populate the money fields,
+ * `category` (lines) populates `qty_sold`/`line_total_cents`. Which fields are present
+ * is determined by the `group_by` the caller chose — see `basis` on `SalesReport`,
+ * which names which kind of number this response actually is.
+ */
+export type SalesReportRow = {
+  bucket: string
+  orders_closed?: number
+  gross_cents?: number
+  refunds_cents?: number
+  net_cents?: number
+  qty_sold?: string
+  line_total_cents?: number
+}
+
+export type SalesReport = {
+  rows: SalesReportRow[]
+  totals: Omit<SalesReportRow, 'bucket'>
+  // 'ledger': captured payments & refunds actually moved (day/user). 'lines': the sales
+  // mix read off order lines, joined to the live catalog (category). The two are not
+  // guaranteed to reconcile — never label one as the other.
+  basis: 'ledger' | 'lines'
+}
+
+export type StockReportParams = { location_id: string; low_only?: boolean }
+
+export type StockReportRow = { variant_id: string; sku: string; name: string; qty: string; low: boolean }
+
+export type StockReport = { rows: StockReportRow[] }
+
+export type AuditParams = {
+  entity_type?: string
+  entity_id?: string
+  user_id?: string
+  action?: string
+  from?: string // 'YYYY-MM-DD', inclusive
+  to?: string // 'YYYY-MM-DD', inclusive
+  page?: number
+}
+
+export type AuditLogEntry = {
+  id: string
+  created_at: string
+  action: string
+  entity_type: string
+  entity_id: string
+  user_name: string | null
+  register_name: string | null
+  payload: unknown
+}
+
+export type AuditPage = { rows: AuditLogEntry[]; page: number; has_more: boolean }
+
+/**
+ * Build a query string from a flat params object, dropping `undefined`/empty values —
+ * every report/audit filter is optional-by-omission, never sent as the literal string
+ * `"undefined"`.
+ */
+function qs(params: Record<string, string | number | boolean | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === '') continue
+    search.set(key, String(value))
+  }
+  const s = search.toString()
+  return s ? `?${s}` : ''
+}
+
 /**
  * One list+create+update trio per catalog entity. Every list endpoint wraps its rows
  * as `{ items: [...] }`; every create/update wraps the single row under the entity's
@@ -309,7 +391,15 @@ export const api = {
       post<{ token: string }>(`/admin/registers/${registerId}/token`, {}).then((r) => r.token),
   },
 
-  // Task 11 extends from here:
-  // salesReport(params): Promise<SalesReport>; stockReport(params)
-  // audit(params): Promise<AuditPage>
+  // ---------------------------------------------------------------------------
+  // Reports & audit (Task 11) — verified against SalesReportResource.php,
+  // StockReportResource.php and Actions/Admin/Audit/ListAuditLog.php.
+  // ---------------------------------------------------------------------------
+  reports: {
+    sales: (params: SalesReportParams): Promise<SalesReport> => request<SalesReport>(`/admin/reports/sales${qs(params)}`),
+    stock: (params: StockReportParams): Promise<StockReport> => request<StockReport>(`/admin/reports/stock${qs(params)}`),
+  },
+  audit: {
+    list: (params: AuditParams): Promise<AuditPage> => request<AuditPage>(`/admin/audit${qs(params)}`),
+  },
 }

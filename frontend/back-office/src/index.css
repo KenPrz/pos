@@ -1098,3 +1098,12 @@ form > *:not(:last-child) {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* StockReportView (Task 11): the one place a report row itself carries signal orange
+   rather than a button — a low variant is the one thing on this screen that's
+   action-worthy (reorder), so it earns the warm accent DESIGN.md otherwise reserves for
+   NEW/SAVE/SEND. */
+.low-stock-row {
+  color: var(--color-signal);
+  font-weight: bold;
+}
