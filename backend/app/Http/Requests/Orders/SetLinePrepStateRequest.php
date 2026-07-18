@@ -31,6 +31,7 @@ final class SetLinePrepStateRequest extends FormRequest
             registerId: $this->attributes->get(EnsureDeviceToken::REGISTER)->id,
             state: $this->string('state')->toString(),
             actorId: $this->user()->id,
+            actorMayVoidLines: $this->user()->can(Permissions::ORDER_LINE_VOID),
         );
     }
 }

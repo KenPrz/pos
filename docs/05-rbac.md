@@ -163,7 +163,12 @@ with no permission is a bug in one of the two documents.
 `in_progress` or `ready`) needs `order.line.void` too — shrinking a sent line is the same
 fraud surface as voiding one, so it takes the same permission rather than a new one.
 Increasing a fired line's quantity is not gated this way; a kitchen wanting more of
-something isn't a fraud path. This is decided inside the action, not by the route's
+something isn't a fraud path. The prep verb itself (`PATCH .../prep`) is gated on
+`order.line.update`, but **downgrading a line out of a fired state** (`in_progress` or
+`ready`) back toward an earlier one needs `order.line.void` too — un-firing a line on
+paper is the front half of the same shrink-past-the-gate fraud path, so it takes the same
+permission. Moving a line forward through the states is ungated beyond `order.line.update`.
+This is decided inside the action, not by the route's
 `can()` — the flat permission can't express "only when decreasing and only when fired,"
 which is the same shape as the ownership checks in Permissions vs Policies below, just
 resolved in the action rather than a policy class.

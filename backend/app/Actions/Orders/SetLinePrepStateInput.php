@@ -12,5 +12,6 @@ final readonly class SetLinePrepStateInput
         public string $registerId,
         public string $state,
         public string $actorId,
+        public bool $actorMayVoidLines,   // evaluated in the FormRequest; the action has no HTTP/user access
     ) {}
 }

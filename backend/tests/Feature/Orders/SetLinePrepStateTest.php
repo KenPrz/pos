@@ -33,6 +33,31 @@ it('fires and readies a line without bumping the order version', function (): vo
     $this->assertDatabaseHas('audit_log', ['action' => 'order.line.prep', 'entity_id' => $this->line->id]);
 });
 
+it('lets a cashier walk a line forward pending → in_progress → ready', function (): void {
+    $headers = staffHeaders($this->register, $this->cashier);
+    $this->patchJson("/api/v1/orders/{$this->order->id}/lines/{$this->line->id}/prep", ['state' => 'in_progress'], $headers)
+        ->assertOk()->assertJsonPath('data.line.prep_state', 'in_progress');
+    $this->patchJson("/api/v1/orders/{$this->order->id}/lines/{$this->line->id}/prep", ['state' => 'ready'], $headers)
+        ->assertOk()->assertJsonPath('data.line.prep_state', 'ready');
+});
+
+it('forbids a cashier downgrading a fired line back toward pending', function (): void {
+    // ready → pending would let a cashier "uncook" a line and then shrink it past
+    // UpdateLineQty's fired-line gate; it takes the void permission the cashier lacks.
+    $this->line->forceFill(['prep_state' => 'ready'])->save();
+    $this->patchJson("/api/v1/orders/{$this->order->id}/lines/{$this->line->id}/prep", ['state' => 'pending'],
+        staffHeaders($this->register, $this->cashier))
+        ->assertStatus(403)->assertJsonPath('error.code', 'forbidden');
+});
+
+it('lets a supervisor downgrade a fired line', function (): void {
+    $supervisor = staffWithRole($this->location, Roles::SUPERVISOR);
+    $this->line->forceFill(['prep_state' => 'ready'])->save();
+    $this->patchJson("/api/v1/orders/{$this->order->id}/lines/{$this->line->id}/prep", ['state' => 'pending'],
+        staffHeaders($this->register, $supervisor))
+        ->assertOk()->assertJsonPath('data.line.prep_state', 'pending');
+});
+
 it('rejects an unknown state as validation, and a voided line as domain refusal', function (): void {
     $headers = staffHeaders($this->register, $this->cashier);
     $this->patchJson("/api/v1/orders/{$this->order->id}/lines/{$this->line->id}/prep", ['state' => 'burnt'], $headers)

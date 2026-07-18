@@ -245,6 +245,12 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
   // the order's version for a prep-state change (SetLinePrepStateRequest carries none —
   // see api.ts's setLinePrep comment), so the response is applied directly.
   const PREP_CYCLE = { pending: 'in_progress', in_progress: 'ready', ready: 'pending' } as const
+  // ready → pending is a downgrade out of a fired state; the server gates it on
+  // order.line.void (mirrors UpdateLineQty's fired-line rule). Without that permission the
+  // cycle stops at ready rather than wrapping back to pending — a supervisor keeps the
+  // full loop. `null` means the chip is a dead end for this user (rendered disabled).
+  const nextPrep = (state: 'pending' | 'in_progress' | 'ready') =>
+    state === 'ready' && !can('order.line.void') ? null : PREP_CYCLE[state]
   const setPrep = useMutation({
     mutationFn: ({ lineId, state }: { lineId: string; state: 'pending' | 'in_progress' | 'ready' }) =>
       api.setLinePrep((order as Order).id, lineId, state),
@@ -520,16 +526,19 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
               {/* Prep chip: pending → in_progress → ready → pending, one tap per step. Lines
                   with no prep tracking (prep_state null — e.g. a bagged retail add-on rung
                   up on a food-mode till) get no chip at all. */}
-              {foodMode && l.prep_state !== null && phase.name === 'scanning' && (
-                <button
-                  type="button"
-                  className={`chip prep-chip prep-${l.prep_state}`}
-                  disabled={setPrep.isPending}
-                  onClick={() => setPrep.mutate({ lineId: l.id, state: PREP_CYCLE[l.prep_state as 'pending' | 'in_progress' | 'ready'] })}
-                >
-                  {l.prep_state === 'pending' ? 'Pending' : l.prep_state === 'in_progress' ? 'Cooking' : 'Ready'}
-                </button>
-              )}
+              {foodMode && l.prep_state !== null && phase.name === 'scanning' && (() => {
+                const next = nextPrep(l.prep_state)
+                return (
+                  <button
+                    type="button"
+                    className={`chip prep-chip prep-${l.prep_state}`}
+                    disabled={setPrep.isPending || next === null}
+                    onClick={() => next !== null && setPrep.mutate({ lineId: l.id, state: next })}
+                  >
+                    {l.prep_state === 'pending' ? 'Pending' : l.prep_state === 'in_progress' ? 'Cooking' : 'Ready'}
+                  </button>
+                )
+              })()}
               {can('order.line.void') && phase.name === 'scanning' && voidingLineId !== l.id && (
                 <button type="button" className="btn btn-void btn-chip" onClick={() => { setVoidingLineId(l.id); setVoidReason('') }}>
                   Void
