@@ -365,6 +365,79 @@ What building it changed, and what to know before M7:
 
 **Done when:** it's live and someone other than us can operate it at 2am.
 
+**Status: complete**, scoped at the owner's direction to what containerizing actually
+needs — industry-standard Dockerfiles driven by a Makefile — plus the two pieces the
+production compose naturally carries: automatic TLS and a runnable restore drill.
+Monitoring, load testing, the runbook, and a registry/CD pipeline are named deferrals
+below, not gaps nobody noticed. `make dev` on a machine with nothing but Docker
+installed brings up the full stack — db, api, register, back office — hot-reloading
+against the working tree; `make prod-up` on a host with DNS serves both apps over TLS
+from one edge; `make restore-drill` proves a backup restores into a throwaway
+container. 462 backend / 80 register / 80 back-office tests — unchanged, since
+containerizing touched no application code — now run inside the stack itself via
+`make test`, and all three committed end-to-end scripts run against it via `make e2e`.
+
+What building it changed, and what to know operating it:
+
+- **Config is cached at boot, never baked into the image.** `php artisan
+  config:cache`/`route:cache` need `POS_CURRENCY`/`POS_BUSINESS_NAME`/`APP_KEY` to boot
+  the framework at all, and none of those exist at `docker build` time — only at
+  container start, when real env is present. The prod Dockerfile's `composer
+  dump-autoload --no-scripts` exists specifically to skip package discovery, which
+  would otherwise try to boot the framework mid-build and fail on the same missing
+  vars; discovery and config caching both happen once, at first boot, when the env is
+  real.
+- **FrankenPHP *is* Caddy**, which collapses reverse proxy, TLS termination, and the
+  PHP runtime into one container. `compose.prod.yml`'s `api` service is the single
+  public entrypoint: its Caddyfile terminates TLS for both domains (auto-provisioned,
+  auto-renewed), routes `/api/*` to itself, and reverse-proxies everything else to
+  `web:3000` or `back-office:3000` by host. One image is the edge; there is no separate
+  nginx or load balancer in front of it.
+- **`API_ORIGIN` keeps the no-CORS principle alive in every environment.** Both
+  Next.js apps' `/api` rewrite reads `process.env.API_ORIGIN`; native dev falls back to
+  `http://127.0.0.1:8000`, dev compose sets `http://api:8000`, and prod needs nothing at
+  all — Caddy already routes `/api/*` to the api service before the request reaches a
+  Next server. The browser has seen exactly one origin from M0 through prod; only the
+  value behind the rewrite ever changed.
+- **The dev containers drop root the moment they've done the one thing that needs
+  it.** A fresh named volume (`api_vendor`, `*_node_modules`) is root-owned by Docker,
+  and the image's own non-root user can't write into it on first boot. Each dev service
+  starts as root *only* to `chown` that volume once (a single `stat`, skipped on
+  restart), then `exec su`s to the matching non-root user for the rest of the
+  container's life. The host bind-mounted tree itself is never touched by root —
+  verified with `find backend frontend -user root` coming back empty after a full
+  `make clean && make dev` cycle. `docker compose exec` is a separate hazard from this:
+  it defaults to root regardless, so every Makefile target that touches a bind mount
+  names `--user pos`/`--user node` explicitly; see CLAUDE.md.
+- **The restore drill is a `make` target, not a wiki page.** `make restore-drill`
+  spins up a throwaway Postgres container, restores the newest backup into it, prints
+  row counts, and tears down, so "the backup works" is provable on demand instead of
+  assumed. Proven for real, not just plausible: `dropdb --force` against a database
+  with an *active held connection* (not merely an idle one) genuinely terminates it and
+  drops the database — the exact case a stale connection would otherwise block, and the
+  one `make restore` itself relies on.
+- **`make e2e` reseeds twice, on purpose.** All three committed end-to-end scripts
+  transact at the same location on the same calendar day; `e2e-admin-day.sh`'s
+  sales-report assertions are absolute counts, proven standalone in M6 against its own
+  fresh seed. Running it after the other two scripts (which also transact there, same
+  day) makes that one assertion false without anything actually being broken — so
+  `make e2e` reseeds once before the retail/lunch scripts and again before admin-day,
+  restoring the exact precondition admin-day was written against. Reordering instead
+  (admin-day first) doesn't work either: admin-day flips a till to food mode and
+  reissues its device token, which the lunch script depends on still being retail-mode.
+  The target leaves the dev db dirty on purpose afterward — see its own `make help`
+  line.
+- **The Compose project name `pos` is a real collision hazard, not a cosmetic
+  choice.** Both compose files name their project `pos`, which claims the `pos_pgdata`
+  volume outright; a host that ever ran the retired `infra/docker-compose.yml` (same
+  default project name) attaches to that same volume — a real database, not a fresh one
+  — unless it's torn down with `-v` first or the new stack boots under an overridden
+  `COMPOSE_PROJECT_NAME`. Documented in the compose files themselves, not just here.
+
+Next: nothing scheduled. See the deferred table below — M7 added five ops-shaped rows
+to it (monitoring, load test, runbook, registry/CD, worker mode) plus two hardening
+items surfaced while proving the restore drill and `make e2e`.
+
 ---
 
 ## Sequencing rationale
@@ -391,6 +464,13 @@ Not "maybe someday" — each has a specific condition that should promote it.
 | Queue + Redis | The first thing worth doing async — realistically, emailed receipts. |
 | Multi-tenancy | Selling this to a second business. **Costly by then, so decide early, not when the contract's signed.** |
 | Loyalty / gift cards | A concrete promotion needs it. |
+| Monitoring / alerting / log shipping | First real deployment day. |
+| Load test at lunch-rush concurrency | First pilot store scheduled. |
+| Runbook (register won't connect, drawer won't reconcile, restore from backup) | First operator who isn't us. |
+| Registry + CD pipeline | First remote host to deploy to. |
+| FrankenPHP worker mode (Octane) | Measured latency need — off by default; the image already supports it. |
+| Delta-based `e2e-admin-day.sh` assertions | The e2e scripts need to compose without `make e2e`'s double-reseed — today its sales-report checks are absolute counts that only hold against its own fresh seed. |
+| `COMPOSE_VAR` hardening against a typo'd `COMPOSE=` | A destructive `backup`/`restore`/`restore-drill` target is run with a mistyped `COMPOSE=prod` and silently falls back to the dev stack instead of failing loudly. |
 
 ## Risks
 

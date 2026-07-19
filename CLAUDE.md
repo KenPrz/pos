@@ -18,8 +18,11 @@ frontend/web/         Next.js register app
 frontend/back-office/ Next.js back-office app (M6) — catalog/user/location CRUD, reports, audit
 frontend/native/      Reserved for a desktop shell (Electron/Tauri) — hosts the register
                       app and adds cash drawer + receipt printer access. Empty in v1.
-infra/                docker-compose for local Postgres
-docs/                 The design. Start at docs/README.md
+Makefile               Runner surface for the containerized stack — `make help` lists everything.
+compose.dev.yml        Full dev stack: db + api + web + back-office, hot reload. `make dev`.
+compose.prod.yml       Single-host production: one FrankenPHP edge, TLS, host routing. `make prod-up`.
+infra/                 Retired (M7) — was a standalone Postgres-only compose; compose.dev.yml replaced it.
+docs/                  The design. Start at docs/README.md
 ```
 
 Two separate frontends, not one app split by route: the register (device-token auth,
@@ -28,7 +31,36 @@ are different enough sessions that a shared build bought nothing. See `01-archit
 
 ## Running it
 
-Four things, in this order (the fourth only if you need the back office).
+**`make dev` is the front door.** One Postgres, one API, both frontends, all in
+containers, hot-reloading against your working tree — nothing but Docker needed.
+
+```bash
+cp -n .env.example .env        # first time only
+make dev-key                   # first time only — mints POS_DEV_APP_KEY; paste into .env
+make dev                       # db + api + register + back office, hot reload
+make seed                      # fresh migrate + seed — prints dev PINs and device tokens
+```
+
+http://127.0.0.1:8000 (API) · http://127.0.0.1:5174 (register) · http://127.0.0.1:5175
+(back office). `make help` lists every target; the ones you'll reach for most:
+
+| Target | Does |
+| --- | --- |
+| `make dev` / `make dev-down` | Bring the dev stack up / down (volumes survive `dev-down`) |
+| `make seed` / `make migrate` | Fresh migrate + seed / pending migrations only |
+| `make test` | All three suites, in containers (`test-backend`/`test-web`/`test-bo` individually) |
+| `make e2e` | The three committed end-to-end proofs against the running stack |
+| `make build` | Build all three production images |
+| `make backup` / `make restore` / `make restore-drill` | Dump the db, restore a dump, prove the dump actually restores |
+| `make clean` | Stack down **and volumes destroyed** — asks first |
+
+Full recipes: `Makefile` at the repo root. Compose files: `compose.dev.yml` /
+`compose.prod.yml`. Deploy topology (prod): `docs/01-architecture.md`.
+
+### Native path (no Docker)
+
+Still fully supported — the dev compose adds a path, it doesn't remove one. Four
+things, in this order (the fourth only if you need the back office).
 
 **1. Postgres**
 
@@ -74,6 +106,9 @@ an admin's email and password (`POST /api/v1/admin/login`) — the seeder prints
 Status, below.
 
 ## Tests
+
+`make test` runs all three suites inside the containers (creates `pos_test` in the
+compose db if missing). Natively:
 
 ```bash
 cd backend && ./vendor/bin/pest         # needs Postgres up (creates/uses pos_test)
@@ -159,7 +194,15 @@ auth (`POST /api/v1/admin/login`), archive-never-delete throughout (no `DELETE` 
 anywhere under `/admin/*`). Seed and run `scripts/e2e-admin-day.sh` for the full story
 end to end.
 
-Next: **M7 — production** (`docs/06-roadmap.md`).
+**M7 complete** — containerization: three images (FrankenPHP API, two identical-shape
+Next.js runners), one dev compose (`make dev` — nothing but Docker needed) and one prod
+compose (single FrankenPHP edge, host-routed TLS, no-CORS preserved end to end),
+backups with a runnable restore drill, CI building all three images on every PR. Same
+462/80/80 tests, now proven inside the stack via `make test`; all three e2e scripts
+green via `make e2e`. Full story in `docs/06-roadmap.md`.
+
+Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
+trigger that would revive each (monitoring, load test, runbook, registry/CD, and more).
 
 ### Gotchas that will cost you an afternoon
 
@@ -200,3 +243,15 @@ Next: **M7 — production** (`docs/06-roadmap.md`).
   Reusing one on a genuinely different request anywhere in the system is
   `409 idempotency_key_reused`, even across unrelated endpoints. Don't assume "different
   path, same key" is safe.
+- **`docker compose exec` defaults to root.** The dev containers drop to a non-root
+  user for good after boot (see `docs/06-roadmap.md`'s M7 notes), but `exec` reconnects
+  as root unless told otherwise — a command run against a bind-mounted service (api,
+  web, back-office) needs `--user pos` or `--user node` explicitly, or it can leave
+  root-owned files under the bind mount. The Makefile's targets already do this; a
+  hand-run `docker compose exec` needs to as well.
+- **The Compose project name `pos` is a collision, not a coincidence.** Both
+  `compose.dev.yml` and `compose.prod.yml` name their project `pos`, which claims the
+  `pos_pgdata` volume outright. A host that ever ran the retired
+  `infra/docker-compose.yml` (same default project name) attaches to that same volume —
+  a real database, not a fresh one — unless it's torn down with `-v` first or the new
+  stack boots under an overridden `COMPOSE_PROJECT_NAME`.

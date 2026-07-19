@@ -92,6 +92,46 @@ offline-tolerant path in `00-overview.md` reachable rather than theoretical. Tha
 *not* licence to start caching writes now — the v1 decision stands, and the idempotency
 keys are the on-ramp. It only means the road exists when the trigger fires.
 
+## Deployment topology
+
+Three images, one edge, single-host `docker compose` for both dev and prod — no
+Kubernetes, no registry, no separate load balancer. `docs/06-roadmap.md`'s M7 section
+has the full story of what shipped and what's a named deferral.
+
+- **Three images.** `backend/Dockerfile` (FrankenPHP + PHP 8.5, multi-stage: `vendor`
+  → `prod`, non-root) and one identical-shape Dockerfile each for `frontend/web` and
+  `frontend/back-office` (`npm ci` → `next build` with `output: 'standalone'` → a
+  minimal `node:24-alpine` runner). `postgres:18-alpine` is used unmodified — no custom
+  image.
+- **One FrankenPHP edge.** FrankenPHP *is* Caddy, so the `api` image is the single
+  public entrypoint in production: its Caddyfile terminates TLS for both public
+  hostnames (`POS_REGISTER_DOMAIN`, `POS_ADMIN_DOMAIN` — certificates
+  auto-provisioned and auto-renewed), serves `/api/*` itself, and reverse-proxies
+  everything else to `web:3000` or `back-office:3000` by host. Reverse proxy, TLS
+  termination, and the PHP runtime collapse into one container instead of three;
+  `web` and `back-office` are not published to the host at all in prod.
+- **Host routing, not path routing.** The register and back-office domains are
+  distinguished by the `Host` header, each routed to its own Next.js service; `/api/*`
+  on either host reaches the same API.
+- **No-CORS survives production end to end.** Each Next.js app's `/api` rewrite
+  (`next.config.ts`) targets `process.env.API_ORIGIN`, so the browser has seen exactly
+  one origin from M0 onward — only what backs the rewrite changes: `http://
+  127.0.0.1:8000` for native dev, `http://api:8000` on the dev compose network, and in
+  prod nothing needs setting at all, because Caddy already routes `/api/*` to the api
+  service before the request ever reaches a Next server.
+- **Single-host compose, dev and prod sharing a shape.** `compose.dev.yml` (`make
+  dev`) runs all four services with bind mounts and hot reload; `compose.prod.yml`
+  (`make prod-up`) runs the built images with no bind mounts, internal-only networking
+  for `db`/`web`/`back-office`, and secrets via an uncommitted `.env`
+  (`.env.prod.example` documents every required var). Both name their Compose project
+  `pos`, a real collision hazard on a host that ever ran the retired
+  `infra/docker-compose.yml` under the same default project name — see the compose
+  files' own comments before a first boot there.
+- **Backups are a `make` target, not a hope.** `make backup` dumps the running
+  database; `make restore-drill` restores the newest dump into a throwaway container
+  and prints row counts, so "the backup works" is provable on demand rather than
+  assumed.
+
 The backend follows a strict action-class architecture: one system action is one route,
 one single-action controller, one Action class, returned through one Resource. The rules,
 the layering, and a worked example are in `04-backend-conventions.md`. Two decisions in

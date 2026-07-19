@@ -5,7 +5,7 @@ Design-first. Read in order; each assumes the one before it.
 | Doc | What's in it |
 | --- | --- |
 | [00-overview.md](00-overview.md) | What we're building, why retail and food service are one system, principles, v1 decisions, non-goals, glossary. |
-| [01-architecture.md](01-architecture.md) | Stack and versions, topology, money and rounding rules, auth, idempotency, concurrency, payment driver contract, error format, testing. |
+| [01-architecture.md](01-architecture.md) | Stack and versions, topology, deployment topology, money and rounding rules, auth, idempotency, concurrency, payment driver contract, error format, testing. |
 | [02-data-model.md](02-data-model.md) | Full Postgres schema with rationale. The core artifact. |
 | [03-api.md](03-api.md) | REST surface, auth flows, order lifecycle, error codes. |
 | [04-backend-conventions.md](04-backend-conventions.md) | Action-class architecture: controller → request → action → resource. Rules, layering, worked example, configuration. |
