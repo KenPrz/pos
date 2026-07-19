@@ -41,10 +41,10 @@ sidebar switcher is set to, right now, with nothing to configure.
   (captured payments and refunds that actually moved money, for today only) — and
   **Low stock**, a count of variants at or below their reorder threshold (the Stock
   report's **Low only** filter).
-- **Needs attention**: every low-stock variant (name and quantity) and every inactive
-  register at this location, each with a colored status dot — yellow for low stock,
-  red for a register that can't clock in a shift. Nothing to flag shows **"All
-  clear"** instead of an empty table.
+- **Needs attention**: a table of every low-stock variant and every inactive
+  register at this location — **Name**, **Qty**, **Status** — each status a colored
+  dot — yellow for low stock, red for a register that can't clock in a shift.
+  Nothing to flag shows **"All clear"** instead of an empty table.
 - **Recent activity**: the first page of the **Audit** log — **When**, **Action**,
   **User** — the same trail **Audit** itself shows in full, trimmed to a glance.
 

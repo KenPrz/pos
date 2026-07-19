@@ -4,7 +4,18 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Product, type TaxRate, type Variant } from '../../lib/api'
 import { parseCentsOrNull } from '../../lib/money'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { FieldRow } from '../../components/FieldRow'
+import { Button } from '../../components/ui/button'
+import { Card, CardTitle } from '../../components/ui/card'
+import { Checkbox } from '../../components/ui/checkbox'
+import { Input } from '../../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { MoneyField } from './MoneyField'
+
+// Radix `Select.Item` rejects an empty-string value — see SimpleEditor's identical
+// sentinel. Tax rate is the one optional select here ("None" is a real choice).
+const NONE_TAX_RATE = '__none__'
 
 /**
  * SKU/barcode/price/track_inventory/tax-rate, per the brief. `product_id` is only
@@ -38,6 +49,9 @@ export function VariantEditor({
   const [trackInventory, setTrackInventory] = useState(variant?.track_inventory ?? true)
   const [isActive, setIsActive] = useState(variant?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
+  // Archive behind a confirm (brief's global constraint) — set only when Save would
+  // otherwise archive; the dialog's Confirm re-plays the exact body already computed.
+  const [pendingArchive, setPendingArchive] = useState<Record<string, unknown> | null>(null)
 
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -84,79 +98,95 @@ export function VariantEditor({
 
     // Archive behind a confirm (brief's global constraint) — unchecking Active and
     // hitting Save must not silently archive. UNARCHIVE (the table action) needs none.
-    if (body.is_active === false && !window.confirm(`Archive ${name}? It leaves the register catalog but stays in history.`)) {
+    if (body.is_active === false) {
+      setPendingArchive(body)
       return
     }
     save.mutate(body)
   }
 
   return (
-    <section className="form-panel">
-      <header className="row">
-        <h2>{variant ? 'Edit variant' : 'New variant'}</h2>
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+    <Card>
+      <div className="mb-lg flex items-center justify-between gap-md">
+        <CardTitle>{variant ? 'Edit variant' : 'New variant'}</CardTitle>
+        <Button type="button" variant="tertiary" onClick={onCancel}>
           Back
-        </button>
-      </header>
+        </Button>
+      </div>
 
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="flex flex-col gap-md">
         {variant === null && (
-          <label htmlFor="variant-product">
-            Product
-            <select id="variant-product" value={productId} onChange={(e) => setProductId(e.target.value)}>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FieldRow label="Product">
+            <Select value={productId} onValueChange={setProductId}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {products.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
         )}
-        <label htmlFor="variant-name">
-          Name
-          <input id="variant-name" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label htmlFor="variant-sku">
-          SKU
-          <input id="variant-sku" value={sku} onChange={(e) => setSku(e.target.value)} />
-        </label>
-        <label htmlFor="variant-barcode">
-          Barcode
-          <input id="variant-barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
-        </label>
+        <FieldRow label="Name">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="SKU">
+          <Input value={sku} onChange={(e) => setSku(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="Barcode">
+          <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} />
+        </FieldRow>
         <MoneyField id="variant-price" label="Price" value={priceInput} onChange={setPriceInput} invalid={priceInvalid} />
         <MoneyField id="variant-cost" label="Cost (optional)" value={costInput} onChange={setCostInput} invalid={costInvalid} />
-        <label htmlFor="variant-tax-rate">
-          Tax rate
-          <select id="variant-tax-rate" value={taxRateId} onChange={(e) => setTaxRateId(e.target.value)}>
-            <option value="">None</option>
-            {taxRates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label htmlFor="variant-track-inventory">
-          Track inventory
-          <input
-            id="variant-track-inventory"
-            type="checkbox"
-            checked={trackInventory}
-            onChange={(e) => setTrackInventory(e.target.checked)}
-          />
-        </label>
+        <FieldRow label="Tax rate">
+          <Select value={taxRateId || NONE_TAX_RATE} onValueChange={(v) => setTaxRateId(v === NONE_TAX_RATE ? '' : v)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE_TAX_RATE}>None</SelectItem>
+              {taxRates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FieldRow>
+        <FieldRow label="Track inventory">
+          <Checkbox checked={trackInventory} onCheckedChange={(checked) => setTrackInventory(Boolean(checked))} />
+        </FieldRow>
         {variant && (
-          <label htmlFor="variant-active">
-            Active
-            <input id="variant-active" type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-          </label>
+          <FieldRow label="Active">
+            <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(Boolean(checked))} />
+          </FieldRow>
         )}
-        <button type="submit" className="btn btn-submit" disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save'}
-        </button>
+        <div>
+          <Button type="submit" variant="primary" disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </form>
-      {error && <p className="error">{error}</p>}
-    </section>
+      {error && <p className="type-body-sm mt-md text-error">{error}</p>}
+
+      <ConfirmDialog
+        open={pendingArchive !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingArchive(null)
+        }}
+        message={`Archive ${name}? It leaves the register catalog but stays in history.`}
+        confirmLabel="Archive"
+        destructive
+        onConfirm={() => {
+          if (!pendingArchive) return
+          save.mutate(pendingArchive)
+          setPendingArchive(null)
+        }}
+      />
+    </Card>
   )
 }

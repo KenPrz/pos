@@ -4,6 +4,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Modifier, type ModifierGroup } from '../../lib/api'
 import { parseCents } from '../../lib/money'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { FieldRow } from '../../components/FieldRow'
+import { Button } from '../../components/ui/button'
+import { Card, CardTitle } from '../../components/ui/card'
+import { Checkbox } from '../../components/ui/checkbox'
+import { Input } from '../../components/ui/input'
 import { MoneyField } from './MoneyField'
 import { EntityTable } from './EntityTable'
 
@@ -47,6 +53,9 @@ function ModifierForm({
   const [position, setPosition] = useState(String(modifier?.position ?? 0))
   const [isActive, setIsActive] = useState(modifier?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
+  // Archive behind a confirm (brief's global constraint) — set only when Save would
+  // otherwise archive; the dialog's Confirm re-plays the exact body already computed.
+  const [pendingArchive, setPendingArchive] = useState<Record<string, unknown> | null>(null)
 
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -92,37 +101,56 @@ function ModifierForm({
 
     // Archive behind a confirm (brief's global constraint) — unchecking Active and
     // hitting Save must not silently archive. UNARCHIVE (the table action) needs none.
-    if (body.is_active === false && !window.confirm(`Archive ${name}? It leaves the register catalog but stays in history.`)) {
+    if (body.is_active === false) {
+      setPendingArchive(body)
       return
     }
     save.mutate(body)
   }
 
   return (
-    <form className="inline-reason" onSubmit={submit} style={{ flexWrap: 'wrap' }}>
-      <label htmlFor="modifier-name">
-        Name
-        <input id="modifier-name" value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
-      <MoneyField id="modifier-price" label="Price delta" value={priceInput} onChange={setPriceInput} />
-      <label htmlFor="modifier-position">
-        Position
-        <input id="modifier-position" inputMode="numeric" value={position} onChange={(e) => setPosition(e.target.value)} />
-      </label>
-      {modifier && (
-        <label htmlFor="modifier-active">
-          Active
-          <input id="modifier-active" type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-        </label>
-      )}
-      <button type="submit" className="btn btn-submit" disabled={save.isPending}>
-        {save.isPending ? 'Saving…' : 'Save'}
-      </button>
-      <button type="button" className="btn btn-secondary" onClick={onCancel}>
-        Cancel
-      </button>
-      {error && <p className="error">{error}</p>}
-    </form>
+    <div className="flex flex-col gap-md">
+      <form onSubmit={submit} className="flex flex-col gap-md">
+        <div className="flex flex-wrap items-end gap-md">
+          <FieldRow label="Name">
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </FieldRow>
+          <MoneyField id="modifier-price" label="Price delta" value={priceInput} onChange={setPriceInput} />
+          <FieldRow label="Position">
+            <Input inputMode="numeric" value={position} onChange={(e) => setPosition(e.target.value)} />
+          </FieldRow>
+          {modifier && (
+            <FieldRow label="Active">
+              <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(Boolean(checked))} />
+            </FieldRow>
+          )}
+        </div>
+        <div className="flex items-center gap-xs">
+          <Button type="submit" variant="primary" disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save'}
+          </Button>
+          <Button type="button" variant="tertiary" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+      {error && <p className="type-body-sm text-error">{error}</p>}
+
+      <ConfirmDialog
+        open={pendingArchive !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingArchive(null)
+        }}
+        message={`Archive ${name}? It leaves the register catalog but stays in history.`}
+        confirmLabel="Archive"
+        destructive
+        onConfirm={() => {
+          if (!pendingArchive) return
+          save.mutate(pendingArchive)
+          setPendingArchive(null)
+        }}
+      />
+    </div>
   )
 }
 
@@ -213,45 +241,44 @@ export function ModifierGroupEditor({
   }
 
   return (
-    <section className="form-panel">
-      <header className="row">
-        <h2>{group ? 'Edit modifier group' : 'New modifier group'}</h2>
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+    <Card>
+      <div className="mb-lg flex items-center justify-between gap-md">
+        <CardTitle>{group ? 'Edit modifier group' : 'New modifier group'}</CardTitle>
+        <Button type="button" variant="tertiary" onClick={onCancel}>
           Back
-        </button>
-      </header>
+        </Button>
+      </div>
 
-      <form onSubmit={submit}>
-        <label htmlFor="group-name">
-          Name
-          <input id="group-name" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label htmlFor="group-min-select">
-          Min select
-          <input id="group-min-select" inputMode="numeric" value={minSelect} onChange={(e) => setMinSelect(e.target.value)} />
-        </label>
-        <label htmlFor="group-max-select">
-          Max select (blank = unlimited)
-          <input id="group-max-select" inputMode="numeric" value={maxSelect} onChange={(e) => setMaxSelect(e.target.value)} />
-        </label>
-        <button type="submit" className="btn btn-submit" disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save'}
-        </button>
+      <form onSubmit={submit} className="flex flex-col gap-md">
+        <FieldRow label="Name">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="Min select">
+          <Input inputMode="numeric" value={minSelect} onChange={(e) => setMinSelect(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="Max select (blank = unlimited)">
+          <Input inputMode="numeric" value={maxSelect} onChange={(e) => setMaxSelect(e.target.value)} />
+        </FieldRow>
+        <div>
+          <Button type="submit" variant="primary" disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </form>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="type-body-sm mt-md text-error">{error}</p>}
 
-      <hr className="dotted-divider" />
+      <hr className="my-lg border-t border-hairline" />
 
       {group === null ? (
         <>
-          <h3>Modifiers</h3>
-          <p className="muted">Save the group first to add modifiers.</p>
+          <CardTitle className="mb-md">Modifiers</CardTitle>
+          <p className="type-body-sm text-ink-muted">Save the group first to add modifiers.</p>
         </>
       ) : (
         <>
           {editingModifier !== null ? (
             <>
-              <h3>Modifiers</h3>
+              <CardTitle className="mb-md">Modifiers</CardTitle>
               <ModifierForm
                 groupId={group.id}
                 modifier={editingModifier === 'new' ? null : editingModifier}
@@ -273,15 +300,15 @@ export function ModifierGroupEditor({
               onNew={() => setEditingModifier('new')}
               onUnarchive={(m) => unarchiveModifier.mutate(m.id)}
               newLabel="New modifier"
-              // Downgraded from the default warm btn-submit (ProductEditor's "Save
-              // modifier groups" precedent) — the group's own Save above is this
-              // screen's one primary action; a nested table can't have a second.
-              newButtonClass="btn-utility"
+              // Downgraded from the default `primary` (ProductEditor's "Save modifier
+              // groups" precedent) — the group's own Save above is this screen's one
+              // primary action; a nested table can't have a second.
+              newButtonVariant="tertiary"
               emptyMessage="No modifiers in this group yet."
             />
           )}
         </>
       )}
-    </section>
+    </Card>
   )
 }

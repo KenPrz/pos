@@ -29,7 +29,11 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2',
+        // Carbon.css's custom `--spacing-*` scale reuses Tailwind's own t-shirt key names
+        // (sm/md/lg/...), so a bare `max-w-md` silently resolves to `--spacing-md` (16px)
+        // rather than Tailwind's built-in 28rem container scale — an arbitrary value
+        // sidesteps the theme lookup entirely and gets the intended width.
+        'fixed left-1/2 top-1/2 z-50 w-full max-w-[28rem] -translate-x-1/2 -translate-y-1/2',
         'rounded-none border border-hairline bg-canvas p-lg outline-none',
         className
       )}

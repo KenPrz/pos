@@ -1,5 +1,8 @@
 'use client'
 
+import { FieldRow } from '../../components/FieldRow'
+import { Input } from '../../components/ui/input'
+
 /**
  * A labeled money input shared by VariantEditor (price, cost) and DiscountEditor
  * (amount). Cents in, cents out at the edges — this component only ever holds the raw
@@ -20,9 +23,8 @@ export function MoneyField({
   invalid?: boolean
 }) {
   return (
-    <label htmlFor={id}>
-      {label}
-      <input
+    <FieldRow label={label}>
+      <Input
         id={id}
         type="text"
         inputMode="decimal"
@@ -31,6 +33,6 @@ export function MoneyField({
         aria-invalid={invalid || undefined}
         onChange={(e) => onChange(e.target.value)}
       />
-    </label>
+    </FieldRow>
   )
 }

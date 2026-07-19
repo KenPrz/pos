@@ -72,4 +72,34 @@ describe('DiscountEditor', () => {
 
     await waitFor(() => expect(api.discounts.update).toHaveBeenCalledWith('disc-1', { amount_cents: 300 }))
   })
+
+  // UI-rework addition: the archive-behind-a-confirm constraint (brief's global rule)
+  // now goes through `ConfirmDialog` — added coverage since the source always carried a
+  // `window.confirm` call here but no prior test exercised it.
+  it('cancelling the archive ConfirmDialog blocks the save', () => {
+    renderEditor()
+
+    fireEvent.click(screen.getByLabelText(/^active$/i))
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(
+      screen.getByText('Archive Staff discount? It leaves the register catalog but stays in history.'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(api.discounts.update).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('confirming the archive ConfirmDialog proceeds with the save', async () => {
+    vi.mocked(api.discounts.update).mockResolvedValue({ ...DISCOUNT, is_active: false })
+    renderEditor()
+
+    fireEvent.click(screen.getByLabelText(/^active$/i))
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
+
+    await waitFor(() => expect(api.discounts.update).toHaveBeenCalledWith('disc-1', { is_active: false }))
+  })
 })

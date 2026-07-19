@@ -18,6 +18,7 @@ import { ProductEditor } from './ProductEditor'
 import { VariantEditor } from './VariantEditor'
 import { ModifierGroupEditor } from './ModifierGroupEditor'
 import { DiscountEditor } from './DiscountEditor'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 
 type Tab = 'products' | 'variants' | 'categories' | 'modifier-groups' | 'discounts' | 'tax-rates'
 
@@ -63,39 +64,48 @@ function useUnarchive<T extends { id: string }>(key: string, update: (id: string
 }
 
 /**
- * The back-office catalog screens (Task 9): a tab rail over six entity tables, each
- * swapping to its editor in place when a row (or NEW) is picked — one primary surface at
- * a time, same as the register's phase screens. `onUnauthorized` is threaded down from
- * AdminApp so any list query's 401 drops the whole shell back to the login screen.
+ * The back-office catalog screens: a `Tabs` rail over six entity tables, each swapping
+ * to its editor in place when a row (or NEW) is picked — one primary surface at a time,
+ * same as the register's phase screens. Radix `TabsContent` unmounts inactive panels
+ * (no `forceMount`), so only the active tab's panel component is mounted and firing its
+ * queries — same as the old conditional-render idiom this replaces. `onUnauthorized` is
+ * threaded down from AdminApp so any list query's 401 drops the whole shell back to the
+ * login screen.
  */
 export function CatalogSection({ onUnauthorized }: { onUnauthorized: () => void }) {
   const [tab, setTab] = useState<Tab>('products')
 
   return (
-    <div className="menu-grid">
-      <nav className="menu-rail" aria-label="Catalog tabs">
+    <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+      <TabsList aria-label="Catalog tabs">
         {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`menu-rail-tab${t.id === tab ? ' active' : ''}`}
-            aria-pressed={t.id === tab}
-            onClick={() => setTab(t.id)}
-          >
+          <TabsTrigger key={t.id} value={t.id}>
             {t.label}
-          </button>
+          </TabsTrigger>
         ))}
-      </nav>
+      </TabsList>
 
-      <div style={{ flex: 1 }}>
-        {tab === 'products' && <ProductsPanel onUnauthorized={onUnauthorized} />}
-        {tab === 'variants' && <VariantsPanel onUnauthorized={onUnauthorized} />}
-        {tab === 'categories' && <CategoriesPanel onUnauthorized={onUnauthorized} />}
-        {tab === 'modifier-groups' && <ModifierGroupsPanel onUnauthorized={onUnauthorized} />}
-        {tab === 'discounts' && <DiscountsPanel onUnauthorized={onUnauthorized} />}
-        {tab === 'tax-rates' && <TaxRatesPanel onUnauthorized={onUnauthorized} />}
+      <div className="pt-lg">
+        <TabsContent value="products">
+          <ProductsPanel onUnauthorized={onUnauthorized} />
+        </TabsContent>
+        <TabsContent value="variants">
+          <VariantsPanel onUnauthorized={onUnauthorized} />
+        </TabsContent>
+        <TabsContent value="categories">
+          <CategoriesPanel onUnauthorized={onUnauthorized} />
+        </TabsContent>
+        <TabsContent value="modifier-groups">
+          <ModifierGroupsPanel onUnauthorized={onUnauthorized} />
+        </TabsContent>
+        <TabsContent value="discounts">
+          <DiscountsPanel onUnauthorized={onUnauthorized} />
+        </TabsContent>
+        <TabsContent value="tax-rates">
+          <TaxRatesPanel onUnauthorized={onUnauthorized} />
+        </TabsContent>
       </div>
-    </div>
+    </Tabs>
   )
 }
 
@@ -106,8 +116,9 @@ function ProductsPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
   const { unarchive, error: unarchiveError } = useUnarchive('products', api.products.update, onUnauthorized)
   const [editing, setEditing] = useState<Product | 'new' | null>(null)
 
-  if (products.isLoading || categories.isLoading || modifierGroups.isLoading) return <p className="muted">Loading…</p>
-  if (products.isError) return <p className="error">Could not load products.</p>
+  if (products.isLoading || categories.isLoading || modifierGroups.isLoading)
+    return <p className="type-body-sm text-ink-muted">Loading…</p>
+  if (products.isError) return <p className="type-body-sm text-error">Could not load products.</p>
 
   if (editing !== null) {
     return (
@@ -139,7 +150,7 @@ function ProductsPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
         onUnarchive={unarchive}
         emptyMessage="No products yet."
       />
-      {unarchiveError && <p className="error">{unarchiveError}</p>}
+      {unarchiveError && <p className="type-body-sm text-error">{unarchiveError}</p>}
     </>
   )
 }
@@ -151,8 +162,9 @@ function VariantsPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
   const { unarchive, error: unarchiveError } = useUnarchive('variants', api.variants.update, onUnauthorized)
   const [editing, setEditing] = useState<Variant | 'new' | null>(null)
 
-  if (variants.isLoading || products.isLoading || taxRates.isLoading) return <p className="muted">Loading…</p>
-  if (variants.isError) return <p className="error">Could not load variants.</p>
+  if (variants.isLoading || products.isLoading || taxRates.isLoading)
+    return <p className="type-body-sm text-ink-muted">Loading…</p>
+  if (variants.isError) return <p className="type-body-sm text-error">Could not load variants.</p>
 
   if (editing !== null) {
     return (
@@ -185,7 +197,7 @@ function VariantsPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
         onUnarchive={unarchive}
         emptyMessage="No variants yet."
       />
-      {unarchiveError && <p className="error">{unarchiveError}</p>}
+      {unarchiveError && <p className="type-body-sm text-error">{unarchiveError}</p>}
     </>
   )
 }
@@ -209,8 +221,8 @@ function CategoriesPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
     },
   })
 
-  if (categories.isLoading) return <p className="muted">Loading…</p>
-  if (categories.isError) return <p className="error">Could not load categories.</p>
+  if (categories.isLoading) return <p className="type-body-sm text-ink-muted">Loading…</p>
+  if (categories.isError) return <p className="type-body-sm text-error">Could not load categories.</p>
 
   if (editing !== null) {
     const current = editing === 'new' ? null : editing
@@ -265,8 +277,8 @@ function ModifierGroupsPanel({ onUnauthorized }: { onUnauthorized: () => void })
   const modifiers = useCatalogList('modifiers', api.modifiers.list, onUnauthorized)
   const [editing, setEditing] = useState<ModifierGroup | 'new' | null>(null)
 
-  if (groups.isLoading || modifiers.isLoading) return <p className="muted">Loading…</p>
-  if (groups.isError) return <p className="error">Could not load modifier groups.</p>
+  if (groups.isLoading || modifiers.isLoading) return <p className="type-body-sm text-ink-muted">Loading…</p>
+  if (groups.isError) return <p className="type-body-sm text-error">Could not load modifier groups.</p>
 
   if (editing !== null) {
     const current = editing === 'new' ? null : editing
@@ -302,8 +314,8 @@ function DiscountsPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
   const { unarchive, error: unarchiveError } = useUnarchive('discounts', api.discounts.update, onUnauthorized)
   const [editing, setEditing] = useState<Discount | 'new' | null>(null)
 
-  if (discounts.isLoading) return <p className="muted">Loading…</p>
-  if (discounts.isError) return <p className="error">Could not load discounts.</p>
+  if (discounts.isLoading) return <p className="type-body-sm text-ink-muted">Loading…</p>
+  if (discounts.isError) return <p className="type-body-sm text-error">Could not load discounts.</p>
 
   if (editing !== null) {
     return (
@@ -335,7 +347,7 @@ function DiscountsPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
         onUnarchive={unarchive}
         emptyMessage="No discounts yet."
       />
-      {unarchiveError && <p className="error">{unarchiveError}</p>}
+      {unarchiveError && <p className="type-body-sm text-error">{unarchiveError}</p>}
     </>
   )
 }
@@ -360,8 +372,8 @@ function TaxRatesPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
     },
   })
 
-  if (taxRates.isLoading) return <p className="muted">Loading…</p>
-  if (taxRates.isError) return <p className="error">Could not load tax rates.</p>
+  if (taxRates.isLoading) return <p className="type-body-sm text-ink-muted">Loading…</p>
+  if (taxRates.isError) return <p className="type-body-sm text-error">Could not load tax rates.</p>
 
   if (editing !== null) {
     const current = editing === 'new' ? null : editing
@@ -402,7 +414,7 @@ function TaxRatesPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
         onUnarchive={unarchive}
         emptyMessage="No tax rates yet."
       />
-      {unarchiveError && <p className="error">{unarchiveError}</p>}
+      {unarchiveError && <p className="type-body-sm text-error">{unarchiveError}</p>}
     </>
   )
 }

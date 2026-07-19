@@ -29,7 +29,10 @@ const SheetContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed inset-y-0 right-0 z-50 h-full w-full max-w-sm overflow-y-auto',
+        // Same collision as Dialog: carbon.css's custom `--spacing-sm` (12px) shadows
+        // Tailwind's built-in 24rem container scale for a bare `max-w-sm` — an arbitrary
+        // value sidesteps the theme lookup entirely and gets the intended width.
+        'fixed inset-y-0 right-0 z-50 h-full w-full max-w-[24rem] overflow-y-auto',
         'rounded-none border-l border-hairline bg-canvas p-lg outline-none',
         className
       )}

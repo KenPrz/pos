@@ -10,4 +10,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  test: {
+    // ResizeObserver polyfill for Radix `Checkbox` — see vitest.setup.ts.
+    setupFiles: ['./vitest.setup.ts'],
+  },
 })
