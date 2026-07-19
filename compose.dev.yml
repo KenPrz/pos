@@ -1,0 +1,155 @@
+# compose.dev.yml — the full dev stack: `make dev`.
+# Native dev (artisan serve + npm run dev + any Postgres) remains fully supported.
+name: pos-dev
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: pos
+      POSTGRES_USER: pos
+      POSTGRES_PASSWORD: ${POS_DEV_DB_PASSWORD:-pos}
+      # Deterministic collation. Left to the host locale, index ordering can
+      # differ between machines (and a glibc upgrade can silently corrupt text
+      # indexes even on one machine). Only takes effect on a fresh volume —
+      # initdb args are read once, at first cluster creation; re-running
+      # against an existing pgdata volume is a no-op.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    ports:
+      - "${POS_DEV_DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      # Depends on the DB accepting queries, not just the port being open —
+      # pg_isready returns true during recovery, before it can serve anything.
+      test: ["CMD-SHELL", "pg_isready -U pos -d pos -q && psql -U pos -d pos -qtAc 'select 1' >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build: { context: backend, target: dev }
+    # Dev-only: Docker creates a fresh named volume root-owned, and the
+    # image's `USER pos` (Dockerfile) can't write into api_vendor — first
+    # boot's `composer install` fails with "vendor/... could not be created".
+    # `user: root` here only gets the container's *starting* process to root
+    # so the command below can chown api_vendor once; every actual long-running
+    # process (composer install, frankenphp) then runs via `su pos`, which
+    # matches the host user by construction (Dockerfile: `useradd -u 1000 pos`).
+    # That means bootstrap/cache and everything else under the ./backend bind
+    # mount is written as uid 1000, never root — prod (Task 5) is untouched,
+    # it never runs this command.
+    user: root
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      APP_ENV: local
+      # Soft default, not `:?required` — a required var with no default fails
+      # interpolation for the WHOLE compose file (every service, every
+      # command, including `up -d db` alone and `dev-key`'s own `build api`),
+      # which is exactly what a blank .env.example-copied POS_DEV_APP_KEY did.
+      # The loud failure lives in backend/docker/entrypoint.sh instead, so only
+      # the api service (the one that actually needs the key) refuses to boot.
+      APP_KEY: ${POS_DEV_APP_KEY:-}
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: pos
+      DB_USERNAME: pos
+      DB_PASSWORD: ${POS_DEV_DB_PASSWORD:-pos}
+      POS_CURRENCY: USD
+      POS_BUSINESS_NAME: "Dev Trading Co"
+    ports:
+      # ${POS_DEV_API_PORT:-8000} — override when 8000 is already held on the host
+      # (e.g. a native `php artisan serve` from an earlier session).
+      - "${POS_DEV_API_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+      - api_vendor:/app/vendor
+    # Bind mount hides the image's vendor; install on boot if absent, then serve.
+    # Root chowns the volume mountpoint ONCE (skipped on restart — the check
+    # below is a single stat, not a walk of every file composer installed),
+    # then `exec su` hands off to pos for good — no php/composer process, and
+    # nothing it writes, ever runs as root.
+    command:
+      - sh
+      - -c
+      - |
+        if [ "$(stat -c %u /app/vendor)" = "$(id -u pos)" ]; then
+          echo "api_vendor already owned by pos — skipping chown"
+        else
+          echo "api_vendor not owned by pos yet — chowning (first boot only)"
+          chown -R pos:pos /app/vendor
+        fi
+        exec su pos -s /bin/sh -c 'composer install --no-interaction && exec entrypoint.sh frankenphp run --config /etc/frankenphp/Caddyfile'
+
+  web:
+    build: { context: frontend/web, target: dev }
+    # Dev-only: same root-owned fresh named volume problem as api, here for
+    # web_node_modules. `user: root` only gets the container's starting
+    # process to root so the command can chown the volume once; the actual
+    # `npm install`/`next dev` run via `su node`. Not `su pos` — the
+    # Dockerfile's own `pos` user is Alpine's next free system uid (100 here),
+    # which does NOT match the host. `node:24-alpine` already ships a `node`
+    # user at uid 1000/gid 1000 (verified: matches this host's uid), so we use
+    # that instead — everything written under the ./frontend/web bind mount
+    # (including .next) lands owned by the host user, never root.
+    user: root
+    environment:
+      API_ORIGIN: http://api:8000
+      PORT: 5174
+    ports:
+      # ${POS_DEV_WEB_PORT:-5174} — override when 5174 is already held on the host.
+      - "${POS_DEV_WEB_PORT:-5174}:5174"
+    volumes:
+      - ./frontend/web:/app
+      - web_node_modules:/app/node_modules
+    # Chown the volume ONCE (skipped on restart, see api's comment above).
+    command:
+      - sh
+      - -c
+      - |
+        if [ "$(stat -c %u /app/node_modules)" = "$(id -u node)" ]; then
+          echo "web_node_modules already owned by node — skipping chown"
+        else
+          echo "web_node_modules not owned by node yet — chowning (first boot only)"
+          chown -R node:node /app/node_modules
+        fi
+        exec su node -s /bin/sh -c 'npm install && npm run dev'
+
+  back-office:
+    build: { context: frontend/back-office, target: dev }
+    # Dev-only: see web's note above — same fix, here for bo_node_modules and
+    # the ./frontend/back-office bind mount. `su node`, not `su pos`, for the
+    # same uid-1000-vs-100 reason.
+    user: root
+    environment:
+      API_ORIGIN: http://api:8000
+      PORT: 5175
+    ports:
+      # ${POS_DEV_BACKOFFICE_PORT:-5175} — override when 5175 is already held on
+      # the host (e.g. a native `npm run dev` from an earlier session).
+      - "${POS_DEV_BACKOFFICE_PORT:-5175}:5175"
+    volumes:
+      - ./frontend/back-office:/app
+      - bo_node_modules:/app/node_modules
+    # Chown the volume ONCE (skipped on restart, see api's comment above).
+    command:
+      - sh
+      - -c
+      - |
+        if [ "$(stat -c %u /app/node_modules)" = "$(id -u node)" ]; then
+          echo "bo_node_modules already owned by node — skipping chown"
+        else
+          echo "bo_node_modules not owned by node yet — chowning (first boot only)"
+          chown -R node:node /app/node_modules
+        fi
+        exec su node -s /bin/sh -c 'npm install && npm run dev'
+
+volumes:
+  pgdata:
+  api_vendor:
+  web_node_modules:
+  bo_node_modules:

@@ -39,7 +39,11 @@ beforeEach(function (): void {
     $admin = User::factory()->create(['email' => 'admin@pos.test', 'password_hash' => 'pw', 'is_admin' => true]);
     $this->headers = ['Authorization' => 'Bearer '.$admin->createToken('t')->plainTextToken];
 
-    $this->today = now()->toDateString();
+    // Location-timezone-aware, matching OrderFactory::forRegister()'s own business_date
+    // computation (and OpenOrder's/RefundOrder's) — plain now() is app-default UTC and
+    // disagrees with the location's timezone for a few hours a day, which is exactly the
+    // bug this test used to trip over.
+    $this->today = now($this->location->timezone)->toDateString();
 });
 
 // Pest file-scoped functions collide across test files if two share a name — namespaced

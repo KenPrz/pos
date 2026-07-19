@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.prod.example
 
 # PHP
 /backend/vendor/
@@ -28,6 +29,7 @@ node_modules/
 
 # Local infra state
 /infra/pgdata/
+/backups/
 
 # SDD scratch (ledger, briefs, reports)
 .superpowers/

@@ -1,0 +1,43 @@
+# backend/docker/Caddyfile.prod — one public entrypoint: TLS + host routing.
+# POS_REGISTER_DOMAIN / POS_ADMIN_DOMAIN come from the prod .env via compose.
+# POS_TLS_ISSUER lets a domainless smoke test use Caddy's internal CA:
+#   POS_TLS_ISSUER=internal  →  self-signed, no ACME attempts.
+{
+    frankenphp
+}
+
+# Internal health listener (container healthcheck + no public exposure needed)
+:8000 {
+    root * /app/public
+    php_server
+}
+
+{$POS_REGISTER_DOMAIN} {
+    tls {
+        issuer {$POS_TLS_ISSUER:acme}
+    }
+    encode zstd gzip
+    @api path /api/*
+    handle @api {
+        root * /app/public
+        php_server
+    }
+    handle {
+        reverse_proxy web:3000
+    }
+}
+
+{$POS_ADMIN_DOMAIN} {
+    tls {
+        issuer {$POS_TLS_ISSUER:acme}
+    }
+    encode zstd gzip
+    @api path /api/*
+    handle @api {
+        root * /app/public
+        php_server
+    }
+    handle {
+        reverse_proxy back-office:3000
+    }
+}
