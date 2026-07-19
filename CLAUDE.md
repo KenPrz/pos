@@ -64,11 +64,21 @@ things, in this order (the fourth only if you need the back office).
 
 **1. Postgres**
 
+`infra/docker-compose.yml` is retired (M7) — it's an empty `services: {}` pointer now.
+Run just the `db` service out of the dev compose instead; the api/web/back-office
+services stay down, so this is the containers-for-Postgres-only, everything-else-native
+path:
+
 ```bash
-cd infra
-cp -n .env.example .env
-docker compose up -d          # postgres:18-alpine on :5432
+cp -n .env.example .env                       # first time only
+docker compose -f compose.dev.yml up -d db    # postgres:18-alpine on ${POS_DEV_DB_PORT:-5432}
 ```
+
+Idempotent — safe to run even if the full `make dev` stack is already up (this just
+confirms `db` is running, it won't touch `api`/`web`/`back-office`). `backend/.env`'s
+`DB_PORT` needs to match `POS_DEV_DB_PORT` (both default `5432`) and `DB_PASSWORD` needs
+to match `POS_DEV_DB_PASSWORD` (both default `pos` — `backend/.env.example`'s own blank
+default won't authenticate against this container as-is).
 
 **2. API** — http://127.0.0.1:8000
 
@@ -249,9 +259,10 @@ trigger that would revive each (monitoring, load test, runbook, registry/CD, and
   web, back-office) needs `--user pos` or `--user node` explicitly, or it can leave
   root-owned files under the bind mount. The Makefile's targets already do this; a
   hand-run `docker compose exec` needs to as well.
-- **The Compose project name `pos` is a collision, not a coincidence.** Both
-  `compose.dev.yml` and `compose.prod.yml` name their project `pos`, which claims the
-  `pos_pgdata` volume outright. A host that ever ran the retired
+- **The prod Compose project name `pos` is a collision, not a coincidence.** Only
+  `compose.prod.yml` names its project `pos` (`compose.dev.yml` is `pos-dev` — its own,
+  separate `pos-dev_pgdata` volume, no collision risk). `compose.prod.yml`'s `pos`
+  claims the `pos_pgdata` volume outright, and a host that ever ran the retired
   `infra/docker-compose.yml` (same default project name) attaches to that same volume —
-  a real database, not a fresh one — unless it's torn down with `-v` first or the new
+  a real database, not a fresh one — unless it's torn down with `-v` first or the prod
   stack boots under an overridden `COMPOSE_PROJECT_NAME`.

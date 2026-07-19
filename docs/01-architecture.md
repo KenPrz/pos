@@ -123,10 +123,11 @@ has the full story of what shipped and what's a named deferral.
   dev`) runs all four services with bind mounts and hot reload; `compose.prod.yml`
   (`make prod-up`) runs the built images with no bind mounts, internal-only networking
   for `db`/`web`/`back-office`, and secrets via an uncommitted `.env`
-  (`.env.prod.example` documents every required var). Both name their Compose project
-  `pos`, a real collision hazard on a host that ever ran the retired
-  `infra/docker-compose.yml` under the same default project name — see the compose
-  files' own comments before a first boot there.
+  (`.env.prod.example` documents every required var). Only `compose.prod.yml` names
+  its Compose project `pos` (`compose.dev.yml` is `pos-dev`, its own separate volume
+  namespace, no collision risk) — a real collision hazard on a host that ever ran the
+  retired `infra/docker-compose.yml` under the same default project name — see the
+  prod compose file's own comments before a first boot there.
 - **Backups are a `make` target, not a hope.** `make backup` dumps the running
   database; `make restore-drill` restores the newest dump into a throwaway container
   and prints row counts, so "the backup works" is provable on demand rather than

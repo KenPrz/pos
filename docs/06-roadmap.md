@@ -365,7 +365,7 @@ What building it changed, and what to know before M7:
 
 **Done when:** it's live and someone other than us can operate it at 2am.
 
-**Status: complete**, scoped at the owner's direction to what containerizing actually
+**Status: complete.** Scoped at the owner's direction to what containerizing actually
 needs — industry-standard Dockerfiles driven by a Makefile — plus the two pieces the
 production compose naturally carries: automatic TLS and a runnable restore drill.
 Monitoring, load testing, the runbook, and a registry/CD pipeline are named deferrals
@@ -427,15 +427,17 @@ What building it changed, and what to know operating it:
   reissues its device token, which the lunch script depends on still being retail-mode.
   The target leaves the dev db dirty on purpose afterward — see its own `make help`
   line.
-- **The Compose project name `pos` is a real collision hazard, not a cosmetic
-  choice.** Both compose files name their project `pos`, which claims the `pos_pgdata`
-  volume outright; a host that ever ran the retired `infra/docker-compose.yml` (same
-  default project name) attaches to that same volume — a real database, not a fresh one
-  — unless it's torn down with `-v` first or the new stack boots under an overridden
-  `COMPOSE_PROJECT_NAME`. Documented in the compose files themselves, not just here.
+- **The prod Compose project name `pos` is a real collision hazard, not a cosmetic
+  choice.** Only `compose.prod.yml` names its project `pos` — `compose.dev.yml` is its
+  own `pos-dev`, a separate volume namespace with no collision risk. `compose.prod.yml`'s
+  `pos` claims the `pos_pgdata` volume outright; a host that ever ran the retired
+  `infra/docker-compose.yml` (same default project name) attaches to that same volume —
+  a real database, not a fresh one — unless it's torn down with `-v` first or the prod
+  stack boots under an overridden `COMPOSE_PROJECT_NAME`. Documented in the compose
+  files themselves, not just here.
 
 Next: nothing scheduled. See the deferred table below — M7 added five ops-shaped rows
-to it (monitoring, load test, runbook, registry/CD, worker mode) plus two hardening
+to it (monitoring, load test, runbook, registry/CD, worker mode) plus three hardening
 items surfaced while proving the restore drill and `make e2e`.
 
 ---
@@ -471,6 +473,7 @@ Not "maybe someday" — each has a specific condition that should promote it.
 | FrankenPHP worker mode (Octane) | Measured latency need — off by default; the image already supports it. |
 | Delta-based `e2e-admin-day.sh` assertions | The e2e scripts need to compose without `make e2e`'s double-reseed — today its sales-report checks are absolute counts that only hold against its own fresh seed. |
 | `COMPOSE_VAR` hardening against a typo'd `COMPOSE=` | A destructive `backup`/`restore`/`restore-drill` target is run with a mistyped `COMPOSE=prod` and silently falls back to the dev stack instead of failing loudly. |
+| `make e2e`'s device-token extraction guard checks non-empty, not token-shaped | The seeder's printed table format shifts in a way `test -s` still passes (e.g. a column reflow) but the extracted string isn't a real `id\|hash` token — today's guard would wave through garbage instead of failing at extraction. |
 
 ## Risks
 

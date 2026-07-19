@@ -12,7 +12,7 @@ COMPOSE_VAR := $(if $(filter prod,$(COMPOSE)),$(COMPOSE_PROD),$(COMPOSE_DEV))
 .PHONY: help dev dev-down logs ps seed migrate dev-key test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs backup restore restore-drill e2e
 
 help: ## List available targets
-	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 dev: ## Bring up the full dev stack (db, api, register, back office)
 	$(COMPOSE_DEV) up -d --build
