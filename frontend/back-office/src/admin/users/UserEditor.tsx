@@ -3,6 +3,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Location, type ManagedUser } from '../../lib/api'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { DataTable } from '../../components/DataTable'
+import { Divider } from '../../components/Divider'
+import { FieldRow } from '../../components/FieldRow'
+import { Button } from '../../components/ui/button'
+import { Card, CardTitle } from '../../components/ui/card'
+import { Checkbox } from '../../components/ui/checkbox'
+import { Input } from '../../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 
 type RoleRow = { location_id: string; role: 'cashier' | 'supervisor' }
 
@@ -17,6 +26,10 @@ function toRoleRows(roles: ManagedUser['roles']): RoleRow[] {
 function sameRoles(a: RoleRow[], b: RoleRow[]): boolean {
   return a.length === b.length && a.every((row, i) => row.location_id === b[i].location_id && row.role === b[i].role)
 }
+
+// Radix `Select.Item` rejects an empty-string value — see SimpleEditor's identical
+// sentinel. "Add location" starts with nothing chosen, so it needs one.
+const NONE_LOCATION = '__none__'
 
 /**
  * Name/email/password/PIN + per-location roles + is_admin/is_active. PIN and password
@@ -56,6 +69,9 @@ export function UserEditor({
   const [newRoleLocationId, setNewRoleLocationId] = useState('')
   const [newRoleRole, setNewRoleRole] = useState<'cashier' | 'supervisor'>('cashier')
   const [error, setError] = useState<string | null>(null)
+  // Archive-style confirm (brief's global constraint) — set only when Save would
+  // otherwise deactivate; the dialog's Confirm re-plays the exact body already computed.
+  const [pendingDeactivate, setPendingDeactivate] = useState<Record<string, unknown> | null>(null)
 
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) => (user ? api.users.update(user.id, body) : api.users.create(body)),
@@ -114,10 +130,11 @@ export function UserEditor({
       body.roles = roles.map((r) => ({ location_id: r.location_id, role: r.role }))
     }
 
-    // Archive-style confirm (brief's global constraint): deactivating an existing user
-    // behind a confirm, same as every other is_active:false transition in this app.
+    // Deactivation behind a confirm (brief's global constraint): deactivating an existing
+    // user behind a confirm, same as every other is_active:false transition in this app.
     // Never fires on create — there's no prior active row to leave.
-    if (body.is_active === false && !window.confirm(`Deactivate ${name}? They keep their history but can no longer sign in.`)) {
+    if (body.is_active === false) {
+      setPendingDeactivate(body)
       return
     }
 
@@ -125,102 +142,116 @@ export function UserEditor({
   }
 
   return (
-    <section className="form-panel">
-      <header className="row">
-        <h2>{user ? 'Edit user' : 'New user'}</h2>
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+    <Card>
+      <div className="mb-lg flex items-center justify-between gap-md">
+        <CardTitle>{user ? 'Edit user' : 'New user'}</CardTitle>
+        <Button type="button" variant="tertiary" onClick={onCancel}>
           Back
-        </button>
-      </header>
+        </Button>
+      </div>
 
-      <form onSubmit={submit}>
-        <label htmlFor="user-name">
-          Name
-          <input id="user-name" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label htmlFor="user-email">
-          Email
-          <input id="user-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        </label>
-        <label htmlFor="user-password">
-          Password (leave blank to keep unchanged)
-          <input id="user-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </label>
-        <label htmlFor="user-pin">
-          PIN (leave blank to keep unchanged)
-          <input id="user-pin" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} />
-        </label>
-        <label htmlFor="user-admin">
-          Admin
-          <input id="user-admin" type="checkbox" checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} />
-        </label>
+      <form onSubmit={submit} className="flex flex-col gap-md">
+        <FieldRow label="Name">
+          <Input id="user-name" value={name} onChange={(e) => setName(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="Email">
+          <Input id="user-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="Password (leave blank to keep unchanged)">
+          <Input id="user-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="PIN (leave blank to keep unchanged)">
+          <Input id="user-pin" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="Admin">
+          <Checkbox checked={isAdmin} onCheckedChange={(checked) => setIsAdmin(Boolean(checked))} />
+        </FieldRow>
         {user && (
-          <label htmlFor="user-active">
-            Active
-            <input id="user-active" type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-          </label>
+          <FieldRow label="Active">
+            <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(Boolean(checked))} />
+          </FieldRow>
         )}
-        <button type="submit" className="btn btn-submit" disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save'}
-        </button>
+        <div>
+          <Button type="submit" variant="primary" disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </form>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="type-body-sm mt-md text-error">{error}</p>}
 
-      <hr className="dotted-divider" />
+      <Divider />
 
-      <h3>Roles</h3>
-      {roles.length === 0 ? (
-        <p className="muted">No location roles yet.</p>
-      ) : (
-        <table className="bo-table">
-          <thead>
-            <tr>
-              <th>Location</th>
-              <th>Role</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {roles.map((r) => (
-              <tr key={r.location_id}>
-                <td>{locationName(r.location_id)}</td>
-                <td>{r.role}</td>
-                <td>
-                  <button type="button" className="btn btn-secondary btn-chip" onClick={() => removeRole(r.location_id)}>
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <CardTitle className="mb-md">Roles</CardTitle>
+      <DataTable<RoleRow>
+        columns={[
+          { key: 'location', header: 'Location', render: (r) => locationName(r.location_id) },
+          { key: 'role', header: 'Role', render: (r) => r.role },
+          {
+            key: 'actions',
+            header: 'Actions',
+            render: (r) => (
+              <Button type="button" variant="ghost" onClick={() => removeRole(r.location_id)}>
+                Remove
+              </Button>
+            ),
+          },
+        ]}
+        rows={roles}
+        rowKey={(r) => r.location_id}
+        empty={{ title: 'No location roles yet.' }}
+      />
 
       {availableLocations.length > 0 && (
-        <div className="inline-reason">
-          <label htmlFor="user-add-role-location">
-            Add location
-            <select id="user-add-role-location" value={newRoleLocationId} onChange={(e) => setNewRoleLocationId(e.target.value)}>
-              <option value="">—</option>
-              {availableLocations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label htmlFor="user-add-role-role">
-            Add role
-            <select id="user-add-role-role" value={newRoleRole} onChange={(e) => setNewRoleRole(e.target.value as 'cashier' | 'supervisor')}>
-              <option value="cashier">Cashier</option>
-              <option value="supervisor">Supervisor</option>
-            </select>
-          </label>
-          <button type="button" className="btn btn-utility" onClick={addRole} disabled={newRoleLocationId === ''}>
+        <div className="mt-md flex flex-wrap items-end gap-md">
+          <FieldRow label="Add location">
+            <Select
+              value={newRoleLocationId || NONE_LOCATION}
+              onValueChange={(v) => setNewRoleLocationId(v === NONE_LOCATION ? '' : v)}
+            >
+              <SelectTrigger id="user-add-role-location">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_LOCATION}>—</SelectItem>
+                {availableLocations.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+          <FieldRow label="Add role">
+            <Select value={newRoleRole} onValueChange={(v) => setNewRoleRole(v as 'cashier' | 'supervisor')}>
+              <SelectTrigger id="user-add-role-role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cashier">Cashier</SelectItem>
+                <SelectItem value="supervisor">Supervisor</SelectItem>
+              </SelectContent>
+            </Select>
+          </FieldRow>
+          <Button type="button" variant="tertiary" onClick={addRole} disabled={newRoleLocationId === ''}>
             Add
-          </button>
+          </Button>
         </div>
       )}
-    </section>
+
+      <ConfirmDialog
+        open={pendingDeactivate !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeactivate(null)
+        }}
+        message={`Deactivate ${name}? They keep their history but can no longer sign in.`}
+        confirmLabel="Deactivate"
+        destructive
+        onConfirm={() => {
+          if (!pendingDeactivate) return
+          save.mutate(pendingDeactivate)
+          setPendingDeactivate(null)
+        }}
+      />
+    </Card>
   )
 }
