@@ -32,11 +32,22 @@ class OrderFactory extends Factory
     /** Wire location/register/shift into one consistent chain. */
     public function forRegister(Register $register): static
     {
-        return $this->state(fn (): array => [
-            'location_id' => $register->location_id,
-            'register_id' => $register->id,
-            'shift_id' => Shift::where('register_id', $register->id)->whereNull('closed_at')->value('id')
-                ?? Shift::factory()->create(['register_id' => $register->id])->id,
-        ]);
+        return $this->state(function () use ($register): array {
+            return [
+                'location_id' => $register->location_id,
+                'register_id' => $register->id,
+                'shift_id' => Shift::where('register_id', $register->id)->whereNull('closed_at')->value('id')
+                    ?? Shift::factory()->create(['register_id' => $register->id])->id,
+                // Mirrors OpenOrder's own business_date computation (the location's
+                // timezone, never app-default UTC) — a factory-made order's business_date
+                // must agree with whatever the real actions (OpenOrder, RefundOrder)
+                // compute from the same location, or ledger-basis reports comparing the
+                // two mismatch for a few hours a day whenever the location's timezone
+                // trails UTC across midnight. `Location::find()`, not `$register->location`
+                // — that relation isn't eager-loaded here, and
+                // `Model::preventLazyLoading()` is on outside production.
+                'business_date' => now(Location::find($register->location_id)?->timezone ?? config('app.timezone'))->toDateString(),
+            ];
+        });
     }
 }
