@@ -1,0 +1,35 @@
+# .github/workflows/wiki.yml
+name: Wiki
+
+on:
+  push:
+    branches: [main]
+    paths: [docs/**, "!docs/superpowers/**", scripts/wiki-sync.sh]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync docs to wiki
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build wiki tree
+        run: bash scripts/wiki-sync.sh /tmp/wiki-out
+
+      - name: Push to wiki
+        run: |
+          git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" /tmp/wiki
+          rsync -a --delete --exclude .git /tmp/wiki-out/ /tmp/wiki/
+          cd /tmp/wiki
+          git config user.name "wiki-sync"
+          git config user.email "wiki-sync@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "wiki unchanged"; exit 0; }
+          git commit -m "Sync from ${GITHUB_SHA::7}"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

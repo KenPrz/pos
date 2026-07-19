@@ -12,6 +12,19 @@ Design-first. Read in order; each assumes the one before it.
 | [05-rbac.md](05-rbac.md) | `spatie/laravel-permission`: per-location roles, permission catalog, permissions vs policies. |
 | [06-roadmap.md](06-roadmap.md) | Milestones M0–M7 and their sequencing rationale. |
 
+## User Manual
+
+For people running the store, not building it. Read in order — each chapter assumes
+the ones before it.
+
+| Chapter | Who it's for |
+| --- | --- |
+| [manual/00-getting-started.md](manual/00-getting-started.md) | Everyone — enrollment, signing in, roles, the three surfaces. |
+| [manual/01-cashier-guide.md](manual/01-cashier-guide.md) | A cashier ringing up sales. |
+| [manual/02-supervisor-guide.md](manual/02-supervisor-guide.md) | A supervisor handling voids, discounts, refunds, or variance. |
+| [manual/03-manager-guide.md](manual/03-manager-guide.md) | A manager running catalog, staff, locations, or reports. |
+| [manual/04-operator-guide.md](manual/04-operator-guide.md) | Whoever installs, deploys, or backs up the system. |
+
 ## The five-line version
 
 A POS for one business across several locations, serving both retail and food service

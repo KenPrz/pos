@@ -4,7 +4,8 @@ A point-of-sale system for a single business across multiple locations, serving 
 retail and food service from one order model.
 
 **Read `docs/README.md` first.** The design is written down and is the source of truth;
-this file only covers how to run things.
+this file only covers how to run things. The GitHub wiki is generated from `docs/` by
+CI (`scripts/wiki-sync.sh`, `.github/workflows/wiki.yml`) — edit here, never there.
 
 ## Stack
 
