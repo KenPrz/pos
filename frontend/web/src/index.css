@@ -506,7 +506,10 @@ body {
     color: #000;
     -webkit-text-stroke: 0;
     text-shadow: none;
-    font-size: 24px;
+    /* !important: carbon.css loads after this file, so its unlayered
+       .type-display-md (42px) wins an equal-specificity tie on the migrated
+       hero — print must stay 24px regardless of source order. */
+    font-size: 24px !important;
   }
 
   .receipt {
