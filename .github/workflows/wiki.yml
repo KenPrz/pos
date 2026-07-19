@@ -4,7 +4,7 @@ name: Wiki
 on:
   push:
     branches: [main]
-    paths: [docs/**, scripts/wiki-sync.sh]
+    paths: [docs/**, "!docs/superpowers/**", scripts/wiki-sync.sh]
   workflow_dispatch:
 
 permissions:

@@ -66,9 +66,12 @@ The first time a till is used, it shows an **Enroll this terminal** screen askin
 a device token. This only happens once per terminal — after that, the till remembers
 it.
 
-1. Get a device token for this register. In development, `php artisan migrate:fresh
-   --seed` prints one per till (see the Operator Guide's [First run](04-operator-guide.md#first-run)); in production, a manager issues one from the back office
-   (Manager Guide).
+1. Get a device token for this register. In development, `make seed` prints one per till
+   (see the Operator Guide's [First run](04-operator-guide.md#first-run)); in production,
+   a manager issues one from the back office — either when creating the register or by
+   reissuing its token afterward (see the Manager Guide's
+   [Replace a lost terminal](03-manager-guide.md#replace-a-lost-terminal) section, which
+   also covers a brand-new till's first token).
 2. Paste it into the field (placeholder `1|xxxxxxxx…`) on the **Enroll this terminal**
    screen.
 3. Tap **Save**.

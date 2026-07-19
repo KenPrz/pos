@@ -230,6 +230,12 @@ A register's device token is its identity — whoever holds it can act as that t
 one goes missing (a stolen tablet, a till that needs re-imaging), reissue its token
 rather than trying to track the old one down.
 
+This is also how a brand-new register gets its very first token — there's no separate
+"issue a token" screen. **New register** → fill in **Location**, **Name**, **Mode** →
+**Save** takes you back to the list without a token in sight (the editor doesn't offer
+one for a register that doesn't exist yet); reopen that same till with **Edit** and the
+steps below apply exactly as they do to a lost terminal.
+
 1. **Locations & Registers** → **Registers** tab → **Edit** on the till.
 2. Under **Device token**, tap **Reissue token**.
 3. Confirm: **"Reissue *Name*'s token? The current till goes dark immediately."**

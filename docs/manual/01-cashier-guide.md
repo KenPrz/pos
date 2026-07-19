@@ -55,8 +55,9 @@ What you see: a **New sale** panel with a scan field at the top and an empty car
 ## Switch to tabs
 
 If your till is a **retail** register, skip ahead to Close your shift — this section and
-the two after it are for **food-mode** registers only. Ask a manager if you're not sure
-which yours is.
+the six after it are for **food-mode** registers only, with one exception: Split the
+check and pay each part works the same on either kind of till. Ask a manager if you're
+not sure which yours is.
 
 A food-mode till shows a **Tabs** link next to your name once a shift is open. Tap it to
 see every open tab at this location (the **Floor**); tap **Register** to come back to the

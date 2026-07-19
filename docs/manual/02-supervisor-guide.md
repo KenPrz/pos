@@ -90,6 +90,11 @@ the same authority as voiding it outright, since shrinking a sent course is the 
 fraud surface). **Increasing** a fired line's quantity needs no such gate — a kitchen
 being asked for more of something isn't a fraud path.
 
+The same authority gates the other direction on the prep chip, too: sending a
+**Ready** (or **Cooking**) course back a step is a downgrade out of a fired state, so it
+takes the void permission exactly like the quantity decrease above — a cashier's own tap
+on that chip only ever moves it forward.
+
 > Note: this version's register screen has no on-screen field for changing an existing
 > line's quantity — only **Void** (remove it entirely) and the prep chip (move it through
 > **Pending** / **Cooking** / **Ready**) are exposed here. A quantity correction on a
