@@ -9,7 +9,7 @@ COMPOSE_PROD := docker compose -f compose.prod.yml
 COMPOSE_VAR := $(if $(filter prod,$(COMPOSE)),$(COMPOSE_PROD),$(COMPOSE_DEV))
 
 .DEFAULT_GOAL := help
-.PHONY: help dev dev-down logs ps seed migrate dev-key test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs backup restore restore-drill
+.PHONY: help dev dev-down logs ps seed migrate dev-key test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs backup restore restore-drill e2e
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -47,6 +47,47 @@ seed: ## Fresh migrate + seed (prints dev PINs and device tokens)
 
 migrate: ## Run pending migrations
 	$(COMPOSE_DEV) exec --user pos api php artisan migrate
+
+# Credential extraction is pinned to the seeder's ACTUAL printed table
+# (DatabaseSeeder::run), not an `artisan tinker` query: Sanctum stores only
+# the HASH of a device token server-side (personal_access_tokens.token) — the
+# plaintext exists exactly once, at creation, which is this printed table.
+# There is nothing left for tinker to fetch after the fact; minting a *new*
+# token via tinker would work but seeds an extra, undocumented row the
+# seeder itself doesn't account for. So: parse what the seeder already
+# prints. The one wrinkle — a Sanctum plaintext token is itself `<id>|<hash>`,
+# and the table's own border character is also `|`, so a naive `awk -F'|'`
+# split misaligns on the token's embedded pipe. Anchoring the sed pattern on
+# the fixed "DT / Till N" label and matching to the LAST `|` on the line
+# (greedy `.*`, trimmed of trailing padding in a second pass) survives it.
+# Only Downtown's tokens are needed: e2e-retail-day.sh and the Till-1 leg of
+# e2e-lunch-service.sh / e2e-admin-day.sh all resolve through Bob/Alice, who
+# only hold roles at Downtown (see DatabaseSeeder::seedStaff).
+e2e: ## Reseed, then run all three committed e2e proofs (needs the api container reachable at http://127.0.0.1:8000 — the scripts hardcode it; override POS_DEV_API_PORT back to 8000 in root .env if something else is squatting on it)
+	@$(MAKE) seed | tee /tmp/pos-seed-out.txt
+	@grep '| DT / Till 1 ' /tmp/pos-seed-out.txt | sed -E 's/^\| *DT \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > /tmp/pos-e2e-till1.txt
+	@grep '| DT / Till 2 ' /tmp/pos-seed-out.txt | sed -E 's/^\| *DT \/ Till 2 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > /tmp/pos-e2e-till2.txt
+	@test -s /tmp/pos-e2e-till1.txt && test -s /tmp/pos-e2e-till2.txt || { echo "could not extract DT / Till 1|2 device tokens — seeder's printed table format may have changed"; exit 1; }
+	@echo "extracted: DT/Till1=$$(cut -c1-8 /tmp/pos-e2e-till1.txt)... DT/Till2=$$(cut -c1-8 /tmp/pos-e2e-till2.txt)..."
+	POS_DEVICE_TOKEN=$$(cat /tmp/pos-e2e-till1.txt) bash scripts/e2e-retail-day.sh
+	POS_DEVICE_TOKEN=$$(cat /tmp/pos-e2e-till2.txt) POS_DEVICE_TOKEN_2=$$(cat /tmp/pos-e2e-till1.txt) bash scripts/e2e-lunch-service.sh
+	@# e2e-admin-day.sh's sales-report checks are location+date scoped, not shift-
+	@# scoped like the other two scripts' Z-reports, and it asserts an absolute
+	@# Downtown day-gross of exactly 510c — an assumption baked in when it was
+	@# authored/proven standalone in M6 (git 7d75dcf), against its OWN fresh seed.
+	@# Chaining it after the two scripts above (which also transact at Downtown,
+	@# same calendar day) makes that specific assertion false even though nothing
+	@# is actually broken — it's a test-isolation assumption the script carries,
+	@# not a stack bug. Re-seeding here restores the exact precondition the script
+	@# was written against, without editing the script itself. Reordering instead
+	@# (running admin-day first) was considered and rejected: admin-day flips
+	@# Till 1 to food mode and reissues its token, which e2e-lunch-service.sh
+	@# depends on still being retail-mode — so admin-day must stay last, and a
+	@# second reseed is the only fix that touches neither script nor ordering.
+	@$(MAKE) seed | tee /tmp/pos-seed-out2.txt
+	@grep '| DT / Till 1 ' /tmp/pos-seed-out2.txt | sed -E 's/^\| *DT \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > /tmp/pos-e2e-till1b.txt
+	@test -s /tmp/pos-e2e-till1b.txt || { echo "could not extract DT / Till 1 device token on the second reseed"; exit 1; }
+	POS_ADMIN_EMAIL=admin@pos.test POS_ADMIN_PASSWORD=admin-dev-password POS_DEVICE_TOKEN=$$(cat /tmp/pos-e2e-till1b.txt) POS_E2E_PIN=9876 bash scripts/e2e-admin-day.sh
 
 test: test-backend test-web test-bo ## All suites, in containers
 
