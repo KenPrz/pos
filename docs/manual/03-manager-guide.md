@@ -75,6 +75,16 @@ typo in the name can't accidentally change what's attached, and vice versa.
   delta**, **Position**, and (once saved) **Active** — reached by opening the group
   itself, since a modifier only makes sense attached to one group.
 
+Back on a product's own editor, the order you tick modifier groups in **is** recorded —
+each checkbox shows its tick order as **#1**, **#2**, and so on, and that position is
+what **Save modifier groups** writes to the server.
+
+> Note: that stored attach order doesn't currently reach the till, though. The
+> register's modifier sheet always shows **required groups first**, and beyond that
+> ordering it follows the group list the same way for every product — so ticking groups
+> in a particular order here is recorded, but isn't yet what decides what a cashier sees
+> first for *this* product.
+
 > Note: like categories, a modifier **group** itself has no archive toggle — only the
 > **modifiers** inside it do (its table's own **Unarchive** action). Retiring a whole
 > group means archiving every modifier in it, or detaching the group from any product
@@ -98,13 +108,20 @@ everything else in this section: uncheck **Active**, confirm, done.
 2. Change **Price** (or **Cost**, **Tax rate**, whatever needs updating).
 3. Tap **Save**.
 
-> Note: a reprice only ever affects **orders opened after it saves**. Every order line
-> snapshots the name, price, and tax rate it was rung up with — a receipt is built
-> entirely from that snapshot, never by joining back to the live catalog — so an order
-> that already closed at the old price reprints exactly as it did the day it was paid,
-> forever. This is proven end-to-end in `scripts/e2e-admin-day.sh`: it reprices a
-> variant right after a sale and re-fetches that same order's receipt to confirm the
-> total didn't move.
+> Note: the cutoff is **per line, not per order**. Every order line snapshots the name,
+> price, and tax rate at the moment it's **added** to the order — a receipt is built
+> entirely from that snapshot, never by joining back to the live catalog — so a line
+> already on a receipt reprints exactly as it did the day it was rung up, forever, no
+> matter when the order itself closes. This is proven end-to-end in
+> `scripts/e2e-admin-day.sh`: it reprices a variant right after a sale and re-fetches
+> that same order's receipt to confirm the total didn't move.
+>
+> This matters most on a **long-open tab**: if you reprice a variant while a table's tab
+> has been open for an hour, the round of drinks they already ordered keeps the old
+> price — only a *new* course added to that same tab, after the reprice saves, picks up
+> the new one. The same tab can carry both prices at once, correctly, and that's the
+> conversation to have ready if a customer asks why two rounds of the same drink came
+> out different on the check.
 
 ### Archive vs delete
 
@@ -259,9 +276,10 @@ threshold is highlighted and its quantity marked **— LOW**.
 ### Export CSV
 
 On the **Sales** tab, tap **Export CSV** to download the report exactly as displayed —
-same date range, same location, same group-by — as a spreadsheet-ready file. Quantities
-in the file are plain decimal strings, not the app's rounded on-screen display, so the
-numbers in the spreadsheet always match the underlying figures exactly.
+same date range, same location, same group-by — as a spreadsheet-ready file. Money
+figures land as plain decimal strings rather than currency-formatted text, so the file
+drops straight into a spreadsheet without any reformatting before it can be totaled or
+charted.
 
 ## Audit
 
