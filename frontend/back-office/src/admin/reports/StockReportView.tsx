@@ -2,32 +2,32 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { ApiError, api, type Location } from '../../lib/api'
+import { DataTable } from '../../components/DataTable'
+import { EmptyState } from '../../components/EmptyState'
+import { Button } from '../../components/ui/button'
+import { CardTitle } from '../../components/ui/card'
+import { ApiError, api, type StockReportRow } from '../../lib/api'
 
 /**
- * On-hand quantities at a location (Task 11), over the StockReport endpoint from Task 6.
- * `low` rows get the report's one warm-accent signal — see `.low-stock-row` in
- * index.css — because a low variant is the one thing here that calls for action
- * (reorder), unlike everything else on this screen which is read-only.
+ * On-hand quantities at the sidebar switcher's location (`locationId`, part of the query
+ * key — switching locations refetches; the per-screen location picker is gone, the
+ * frozen contract's named switcher-relocation exception). `low` rows keep their " — LOW"
+ * marker and take the warning-semantic ink — a low variant is the one thing here that
+ * calls for action (reorder), unlike everything else on this read-only screen.
  */
 export function StockReportView({
-  locations,
+  locationId,
   onUnauthorized,
 }: {
-  locations: Location[]
+  locationId: string | null
   onUnauthorized: () => void
 }) {
-  const [locationId, setLocationId] = useState(locations[0]?.id ?? '')
   const [lowOnly, setLowOnly] = useState(false)
-
-  useEffect(() => {
-    if (!locationId && locations[0]) setLocationId(locations[0].id)
-  }, [locations, locationId])
 
   const query = useQuery({
     queryKey: ['admin', 'reports', 'stock', locationId, lowOnly],
-    queryFn: () => api.reports.stock({ location_id: locationId, low_only: lowOnly }),
-    enabled: locationId !== '',
+    queryFn: () => api.reports.stock({ location_id: locationId as string, low_only: lowOnly }),
+    enabled: locationId !== null,
   })
 
   useEffect(() => {
@@ -37,63 +37,49 @@ export function StockReportView({
   const rows = query.data?.rows ?? []
 
   return (
-    <section className="form-panel">
-      <header className="row">
-        <h2>Stock</h2>
-      </header>
+    <div className="flex flex-col gap-lg">
+      <CardTitle>Stock</CardTitle>
 
-      <div className="btn-row">
-        <label htmlFor="stock-location">
-          Location
-          <select id="stock-location" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-            {locations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
+      <div>
+        <Button
           type="button"
-          className={`btn btn-chip ${lowOnly ? 'btn-secondary' : 'btn-utility'}`}
+          variant={lowOnly ? 'secondary' : 'ghost'}
           aria-pressed={lowOnly}
           onClick={() => setLowOnly((v) => !v)}
         >
           Low only
-        </button>
+        </Button>
       </div>
 
-      {query.isLoading && <p className="muted">Loading…</p>}
+      {locationId === null && (
+        <EmptyState title="No location selected" description="Pick a location from the sidebar to run this report." />
+      )}
+      {query.isLoading && <p className="type-body-sm text-ink-muted">Loading…</p>}
       {query.isError && !(query.error instanceof ApiError && query.error.status === 401) && (
-        <p className="error">Could not load the stock report.</p>
+        <p className="type-body-sm text-error">Could not load the stock report.</p>
       )}
 
-      {query.data &&
-        (rows.length === 0 ? (
-          <p className="muted">No stock rows for this location.</p>
-        ) : (
-          <table className="bo-table">
-            <thead>
-              <tr>
-                <th>SKU</th>
-                <th>Name</th>
-                <th>Qty</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.variant_id} className={r.low ? 'low-stock-row' : undefined}>
-                  <td>{r.sku}</td>
-                  <td>{r.name}</td>
-                  <td>
-                    {r.qty}
-                    {r.low && ' — LOW'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ))}
-    </section>
+      {query.data && (
+        <DataTable<StockReportRow>
+          columns={[
+            { key: 'sku', header: 'SKU', render: (r) => r.sku },
+            { key: 'name', header: 'Name', render: (r) => r.name },
+            {
+              key: 'qty',
+              header: 'Qty',
+              render: (r) => (
+                <span className={r.low ? 'font-semibold text-warning-ink' : undefined}>
+                  {r.qty}
+                  {r.low && ' — LOW'}
+                </span>
+              ),
+            },
+          ]}
+          rows={rows}
+          rowKey={(r) => r.variant_id}
+          empty={{ title: 'No stock rows for this location.' }}
+        />
+      )}
+    </div>
   )
 }

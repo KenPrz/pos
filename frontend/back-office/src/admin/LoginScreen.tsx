@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import { FieldRow } from '../components/FieldRow'
+import { Button } from '../components/ui/button'
+import { Card, CardTitle } from '../components/ui/card'
+import { Input } from '../components/ui/input'
 import { ApiError, api, type AdminSession } from '../lib/api'
 
 export function LoginScreen({ onLoggedIn }: { onLoggedIn: (session: AdminSession) => void }) {
@@ -25,12 +29,11 @@ export function LoginScreen({ onLoggedIn }: { onLoggedIn: (session: AdminSession
   }
 
   return (
-    <section className="form-panel">
-      <h2>Sign in</h2>
-      <form onSubmit={submit}>
-        <label htmlFor="admin-email">
-          Email
-          <input
+    <Card>
+      <CardTitle className="mb-lg">Sign in</CardTitle>
+      <form onSubmit={submit} className="flex flex-col gap-md">
+        <FieldRow label="Email">
+          <Input
             id="admin-email"
             type="email"
             autoComplete="username"
@@ -38,22 +41,23 @@ export function LoginScreen({ onLoggedIn }: { onLoggedIn: (session: AdminSession
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-        </label>
-        <label htmlFor="admin-password">
-          Password
-          <input
+        </FieldRow>
+        <FieldRow label="Password">
+          <Input
             id="admin-password"
             type="password"
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-        </label>
-        <button type="submit" className="btn btn-submit" disabled={submitting}>
-          Sign in
-        </button>
+        </FieldRow>
+        <div>
+          <Button type="submit" variant="primary" disabled={submitting}>
+            Sign in
+          </Button>
+        </div>
       </form>
-      {error && <p className="error">{error}</p>}
-    </section>
+      {error && <p className="type-body-sm mt-md text-error">{error}</p>}
+    </Card>
   )
 }

@@ -19,10 +19,10 @@ export function AdminApp() {
   // tree — so the machine boots neutral and resolves its real stage after mount.
   const [stage, setStage] = useState<Stage>({ name: 'booting' })
   const [user, setUser] = useState<AdminUser | null>(null)
-  // The sidebar's location switcher (Plate layout, Task 2) lives here — the ONE place
-  // that owns "which location" for the whole shell. Today reads it now; Reports/Stock
-  // keep their own per-screen pickers until Task 5 threads this down and removes them
-  // (the frozen contract's named switcher-relocation exception).
+  // The sidebar's location switcher lives here — the ONE place that owns "which
+  // location" for the whole shell. Today and Reports/Stock all read it as a prop (the
+  // per-screen pickers are gone — the frozen contract's named switcher-relocation
+  // exception).
   const [locationId, setLocationId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -53,8 +53,8 @@ export function AdminApp() {
     setStage({ name: 'login' })
   }, [])
 
-  // Cached the same way PlacesSection/ReportsSection already fetch locations — same
-  // queryKey, so this doesn't cost a second request once a section mounts its own.
+  // Cached the same way PlacesSection fetches locations — same queryKey, so this
+  // doesn't cost a second request once a section mounts its own.
   const locations = useQuery({
     queryKey: ['admin', 'locations'],
     queryFn: api.locations.list,
@@ -65,8 +65,8 @@ export function AdminApp() {
     if (locations.error instanceof ApiError && locations.error.status === 401) handleUnauthorized()
   }, [locations.error, handleUnauthorized])
 
-  // Default to the first location once the list arrives, same convention
-  // SalesReportView/StockReportView already use for their own pickers.
+  // Default to the first location once the list arrives — the switcher never sits
+  // empty when there is anything to pick.
   useEffect(() => {
     if (!locationId && locations.data && locations.data.length > 0) {
       setLocationId(locations.data[0].id)
@@ -74,24 +74,21 @@ export function AdminApp() {
   }, [locations.data, locationId])
 
   // Booting and login are chrome-less relative to the shell: Shell is the one that
-  // owns the full chassis (the Plate sidebar + section body), same as the register's
-  // Register() owns its single <main className="shell"> for every stage — nesting a
-  // second <main> inside Shell's would be wrong, so these two earlier stages get their
-  // own.
+  // owns the full chassis (the AppSidebar + section body) — nesting a second <main>
+  // inside Shell's would be wrong, so these two earlier stages get their own, a
+  // centered card on the plain Carbon canvas.
   if (stage.name === 'booting') {
     return (
-      <main className="shell">
-        <div className="plate chamfer register-body">
-          <p className="muted">Loading…</p>
-        </div>
+      <main className="flex min-h-dvh items-center justify-center bg-canvas">
+        <p className="type-body-sm text-ink-muted">Loading…</p>
       </main>
     )
   }
 
   if (stage.name === 'login') {
     return (
-      <main className="shell">
-        <div className="plate chamfer register-body">
+      <main className="flex min-h-dvh items-center justify-center bg-canvas p-lg">
+        <div className="w-full max-w-[28rem]">
           <LoginScreen
             onLoggedIn={(session: AdminSession) => {
               setUser(session.user)

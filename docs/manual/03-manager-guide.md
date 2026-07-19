@@ -27,9 +27,9 @@ device token involved.
 Once in, six sections sit in a rail down the left, grouped under two headings —
 **Operations**: **Today**, **Catalog**, **Users**, **Locations & Registers**;
 **Insights**: **Reports**, **Audit**. A **location switcher** sits above the rail;
-**Today** reads whichever location it's set to (**Reports** and **Stock** keep their
-own location pickers for now, unchanged). Tap **Sign out**, at the bottom of the rail,
-when you're done.
+**Today**, **Reports**, and **Stock** all read whichever location it's set to — there
+are no per-screen location pickers. Tap **Sign out**, at the bottom of the rail, when
+you're done.
 
 ## Today
 
@@ -281,8 +281,9 @@ steps below apply exactly as they do to a lost terminal.
 
 ### Read the sales report
 
-**Reports** → **Sales** tab: pick a **From**/**To** date range and a **Location**, then
-a group-by chip — **Day**, **Category**, or **User**.
+**Reports** → **Sales** tab: pick a **From**/**To** date range, then a group-by tab —
+**Day**, **Category**, or **User**. The location comes from the sidebar's **location
+switcher** — change it there and the report refetches for the new location.
 
 > **"Basis: ledger (captured payments & refunds)"** shows under **Day** and **User** —
 > these are summed from actual payments and refunds that moved money, with columns
@@ -300,9 +301,10 @@ a group-by chip — **Day**, **Category**, or **User**.
 
 ### Check stock and low-stock items
 
-**Reports** → **Stock** tab: pick a **Location**, optionally tap **Low only** to filter
-down to items running short. The table shows **SKU**, **Name**, **Qty** — a row under
-threshold is highlighted and its quantity marked **— LOW**.
+**Reports** → **Stock** tab: the location comes from the sidebar's **location
+switcher**; optionally tap **Low only** to filter down to items running short. The
+table shows **SKU**, **Name**, **Qty** — a row under threshold is highlighted and its
+quantity marked **— LOW**.
 
 ### Export CSV
 

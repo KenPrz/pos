@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
  * Reissuing revokes every existing token for the register immediately
  * (ReissueDeviceToken.php) — confirmed behind a warning because the till holding the old
  * one goes dark the instant this succeeds — and the fresh token is shown exactly once in
- * a copy-me plate. It lives only in this component's state: never written to the cache,
+ * a copy-me panel. It lives only in this component's state: never written to the cache,
  * never persisted, gone the moment this editor closes.
  */
 export function RegisterEditor({

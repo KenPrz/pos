@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SalesReportView } from './SalesReportView'
-import { api, type Location, type SalesReport } from '../../lib/api'
+import { api, type SalesReport } from '../../lib/api'
 
 afterEach(cleanup)
 
@@ -19,19 +19,6 @@ vi.mock('../../lib/api', async (importOriginal) => {
     api: { ...actual.api, reports: { ...actual.api.reports, sales: vi.fn() } },
   }
 })
-
-const LOCATIONS: Location[] = [
-  {
-    id: 'loc-1',
-    code: 'MAIN',
-    name: 'Main St',
-    timezone: 'UTC',
-    prices_include_tax: false,
-    receipt_header: null,
-    receipt_footer: null,
-    is_active: true,
-  },
-]
 
 const DAY_REPORT: SalesReport = {
   basis: 'ledger',
@@ -48,17 +35,23 @@ const CATEGORY_REPORT: SalesReport = {
   totals: { qty_sold: '12.000', line_total_cents: 4800 },
 }
 
-function renderView() {
+// `locationId` now arrives from the sidebar's location switcher (the frozen contract's
+// named switcher-relocation exception) — the per-screen location select is gone, so the
+// render helper passes the prop and returns a rerender hook for the prop-change test.
+function renderView(locationId: string | null = 'loc-1') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(
+  const onUnauthorized = vi.fn()
+  const view = (id: string | null) => (
     <QueryClientProvider client={client}>
-      <SalesReportView locations={LOCATIONS} onUnauthorized={vi.fn()} />
-    </QueryClientProvider>,
+      <SalesReportView locationId={id} onUnauthorized={onUnauthorized} />
+    </QueryClientProvider>
   )
+  const utils = render(view(locationId))
+  return { rerenderWith: (id: string | null) => utils.rerender(view(id)) }
 }
 
 describe('SalesReportView', () => {
-  it('refetches with the right params when the group-by chip changes', async () => {
+  it('refetches with the right params when the group-by tab changes', async () => {
     vi.mocked(api.reports.sales).mockResolvedValueOnce(DAY_REPORT).mockResolvedValueOnce(CATEGORY_REPORT)
     renderView()
 
@@ -66,7 +59,8 @@ describe('SalesReportView', () => {
     const firstCall = vi.mocked(api.reports.sales).mock.calls[0][0]
     expect(firstCall).toMatchObject({ location_id: 'loc-1', group_by: 'day' })
 
-    fireEvent.click(screen.getByRole('button', { name: /^category$/i }))
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /^category$/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /^category$/i }))
 
     await waitFor(() => expect(api.reports.sales).toHaveBeenCalledTimes(2))
     const secondCall = vi.mocked(api.reports.sales).mock.calls[1][0]
@@ -76,6 +70,19 @@ describe('SalesReportView', () => {
       from: firstCall.from,
       to: firstCall.to,
     })
+  })
+
+  it('refetches with the new location when the sidebar switcher changes locationId', async () => {
+    vi.mocked(api.reports.sales).mockResolvedValue(DAY_REPORT)
+    const { rerenderWith } = renderView('loc-1')
+
+    await waitFor(() => expect(api.reports.sales).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(api.reports.sales).mock.calls[0][0]).toMatchObject({ location_id: 'loc-1' })
+
+    rerenderWith('loc-2')
+
+    await waitFor(() => expect(api.reports.sales).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.reports.sales).mock.calls[1][0]).toMatchObject({ location_id: 'loc-2' })
   })
 
   it('sums the mocked rows in the totals row', async () => {

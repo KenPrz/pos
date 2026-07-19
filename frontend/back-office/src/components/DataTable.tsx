@@ -21,6 +21,9 @@ export interface DataTableProps<T> {
   /** Rows this returns true for render at reduced opacity — archived/inactive rows'
    * long-standing dimmed treatment, now data-driven instead of a hardcoded CSS class. */
   inactive?: (row: T) => boolean
+  /** One cell per column, rendered as a totals/footer row (a `tfoot` capped by a strong
+   * hairline) — the sales report's Total row, promoted here rather than inlined. */
+  footer?: ReactNode[]
 }
 
 // Table + toolbar slot + EmptyState wiring.
@@ -32,6 +35,7 @@ export function DataTable<T extends Record<string, unknown>>({
   rowKey,
   zebra = true,
   inactive,
+  footer,
 }: DataTableProps<T>) {
   return (
     <div>
@@ -66,6 +70,17 @@ export function DataTable<T extends Record<string, unknown>>({
               </TableRow>
             ))}
           </TableBody>
+          {footer ? (
+            <tfoot>
+              <TableRow className="border-t border-hairline-strong">
+                {footer.map((cell, index) => (
+                  <TableCell key={columns[index]?.key ?? index} className="font-semibold">
+                    {cell}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </tfoot>
+          ) : null}
         </Table>
       )}
     </div>

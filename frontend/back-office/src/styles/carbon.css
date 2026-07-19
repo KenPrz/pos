@@ -46,18 +46,10 @@ body {
   background: var(--color-canvas);
 }
 
-/* Cascade-layer bridge (discovered integrating Task 2's Shell/Today against a real
- * browser — jsdom's component tests never exercise real CSS cascade, so this was
- * invisible until the first eyeball): `@theme` above compiles to Tailwind's own
- * `theme` cascade layer, and a LAYERED rule always loses to an UNLAYERED one
- * regardless of specificity or source order. `src/styles/tokens.css` (old chrome
- * palette, still alive until the Task 5 cutover) declares its `:root` block
- * unlayered, so its six colliding variable names were winning over every one of
- * these — including `--color-canvas` (old: periwinkle #7a8aba) and `--color-primary`
- * (old: Nintendo red #e60012), which is why the whole shell rendered tinted blue-grey
- * with a RED active-nav indicator instead of Carbon's white canvas and blue accent.
- * Restated here, unlayered, so Carbon actually wins for as long as both files coexist
- * — delete this block in the same commit that deletes tokens.css. Values copied
+/* Unlayered token restatement: `@theme` above compiles into Tailwind's own `theme`
+ * cascade layer, and a LAYERED rule always loses to an UNLAYERED one regardless of
+ * specificity or source order — so any unlayered var() consumer reads these, not the
+ * layered copies. This block is the live token source for such reads. Values copied
  * verbatim from the `@theme` block above; never let the two diverge. */
 :root {
   --color-primary: #0f62fe;

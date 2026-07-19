@@ -26,9 +26,8 @@ export function Shell({
   // Threaded down to every section's queries/mutations: any 401 anywhere in the shell
   // drops back to the login screen the same way the register's onSessionExpired does.
   onUnauthorized: () => void
-  // The sidebar's location switcher is THE location picker (AdminApp owns the state,
-  // Task 5 threads it into Reports/Stock; until then a section may ignore it — Today
-  // is the first consumer).
+  // The sidebar's location switcher is THE location picker (AdminApp owns the state;
+  // Today and Reports/Stock consume it as a prop — the per-screen pickers are gone).
   location: Location | null
   locations: Location[]
   onLocationChange: (id: string) => void
@@ -86,7 +85,9 @@ export function Shell({
         {section === 'catalog' && <CatalogSection onUnauthorized={onUnauthorized} />}
         {section === 'users' && <UsersSection onUnauthorized={onUnauthorized} />}
         {section === 'locations' && <PlacesSection onUnauthorized={onUnauthorized} />}
-        {section === 'reports' && <ReportsSection onUnauthorized={onUnauthorized} />}
+        {section === 'reports' && (
+          <ReportsSection locationId={location?.id ?? null} onUnauthorized={onUnauthorized} />
+        )}
         {section === 'audit' && <AuditSection onUnauthorized={onUnauthorized} />}
       </div>
     </main>
