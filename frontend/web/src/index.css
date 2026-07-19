@@ -164,7 +164,9 @@ body {
   margin: var(--space-sm) 0 0;
 }
 
-dl {
+/* Scoped to the legacy plates (UI rework Task 7) — same reason as the form rules
+   below: unlayered element selectors would beat the migrated screens' utilities. */
+.form-panel dl {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: var(--space-xs) var(--space-md);
@@ -172,12 +174,12 @@ dl {
   font-size: 12px;
 }
 
-dt {
+.form-panel dt {
   color: var(--color-ink-soft);
   font-weight: 700;
 }
 
-dd {
+.form-panel dd {
   margin: 0;
   font-family: inherit;
   font-variant-numeric: tabular-nums;
@@ -210,19 +212,23 @@ dd {
    Forms & inputs — modern floor overrides the 2001 20px chassis: 44px minimum.
 --------------------------------------------------------------------------- */
 
-label {
+/* Scoped to the legacy plates (UI rework Task 7): these unlayered element selectors
+   would otherwise beat the layered Tailwind utilities on the migrated screens. Every
+   pre-rework screen renders its forms inside a `.form-panel`, so nothing legacy moves.
+   The whole file dies at the register cutover (Task 9). */
+.form-panel label {
   display: block;
   margin-bottom: var(--space-md);
   font: bold 12px/1.4 Arial, Helvetica, sans-serif;
   color: var(--color-ink);
 }
 
-label > input {
+.form-panel label > input {
   margin-top: var(--space-xs);
 }
 
-input,
-select {
+.form-panel input,
+.form-panel select {
   display: block;
   width: 100%;
   min-height: 44px;
@@ -234,11 +240,11 @@ select {
   border-radius: var(--r-xs);
 }
 
-form {
+.form-panel form {
   display: block;
 }
 
-form > *:not(:last-child) {
+.form-panel form > *:not(:last-child) {
   margin-bottom: var(--space-md);
 }
 
@@ -444,7 +450,9 @@ form > *:not(:last-child) {
    Modern floor: focus visibility, reduced motion, print stays plain B&W
 --------------------------------------------------------------------------- */
 
-:focus-visible {
+/* Scoped like the form rules above — the component vocabulary carries its own
+   2px primary focus outline; only the legacy plates keep the signal-orange ring. */
+.form-panel :focus-visible {
   outline: 2px solid var(--color-signal);
   outline-offset: 2px;
 }

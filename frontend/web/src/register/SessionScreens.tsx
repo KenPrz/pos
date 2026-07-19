@@ -1,31 +1,38 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { ApiError, api, tokens, type StaffSession } from '../lib/api'
 
 export function SetupScreen({ onDone }: { onDone: () => void }) {
   const [token, setToken] = useState('')
 
   return (
-    <section className="form-panel">
-      <h2>Enroll this terminal</h2>
-      <p className="muted">
-        Paste a device token — printed by <code>php artisan migrate:fresh --seed</code>, or issued via
-        POST /api/v1/registers/enroll.
-      </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (!token.trim()) return
-          tokens.setDevice(token.trim())
-          onDone()
-        }}
-      >
-        <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="1|xxxxxxxx…" autoFocus />
-        <hr className="dotted-divider" />
-        <button type="submit" className="btn btn-submit">Save</button>
-      </form>
-    </section>
+    <Card className="mx-auto mt-xxl w-full max-w-[480px]">
+      <CardHeader>
+        <CardTitle>Enroll this terminal</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="type-body-sm mb-lg text-ink-muted">
+          Paste a device token — printed by <code>php artisan migrate:fresh --seed</code>, or issued via
+          POST /api/v1/registers/enroll.
+        </p>
+        <form
+          className="flex flex-col gap-lg"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!token.trim()) return
+            tokens.setDevice(token.trim())
+            onDone()
+          }}
+        >
+          <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="1|xxxxxxxx…" autoFocus />
+          <Button type="submit" size="lg" className="w-full">Save</Button>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -55,16 +62,21 @@ export function PinScreen({ onLoggedIn, onDeviceInvalid }: {
   }
 
   return (
-    <section className="form-panel">
-      <h2>Enter PIN</h2>
-      <form onSubmit={submit}>
-        <input
-          type="password" inputMode="numeric" autoComplete="off" autoFocus
-          value={pin} onChange={(e) => setPin(e.target.value)} placeholder="••••"
-        />
-        <button type="submit" className="btn btn-submit">Clock in</button>
-      </form>
-      {error && <p className="error">{error}</p>}
-    </section>
+    <Card className="mx-auto mt-xxl w-full max-w-[360px]">
+      <CardHeader>
+        <CardTitle>Enter PIN</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={submit} className="flex flex-col gap-lg">
+          <Input
+            type="password" inputMode="numeric" autoComplete="off" autoFocus
+            value={pin} onChange={(e) => setPin(e.target.value)} placeholder="••••"
+            className="h-[56px] text-center text-[24px]"
+          />
+          <Button type="submit" size="lg" className="w-full">Clock in</Button>
+        </form>
+        {error && <p className="type-body-sm mt-md text-error">{error}</p>}
+      </CardContent>
+    </Card>
   )
 }
