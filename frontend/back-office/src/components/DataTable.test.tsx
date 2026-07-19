@@ -46,4 +46,11 @@ describe('DataTable', () => {
 
     expect(bodyRows()[0]?.className).not.toContain('odd:bg-surface-1')
   })
+
+  it('dims rows the inactive predicate returns true for', () => {
+    render(<DataTable columns={COLUMNS} rows={ROWS} rowKey={(row) => row.id} inactive={(row) => row.id === 'b'} />)
+
+    expect(screen.getByText('Latte').closest('tr')).not.toHaveClass('opacity-55')
+    expect(screen.getByText('Cortado').closest('tr')).toHaveClass('opacity-55')
+  })
 })

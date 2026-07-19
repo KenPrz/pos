@@ -19,9 +19,10 @@ export type EntityColumn<T> = {
  * categories, modifier groups, discounts, tax rates) reuses one table instead of six
  * near-identical ones.
  *
- * Archived rows (`is_active === false`) render greyed with an ARCHIVED `StatusPill`
- * and an UNARCHIVE ghost `Button` — but only for entities that actually carry
- * `is_active`. Categories and modifier groups don't (verified against
+ * Archived rows (`is_active === false`) render at reduced opacity (dimmed, via
+ * `DataTable`'s `inactive` prop) with an ARCHIVED `StatusPill` and an UNARCHIVE
+ * ghost `Button` — but only for entities that actually carry `is_active`. Categories
+ * and modifier groups don't (verified against
  * AdminCategoryResource / AdminModifierGroupResource): `row.is_active === false` is
  * simply never true for them, so the badge and unarchive button never render, no
  * special-casing needed here.
@@ -92,6 +93,7 @@ export function EntityTable<T extends { id: string; is_active?: boolean }>({
       columns={dataColumns}
       rows={rows}
       rowKey={(row) => row.id}
+      inactive={(row) => row.is_active === false}
       empty={{ title: emptyMessage }}
       toolbar={
         <>

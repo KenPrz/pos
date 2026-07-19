@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Category, type ModifierGroup, type Product } from '../../lib/api'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Divider } from '../../components/Divider'
 import { FieldRow } from '../../components/FieldRow'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
@@ -165,7 +166,7 @@ export function ProductEditor({
         </div>
       </form>
 
-      <hr className="my-lg border-t border-hairline" />
+      <Divider />
 
       <CardTitle className="mb-md">Modifier groups</CardTitle>
       {product === null ? (
@@ -181,7 +182,7 @@ export function ProductEditor({
               return (
                 <label
                   key={g.id}
-                  className={`flex items-center gap-xs border px-sm py-xs text-[14px] leading-[1.29] tracking-[0.16px] ${
+                  className={`type-body-sm flex items-center gap-xs border px-sm py-xs ${
                     selected ? 'border-primary bg-surface-1' : 'border-hairline'
                   }`}
                 >

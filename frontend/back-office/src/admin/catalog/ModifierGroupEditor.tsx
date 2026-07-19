@@ -5,6 +5,7 @@ import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Modifier, type ModifierGroup } from '../../lib/api'
 import { parseCents } from '../../lib/money'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Divider } from '../../components/Divider'
 import { FieldRow } from '../../components/FieldRow'
 import { Button } from '../../components/ui/button'
 import { Card, CardTitle } from '../../components/ui/card'
@@ -267,7 +268,7 @@ export function ModifierGroupEditor({
       </form>
       {error && <p className="type-body-sm mt-md text-error">{error}</p>}
 
-      <hr className="my-lg border-t border-hairline" />
+      <Divider />
 
       {group === null ? (
         <>

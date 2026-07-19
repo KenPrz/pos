@@ -18,6 +18,9 @@ export interface DataTableProps<T> {
   rowKey?: (row: T) => string | number
   /** Zebra-stripe alternate rows. Defaults to true (today's behavior). */
   zebra?: boolean
+  /** Rows this returns true for render at reduced opacity — archived/inactive rows'
+   * long-standing dimmed treatment, now data-driven instead of a hardcoded CSS class. */
+  inactive?: (row: T) => boolean
 }
 
 // Table + toolbar slot + EmptyState wiring.
@@ -28,6 +31,7 @@ export function DataTable<T extends Record<string, unknown>>({
   empty,
   rowKey,
   zebra = true,
+  inactive,
 }: DataTableProps<T>) {
   return (
     <div>
@@ -49,7 +53,11 @@ export function DataTable<T extends Record<string, unknown>>({
           </TableHeader>
           <TableBody>
             {rows.map((row, index) => (
-              <TableRow key={rowKey ? rowKey(row) : index} zebra={zebra}>
+              <TableRow
+                key={rowKey ? rowKey(row) : index}
+                zebra={zebra}
+                className={inactive?.(row) ? 'opacity-55' : undefined}
+              >
                 {columns.map((col) => (
                   <TableCell key={col.key} className={col.className}>
                     {col.render ? col.render(row) : (row[col.key] as ReactNode)}
