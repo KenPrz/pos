@@ -68,8 +68,8 @@ it.
 
 1. Get a device token for this register. In development, `make seed` prints one per till
    (see the Operator Guide's [First run](04-operator-guide.md#first-run)); in production,
-   a manager issues one from the back office — either when creating the register or by
-   reissuing its token afterward (see the Manager Guide's
+   a manager issues one from the back office by reissuing the register's token — that's
+   also how a brand-new till gets its first one (see the Manager Guide's
    [Replace a lost terminal](03-manager-guide.md#replace-a-lost-terminal) section, which
    also covers a brand-new till's first token).
 2. Paste it into the field (placeholder `1|xxxxxxxx…`) on the **Enroll this terminal**
