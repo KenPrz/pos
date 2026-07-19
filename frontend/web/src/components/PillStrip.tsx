@@ -29,6 +29,7 @@ export function PillStrip({ items }: PillStripProps) {
       {items.map((item, ix) => (
         <Badge
           key={ix}
+          data-state={item.state}
           variant={STATE_VARIANT[item.state]}
           className={cn('min-h-[48px] gap-xs px-sm', item.state === 'active' && 'outline outline-2 -outline-offset-1 outline-primary')}
         >

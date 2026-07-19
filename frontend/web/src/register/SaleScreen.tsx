@@ -4,6 +4,13 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError, api, tokens, type CatalogProduct, type CatalogVariant, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
 import { cents, formatMoney, parseCentsOrNull, subtract } from '../lib/money'
+import { ActionZone } from '@/components/ActionZone'
+import { CartLine } from '@/components/CartLine'
+import { MoneyText } from '@/components/MoneyText'
+import { PrepChip } from '@/components/PrepChip'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { MenuGrid } from './MenuGrid'
 import { SplitPrompt, SplitStrip } from './SplitStrip'
 
@@ -32,7 +39,9 @@ type Phase =
   | { name: 'done'; outcome: PaymentOutcome; receipt: Receipt | null }
   | { name: 'split-done'; paid: PaidChild[] }
 
-/** The lines/discount/tax/total table shared by the single-order and split done plates. */
+/** The lines/discount/tax/total table shared by the single-order and split done plates.
+    Deliberately still on the legacy `.receipt` classes: the printable receipt and its
+    @media print CSS are preserved as-is (plain, functional) — do not restyle. */
 function ReceiptCard({ receipt }: { receipt: Receipt }) {
   return (
     <div className="receipt">
@@ -331,7 +340,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
       const paid = [...split.paid, { outcome, receipt }]
       // Splice the just-closed child's own post-payment copy (due_cents: 0) back into
       // `children` at the index that was just paid — without this, the strip's stale
-      // pre-payment snapshot never shows `.settled`/"Paid" for a closed check.
+      // pre-payment snapshot never shows settled/"Paid" for a closed check.
       const children = split.children.map((c, ix) => (ix === split.activeIx ? outcome.order : c))
       const nextIx = split.activeIx + 1
       if (nextIx < children.length) {
@@ -392,12 +401,18 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
     scan.mutate({ code, key })
   }
 
-  const submitPay = (e: FormEvent) => {
-    e.preventDefault()
+  // Shared by the tender form's onSubmit (Enter in the amount field) and the action
+  // zone's Take payment button — one guard path, exactly the old submitPay behavior.
+  const doPay = () => {
     if (!order || phase.name !== 'tender' || pay.isPending) return
     if (driver === 'cash' && parseCentsOrNull(tendered) === null) return setError('Enter the cash handed over, like 50.00')
     setError(null)
     pay.mutate({ key: phase.key })
+  }
+
+  const submitPay = (e: FormEvent) => {
+    e.preventDefault()
+    doPay()
   }
 
   const newSale = () => {
@@ -410,48 +425,48 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
     setTimeout(() => scanRef.current?.focus(), 0)
   }
 
-  if (phase.name === 'done') {
-    const { payment } = phase.outcome
-    const paidCash = payment.driver === 'cash'
-    return (
-      <section className="form-panel ok">
-        <h2>Payment complete — order {phase.outcome.order.number}</h2>
-        {paidCash ? (
-          <div className="hero-panel">
-            <p className="hero-eyebrow">Change</p>
-            <p className="hero-amount">{fm(payment.change_cents ?? 0)}</p>
-          </div>
-        ) : (
-          <div className="hero-panel">
-            <p className="hero-eyebrow">Card</p>
-            <p className="hero-amount">No change due</p>
-          </div>
-        )}
-        <p className="muted">
-          {paidCash
-            ? `${fm(payment.amount_cents)} paid on ${fm(payment.tendered_cents ?? payment.amount_cents)} tendered`
-            : `${fm(payment.amount_cents)} recorded on the card terminal`}
-        </p>
-        {phase.receipt && <ReceiptCard receipt={phase.receipt} />}
-        <div className="btn-row">
-          <button className="btn btn-utility" onClick={() => window.print()}>Print</button>
-          <button className="btn btn-submit" onClick={newSale}>New sale</button>
-        </div>
-      </section>
-    )
-  }
+  const lines = order?.lines ?? []
+  const appliedDiscounts = order?.discounts ?? []
+  // Server-computed (OrderResource.php: max(0, total_cents - paid_cents)) — never
+  // derived client-side, same rule the split-child strip already follows.
+  const balance = order ? order.due_cents : 0
 
-  if (phase.name === 'split-done') {
-    return (
-      <section className="form-panel ok">
-        <h2>All checks settled — {phase.paid.length} {phase.paid.length === 1 ? 'check' : 'checks'}</h2>
+  const inSale = phase.name === 'scanning' || phase.name === 'tender'
+
+  // ── The context pane (right): scan-first idle / menu grid / tender + split / done ──
+  const contextPane =
+    phase.name === 'done' ? (() => {
+      const { payment } = phase.outcome
+      const paidCash = payment.driver === 'cash'
+      return (
+        <div className="flex flex-col gap-lg">
+          <h2 className="type-headline">Payment complete — order {phase.outcome.order.number}</h2>
+          <div className="flex flex-col items-center gap-xs border border-hairline bg-surface-1 px-lg py-xl print:border-0 print:bg-transparent">
+            <p className="type-caption text-ink-muted">{paidCash ? 'Change' : 'Card'}</p>
+            {paidCash ? (
+              <MoneyText cents={payment.change_cents ?? 0} currency={CURRENCY} size="total" />
+            ) : (
+              <p className="type-display-md">No change due</p>
+            )}
+          </div>
+          <p className="type-body-sm text-ink-muted">
+            {paidCash
+              ? `${fm(payment.amount_cents)} paid on ${fm(payment.tendered_cents ?? payment.amount_cents)} tendered`
+              : `${fm(payment.amount_cents)} recorded on the card terminal`}
+          </p>
+          {phase.receipt && <ReceiptCard receipt={phase.receipt} />}
+        </div>
+      )
+    })() : phase.name === 'split-done' ? (
+      <div className="flex flex-col gap-lg">
+        <h2 className="type-headline">All checks settled — {phase.paid.length} {phase.paid.length === 1 ? 'check' : 'checks'}</h2>
         {phase.paid.map(({ outcome, receipt }, ix) => (
-          <div className="split-receipt" key={outcome.order.id}>
-            <header className="row">
-              <h3>Check {ix + 1} — order {outcome.order.number}</h3>
-              {receipt && <button className="btn btn-utility" onClick={() => window.print()}>Print</button>}
+          <div className="flex flex-col gap-sm border-b border-hairline pb-lg print:border-0" key={outcome.order.id}>
+            <header className="flex items-center justify-between gap-md">
+              <h3 className="type-card-title">Check {ix + 1} — order {outcome.order.number}</h3>
+              {receipt && <Button type="button" variant="ghost" onClick={() => window.print()}>Print</Button>}
             </header>
-            <p className="muted">
+            <p className="type-body-sm text-ink-muted">
               {outcome.payment.driver === 'cash'
                 ? `${fm(outcome.payment.amount_cents)} paid on ${fm(outcome.payment.tendered_cents ?? outcome.payment.amount_cents)} tendered`
                 : `${fm(outcome.payment.amount_cents)} recorded on the card terminal`}
@@ -459,209 +474,105 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
             {receipt && <ReceiptCard receipt={receipt} />}
           </div>
         ))}
-        <div className="btn-row">
-          <button className="btn btn-submit" onClick={newSale}>New sale</button>
-        </div>
-      </section>
-    )
-  }
+      </div>
+    ) : (
+      <div className="flex flex-col gap-lg">
+        {/* Visible through scanning AND tender for the active child — the active child's
+            own due tracks the live `order` (not the split snapshot), so an edit made to
+            its cart before it's paid shows up here immediately. */}
+        {split && (
+          <SplitStrip
+            orders={split.children.map((c, ix) => (ix === split.activeIx ? (order ?? c) : c))}
+            activeIx={split.activeIx}
+          />
+        )}
 
-  const lines = order?.lines ?? []
-  const appliedDiscounts = order?.discounts ?? []
-  // Server-computed (OrderResource.php: max(0, total_cents - paid_cents)) — never
-  // derived client-side, same rule the split-child strip already follows.
-  const balance = order ? order.due_cents : 0
+        <form onSubmit={submitScan}>
+          <Input
+            ref={scanRef} autoFocus placeholder="Scan or type a barcode…"
+            value={barcode} onChange={(e) => setBarcode(e.target.value)}
+            // Food mode keeps the scan field (a case of Cheddar arrives with a barcode
+            // too) but compact — the grid below, not the barcode reader, is the everyday
+            // food-order idiom. Retail gets the full-width scan-first field.
+            className={cn('h-[56px] text-[18px]', foodMode && 'max-w-[240px]')}
+          />
+        </form>
 
-  return (
-    <section className="form-panel">
-      <header className="row">
-        <h2>{order ? `Order ${order.number}` : 'New sale'}</h2>
-        <button type="button" className="btn btn-secondary" onClick={onCloseShift}>Close shift</button>
-      </header>
+        {/* The grid reuses the exact keyed addLine/open-order-implicit path the scan
+            form uses. Migrated to the vocabulary in Task 9 — rendered as-is here. */}
+        {foodMode && phase.name === 'scanning' && <MenuGrid onPick={handleMenuPick} />}
 
-      {/* Visible through scanning AND tender for the active child — the active child's
-          own due tracks the live `order` (not the split snapshot), so an edit made to
-          its cart before it's paid shows up here immediately. */}
-      {split && (
-        <SplitStrip
-          orders={split.children.map((c, ix) => (ix === split.activeIx ? (order ?? c) : c))}
-          activeIx={split.activeIx}
-        />
-      )}
-
-      <form onSubmit={submitScan} className={foodMode ? 'scan-form-compact' : undefined}>
-        <input
-          ref={scanRef} autoFocus placeholder="Scan or type a barcode…"
-          value={barcode} onChange={(e) => setBarcode(e.target.value)}
-        />
-      </form>
-
-      {/* Food mode keeps the scan field above (a case of Cheddar arrives with a barcode
-          too), but the grid — not the barcode reader — is the everyday food-order idiom.
-          It reuses the exact keyed addLine/open-order-implicit path the scan form uses. */}
-      {foodMode && phase.name === 'scanning' && <MenuGrid onPick={handleMenuPick} />}
-
-      {lines.length > 0 && (
-        <div className="cart">
-          {lines.filter((l) => !l.voided_at).map((l) => (
-            <div className="cart-row" key={l.id}>
-              {/* A <div>, not a <span>: it wraps the modifier <ul> below, and <ul> is
-                  flow content — invalid inside a <span>, which only permits phrasing
-                  content. */}
-              <div className="cart-row-main">
-                <span className="cart-row-name">{l.name}</span>
-                {l.modifiers && l.modifiers.length > 0 && (
-                  <ul className="cart-row-modifiers">
-                    {l.modifiers.map((m, i) => (
-                      <li key={i}>
-                        {m.name}
-                        {m.price_delta_cents !== 0 && <span className="num"> {fm(m.price_delta_cents)}</span>}
-                      </li>
-                    ))}
-                  </ul>
+        {order && phase.name === 'scanning' && (
+          <>
+            {discountOpen && (
+              <div className="flex flex-col gap-sm border border-hairline p-md">
+                <p className="type-body-sm text-ink-muted">Apply discount</p>
+                <div className="flex flex-wrap gap-sm">
+                  {(discounts.data ?? []).map((d) => (
+                    <Button
+                      key={d.id} type="button" variant="tertiary" size="lg"
+                      disabled={!discountReason.trim() || applyDiscount.isPending}
+                      onClick={() => applyDiscount.mutate({ discountId: d.id, reason: discountReason.trim() })}
+                    >
+                      {d.name}
+                    </Button>
+                  ))}
+                </div>
+                <Input
+                  placeholder="Reason (required)…"
+                  value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}
+                />
+                <div>
+                  <Button type="button" variant="ghost" onClick={() => setDiscountOpen(false)}>Cancel</Button>
+                </div>
+              </div>
+            )}
+            {voidingOrder && (
+              <form
+                className="flex items-center gap-sm"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (!voidReason.trim() || voidOrder.isPending) return
+                  voidOrder.mutate(voidReason.trim())
+                }}
+              >
+                <Input
+                  autoFocus placeholder="Reason for voiding the whole order…"
+                  value={voidReason} onChange={(e) => setVoidReason(e.target.value)}
+                />
+                <Button type="submit" variant="danger" size="lg">Void order</Button>
+                <Button type="button" variant="ghost" size="lg" onClick={() => setVoidingOrder(false)}>Keep</Button>
+              </form>
+            )}
+            {(can('order.discount.apply') || can('order.void')) && (
+              <div className="flex flex-wrap gap-sm">
+                {can('order.discount.apply') && !discountOpen && (
+                  <Button type="button" variant="tertiary" size="lg" onClick={() => setDiscountOpen(true)}>Discount</Button>
+                )}
+                {can('order.void') && !voidingOrder && (
+                  <Button
+                    type="button" variant="ghost" size="lg" className="text-error"
+                    onClick={() => { setVoidingOrder(true); setVoidReason('') }}
+                  >
+                    Void order
+                  </Button>
                 )}
               </div>
-              {l.qty !== '1.000' && <span className="cart-row-qty">{l.qty}</span>}
-              <span className="cart-row-price num">{fm(l.line_total_cents)}</span>
-              {/* Prep chip: pending → in_progress → ready → pending, one tap per step. Lines
-                  with no prep tracking (prep_state null — e.g. a bagged retail add-on rung
-                  up on a food-mode till) get no chip at all. */}
-              {foodMode && l.prep_state !== null && phase.name === 'scanning' && (() => {
-                const next = nextPrep(l.prep_state)
-                return (
-                  <button
-                    type="button"
-                    className={`chip prep-chip prep-${l.prep_state}`}
-                    disabled={setPrep.isPending || next === null}
-                    onClick={() => next !== null && setPrep.mutate({ lineId: l.id, state: next })}
-                  >
-                    {l.prep_state === 'pending' ? 'Pending' : l.prep_state === 'in_progress' ? 'Cooking' : 'Ready'}
-                  </button>
-                )
-              })()}
-              {can('order.line.void') && phase.name === 'scanning' && voidingLineId !== l.id && (
-                <button type="button" className="btn btn-void btn-chip" onClick={() => { setVoidingLineId(l.id); setVoidReason('') }}>
-                  Void
-                </button>
-              )}
-            </div>
-          ))}
-          {voidingLineId !== null && (
-            <form
-              className="inline-reason"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (!voidReason.trim() || voidLine.isPending) return
-                voidLine.mutate({ lineId: voidingLineId, reason: voidReason.trim() })
-              }}
-            >
-              <input
-                autoFocus placeholder="Reason for the void…"
-                value={voidReason} onChange={(e) => setVoidReason(e.target.value)}
-              />
-              <button type="submit" className="btn btn-void">Confirm void</button>
-              <button type="button" className="btn btn-secondary" onClick={() => setVoidingLineId(null)}>Keep</button>
-            </form>
-          )}
-        </div>
-      )}
-
-      {appliedDiscounts.length > 0 && (
-        <div className="cart">
-          {appliedDiscounts.map((d) => (
-            <div className="cart-row discount-row" key={d.id}>
-              <span className="cart-row-name">{d.name}</span>
-              <span className="cart-row-price num">−{fm(d.amount_cents)}</span>
-              {can('order.discount.apply') && phase.name === 'scanning' && (
-                <button
-                  type="button" className="btn btn-secondary btn-chip" aria-label={`Remove ${d.name}`}
-                  onClick={() => removeDiscount.mutate(d.id)}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {order && (
-        <dl className="totals">
-          <dt>Subtotal</dt><dd>{fm(order.subtotal_cents)}</dd>
-          {order.discount_cents > 0 && (<><dt>Discount</dt><dd>−{fm(order.discount_cents)}</dd></>)}
-          <dt>Tax</dt><dd>{fm(order.tax_cents)}</dd>
-          <dt>Total</dt><dd className="grand">{fm(order.total_cents)}</dd>
-        </dl>
-      )}
-
-      {order && phase.name === 'scanning' && (
-        <>
-          {discountOpen && (
-            <div className="discount-picker">
-              <p className="picker-label">Apply discount</p>
-              {(discounts.data ?? []).map((d) => (
-                <button
-                  key={d.id} type="button" className="btn btn-utility"
-                  disabled={!discountReason.trim() || applyDiscount.isPending}
-                  onClick={() => applyDiscount.mutate({ discountId: d.id, reason: discountReason.trim() })}
-                >
-                  {d.name}
-                </button>
-              ))}
-              <input
-                placeholder="Reason (required)…"
-                value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}
-              />
-              <button type="button" className="btn btn-secondary" onClick={() => setDiscountOpen(false)}>Cancel</button>
-            </div>
-          )}
-          {voidingOrder && (
-            <form
-              className="inline-reason"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (!voidReason.trim() || voidOrder.isPending) return
-                voidOrder.mutate(voidReason.trim())
-              }}
-            >
-              <input
-                autoFocus placeholder="Reason for voiding the whole order…"
-                value={voidReason} onChange={(e) => setVoidReason(e.target.value)}
-              />
-              <button type="submit" className="btn btn-void">Void order</button>
-              <button type="button" className="btn btn-secondary" onClick={() => setVoidingOrder(false)}>Keep</button>
-            </form>
-          )}
-          <div className="btn-row">
-            {order.total_cents === 0 ? (
-              <button className="btn btn-submit" disabled={settle.isPending} onClick={() => settle.mutate()}>
-                {(order.discounts?.length ?? 0) > 0 ? 'Close — fully comped' : 'Close empty order'}
-              </button>
-            ) : (
-              <button
-                className="btn btn-submit"
-                onClick={() => setPhase({ name: 'tender', key: crypto.randomUUID() })}
-              >
-                Pay — {fm(balance)}
-              </button>
             )}
-            {can('order.discount.apply') && !discountOpen && (
-              <button type="button" className="btn btn-utility" onClick={() => setDiscountOpen(true)}>Discount</button>
-            )}
-            {can('order.void') && !voidingOrder && (
-              <button type="button" className="btn btn-void" onClick={() => { setVoidingOrder(true); setVoidReason('') }}>
-                Void order
-              </button>
-            )}
+          </>
+        )}
+
+        {/* SPLIT ×N: only offered on the pre-split original (never a child — the server
+            itself refuses once paid_cents > 0, and re-splitting a child isn't a supported
+            shape here) and only before any tender is entered for it. */}
+        {order && phase.name === 'tender' && !split && !splitPromptOpen && (
+          <div>
+            <Button type="button" variant="tertiary" size="lg" onClick={() => setSplitPromptOpen(true)}>
+              Split bill
+            </Button>
           </div>
-        </>
-      )}
-
-      {/* SPLIT ×N: only offered on the pre-split original (never a child — the server
-          itself refuses once paid_cents > 0, and re-splitting a child isn't a supported
-          shape here) and only before any tender is entered for it. */}
-      {order && phase.name === 'tender' && !split && (
-        splitPromptOpen ? (
+        )}
+        {order && phase.name === 'tender' && !split && splitPromptOpen && (
           <SplitPrompt
             ways={splitWays}
             totalCents={order.total_cents}
@@ -670,58 +581,202 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
             onCancel={() => setSplitPromptOpen(false)}
             pending={splitOrderMut.isPending}
           />
-        ) : (
-          <div className="btn-row">
-            <button type="button" className="btn btn-secondary" onClick={() => setSplitPromptOpen(true)}>
-              Split bill
-            </button>
-          </div>
-        )
-      )}
+        )}
 
-      {order && phase.name === 'tender' && !splitPromptOpen && (
-        <form onSubmit={submitPay}>
-          <div className="btn-row" role="group" aria-label="Payment method">
-            <button
-              type="button"
-              className={`btn ${driver === 'cash' ? 'btn-submit' : 'btn-secondary'}`}
-              aria-pressed={driver === 'cash'}
-              onClick={() => setDriver('cash')}
-            >
-              Cash
-            </button>
-            <button
-              type="button"
-              className={`btn ${driver === 'external_card' ? 'btn-submit' : 'btn-secondary'}`}
-              aria-pressed={driver === 'external_card'}
-              onClick={() => setDriver('external_card')}
-            >
-              Card
-            </button>
+        {order && phase.name === 'tender' && !splitPromptOpen && (
+          <form id="tender-form" onSubmit={submitPay} className="flex flex-col gap-md">
+            <div className="flex gap-sm" role="group" aria-label="Payment method">
+              <Button
+                type="button" size="lg" className="flex-1"
+                variant={driver === 'cash' ? 'primary' : 'tertiary'}
+                aria-pressed={driver === 'cash'}
+                onClick={() => setDriver('cash')}
+              >
+                Cash
+              </Button>
+              <Button
+                type="button" size="lg" className="flex-1"
+                variant={driver === 'external_card' ? 'primary' : 'tertiary'}
+                aria-pressed={driver === 'external_card'}
+                onClick={() => setDriver('external_card')}
+              >
+                Card
+              </Button>
+            </div>
+            {driver === 'cash' ? (
+              <label className="block">
+                <span className="type-body-sm text-ink-muted">Cash tendered (owed: {fm(balance)})</span>
+                <Input
+                  value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" autoFocus
+                  className="type-money mt-xs h-[56px] text-[24px]"
+                />
+              </label>
+            ) : (
+              <label className="block">
+                <span className="type-body-sm text-ink-muted">Card terminal reference (owed: {fm(balance)})</span>
+                <Input
+                  value={reference} onChange={(e) => setReference(e.target.value)} placeholder="auth 004321" autoFocus
+                  className="mt-xs h-[56px]"
+                />
+              </label>
+            )}
+          </form>
+        )}
+
+        {error && <p className="type-body-sm text-error">{error}</p>}
+        {notice && <p className="type-body-sm text-ink-muted">{notice}</p>}
+      </div>
+    )
+
+  // ── The screen: header chrome, cart pane (left) | context pane (right), action zone.
+  // Two panes that swap CONTENT between stages while the chrome stays still; height is
+  // the viewport minus the 48px top bar, the shell's p-lg, and the 64px action-zone
+  // band (reserved even when no primary action is showing, so nothing ever jumps).
+  return (
+    <section className="flex h-[calc(100dvh-160px)] min-h-[360px] flex-col gap-md print:block print:h-auto">
+      <header className="flex shrink-0 items-center justify-between gap-md print:hidden">
+        <h2 className="type-headline">{order ? `Order ${order.number}` : 'New sale'}</h2>
+        {/* Present through scanning and tender exactly as before; the done plates never
+            offered it (they were separate screens pre-rework) and still don't. */}
+        {inSale && (
+          <Button type="button" variant="ghost" onClick={onCloseShift}>Close shift</Button>
+        )}
+      </header>
+
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,2fr)_minmax(0,3fr)] gap-lg print:block">
+        {/* Cart pane: scrolling line list on top, discounts + totals pinned beneath. */}
+        <div className="flex min-h-0 flex-col border border-hairline print:hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {lines.filter((l) => !l.voided_at).map((l) => (
+              <CartLine
+                key={l.id}
+                line={l}
+                // Prep chip: pending → in_progress → ready → pending, one tap per step.
+                // Lines with no prep tracking (prep_state null — e.g. a bagged retail
+                // add-on rung up on a food-mode till) get no chip at all.
+                prepChip={
+                  foodMode && l.prep_state !== null && phase.name === 'scanning'
+                    ? (() => {
+                        const next = nextPrep(l.prep_state)
+                        return (
+                          <PrepChip
+                            state={l.prep_state}
+                            disabled={setPrep.isPending || next === null}
+                            onCycle={() => { if (next !== null) setPrep.mutate({ lineId: l.id, state: next }) }}
+                          />
+                        )
+                      })()
+                    : undefined
+                }
+                onVoid={
+                  can('order.line.void') && phase.name === 'scanning' && voidingLineId !== l.id
+                    ? () => { setVoidingLineId(l.id); setVoidReason('') }
+                    : undefined
+                }
+              />
+            ))}
+            {voidingLineId !== null && (
+              <form
+                className="flex items-center gap-sm border-b border-hairline px-md py-sm"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (!voidReason.trim() || voidLine.isPending) return
+                  voidLine.mutate({ lineId: voidingLineId, reason: voidReason.trim() })
+                }}
+              >
+                <Input
+                  autoFocus placeholder="Reason for the void…"
+                  value={voidReason} onChange={(e) => setVoidReason(e.target.value)}
+                />
+                <Button type="submit" variant="danger">Confirm void</Button>
+                <Button type="button" variant="ghost" onClick={() => setVoidingLineId(null)}>Keep</Button>
+              </form>
+            )}
           </div>
-          {driver === 'cash' ? (
-            <label>
-              Cash tendered (owed: {fm(balance)})
-              <input value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" autoFocus />
-            </label>
-          ) : (
-            <label>
-              Card terminal reference (owed: {fm(balance)})
-              <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="auth 004321" autoFocus />
-            </label>
+
+          {(order !== null || appliedDiscounts.length > 0) && (
+            <div className="shrink-0 border-t border-hairline px-md py-sm">
+              {appliedDiscounts.map((d) => (
+                <div className="flex min-h-[48px] items-center gap-sm" key={d.id}>
+                  <span className="type-body-lg min-w-0 flex-1">{d.name}</span>
+                  <span className="type-body-lg type-money shrink-0">
+                    −<MoneyText cents={d.amount_cents} currency={CURRENCY} size="line" />
+                  </span>
+                  {can('order.discount.apply') && phase.name === 'scanning' && (
+                    <Button
+                      type="button" variant="ghost" aria-label={`Remove ${d.name}`}
+                      className="min-h-[48px] shrink-0 text-error"
+                      onClick={() => removeDiscount.mutate(d.id)}
+                    >
+                      ✕
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {order && (
+                <dl className="flex flex-col gap-xxs pt-xs">
+                  <div className="flex items-baseline justify-between gap-md">
+                    <dt className="type-body-sm text-ink-muted">Subtotal</dt>
+                    <dd><MoneyText cents={order.subtotal_cents} currency={CURRENCY} size="line" /></dd>
+                  </div>
+                  {order.discount_cents > 0 && (
+                    <div className="flex items-baseline justify-between gap-md">
+                      <dt className="type-body-sm text-ink-muted">Discount</dt>
+                      <dd className="type-body-lg type-money">−<MoneyText cents={order.discount_cents} currency={CURRENCY} size="line" /></dd>
+                    </div>
+                  )}
+                  <div className="flex items-baseline justify-between gap-md">
+                    <dt className="type-body-sm text-ink-muted">Tax</dt>
+                    <dd><MoneyText cents={order.tax_cents} currency={CURRENCY} size="line" /></dd>
+                  </div>
+                  <div className="mt-xs flex items-baseline justify-between gap-md border-t border-hairline pt-xs">
+                    <dt className="type-body-sm text-ink-muted">Total</dt>
+                    <dd><MoneyText cents={order.total_cents} currency={CURRENCY} size="total" /></dd>
+                  </div>
+                </dl>
+              )}
+            </div>
           )}
-          <hr className="dotted-divider" />
-          <div className="btn-row">
-            <button type="submit" className="btn btn-submit" disabled={pay.isPending}>
-              {pay.isPending ? 'Taking payment…' : 'Take payment'}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setPhase({ name: 'scanning' })}>Back</button>
-          </div>
-        </form>
-      )}
+        </div>
 
-      {error && <p className="error">{error}</p>}
-      {notice && <p className="muted">{notice}</p>}
+        {/* Context pane. */}
+        <div className="min-h-0 overflow-y-auto print:overflow-visible">{contextPane}</div>
+      </div>
+
+      {/* The stage's single primary action. SplitPrompt renders its own GO/Cancel
+          action zone while it's open, so exactly one zone shows at a time. */}
+      {phase.name === 'scanning' && order && (
+        <ActionZone>
+          {order.total_cents === 0 ? (
+            <Button size="xl" disabled={settle.isPending} onClick={() => settle.mutate()}>
+              {(order.discounts?.length ?? 0) > 0 ? 'Close — fully comped' : 'Close empty order'}
+            </Button>
+          ) : (
+            <Button size="xl" onClick={() => setPhase({ name: 'tender', key: crypto.randomUUID() })}>
+              Pay — {fm(balance)}
+            </Button>
+          )}
+        </ActionZone>
+      )}
+      {phase.name === 'tender' && order && !splitPromptOpen && (
+        <ActionZone>
+          <Button size="xl" type="button" disabled={pay.isPending} onClick={doPay}>
+            {pay.isPending ? 'Taking payment…' : 'Take payment'}
+          </Button>
+          <Button size="xl" type="button" variant="ghost" onClick={() => setPhase({ name: 'scanning' })}>Back</Button>
+        </ActionZone>
+      )}
+      {phase.name === 'done' && (
+        <ActionZone>
+          <Button size="xl" type="button" variant="ghost" onClick={() => window.print()}>Print</Button>
+          <Button size="xl" onClick={newSale}>New sale</Button>
+        </ActionZone>
+      )}
+      {phase.name === 'split-done' && (
+        <ActionZone>
+          <Button size="xl" onClick={newSale}>New sale</Button>
+        </ActionZone>
+      )}
     </section>
   )
 }

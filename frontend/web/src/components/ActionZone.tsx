@@ -10,7 +10,7 @@ export interface ActionZoneProps {
 // children to fill the full width so the primary target is impossible to miss.
 export function ActionZone({ children }: ActionZoneProps) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 flex min-h-[64px] items-stretch border-t border-hairline bg-canvas *:flex-1">
+    <div className="fixed inset-x-0 bottom-0 z-40 flex min-h-[64px] items-stretch border-t border-hairline bg-canvas *:flex-1 print:hidden">
       {children}
     </div>
   )

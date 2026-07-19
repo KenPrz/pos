@@ -128,10 +128,12 @@ describe('SaleScreen split flow', () => {
 
     // The settled-chip regression this task fixed: check 1's chip must flip to "Paid"
     // once its payment closes it, not keep showing its stale pre-payment due forever.
-    const chips = document.querySelectorAll('.split-chip')
-    expect(chips[0]).toHaveClass('settled')
+    // (Styling-internal hook moved with the UI rework: the strip is a PillStrip now, so
+    // the old `.split-chip`/`.settled` class assertions read PillStrip's `data-state`.)
+    const chips = document.querySelectorAll('[data-state]')
+    expect(chips[0]).toHaveAttribute('data-state', 'settled')
     expect(chips[0]).toHaveTextContent('Paid')
-    expect(chips[1]).toHaveClass('active')
+    expect(chips[1]).toHaveAttribute('data-state', 'active')
     expect(chips[1]).toHaveTextContent('$5.00')
 
     fireEvent.change(screen.getByLabelText(/cash tendered/i), { target: { value: '5.00' } })
