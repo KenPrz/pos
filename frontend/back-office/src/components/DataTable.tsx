@@ -14,6 +14,10 @@ export interface DataTableProps<T> {
   rows: T[]
   toolbar?: ReactNode
   empty?: { title: string; description?: string }
+  /** Stable row identity for `key`/reconciliation. Defaults to the row's array index. */
+  rowKey?: (row: T) => string | number
+  /** Zebra-stripe alternate rows. Defaults to true (today's behavior). */
+  zebra?: boolean
 }
 
 // Table + toolbar slot + EmptyState wiring.
@@ -22,6 +26,8 @@ export function DataTable<T extends Record<string, unknown>>({
   rows,
   toolbar,
   empty,
+  rowKey,
+  zebra = true,
 }: DataTableProps<T>) {
   return (
     <div>
@@ -43,7 +49,7 @@ export function DataTable<T extends Record<string, unknown>>({
           </TableHeader>
           <TableBody>
             {rows.map((row, index) => (
-              <TableRow key={index} zebra>
+              <TableRow key={rowKey ? rowKey(row) : index} zebra={zebra}>
                 {columns.map((col) => (
                   <TableCell key={col.key} className={col.className}>
                     {col.render ? col.render(row) : (row[col.key] as ReactNode)}

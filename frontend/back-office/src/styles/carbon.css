@@ -27,6 +27,7 @@
   --color-blue-hover: #0050e6;
   --color-success: #24a148;
   --color-warning: #f1c21b;
+  --color-warning-ink: #795600; /* Carbon warning-tag ink, not in the extraction's palette */
   --color-error: #da1e28;
 
   --radius: 0px; /* the brand. Only Badge may use rounded-full. */
