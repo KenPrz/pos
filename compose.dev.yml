@@ -61,6 +61,16 @@ services:
       DB_PASSWORD: ${POS_DEV_DB_PASSWORD:-pos}
       POS_CURRENCY: USD
       POS_BUSINESS_NAME: "Dev Trading Co"
+    healthcheck:
+      # Ready means "composer install finished AND the app answers" — first boot
+      # installs vendor into a fresh named volume, which takes minutes. `make dev`
+      # --waits on this, and the seed/migrate/test targets poll it before exec'ing,
+      # so nothing runs artisan against a container that has no vendor yet.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 600s
     ports:
       # ${POS_DEV_API_PORT:-8000} — override when 8000 is already held on the host
       # (e.g. a native `php artisan serve` from an earlier session).

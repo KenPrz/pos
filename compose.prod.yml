@@ -18,7 +18,12 @@ services:
     environment:
       POSTGRES_DB: pos
       POSTGRES_USER: pos
-      POSTGRES_PASSWORD: ${POS_DB_PASSWORD:?}
+      # Soft default, not `:?required` — a required var with no default fails
+      # interpolation for the WHOLE file on EVERY compose command, including
+      # `down -v` and `config`. The loud failures live at boot instead: the
+      # postgres image refuses to start without a password, and the api's
+      # entrypoint guards its own required vars (see backend/docker/entrypoint.sh).
+      POSTGRES_PASSWORD: ${POS_DB_PASSWORD:-}
       # Deterministic collation. Left to the host locale, index ordering can
       # differ between machines (and a glibc upgrade can silently corrupt text
       # indexes even on one machine). Only takes effect on a fresh volume —
@@ -44,21 +49,21 @@ services:
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
-      APP_KEY: ${POS_APP_KEY:?}
-      APP_URL: https://${POS_REGISTER_DOMAIN:?}
+      APP_KEY: ${POS_APP_KEY:-}
+      APP_URL: https://${POS_REGISTER_DOMAIN:-}
       DB_CONNECTION: pgsql
       DB_HOST: db
       DB_PORT: 5432
       DB_DATABASE: pos
       DB_USERNAME: pos
-      DB_PASSWORD: ${POS_DB_PASSWORD:?}
+      DB_PASSWORD: ${POS_DB_PASSWORD:-}
       MIGRATE_ON_BOOT: ${POS_MIGRATE_ON_BOOT:-1}
-      POS_CURRENCY: ${POS_CURRENCY:?}
-      POS_BUSINESS_NAME: ${POS_BUSINESS_NAME:?}
+      POS_CURRENCY: ${POS_CURRENCY:-}
+      POS_BUSINESS_NAME: ${POS_BUSINESS_NAME:-}
       POS_BUSINESS_ADDRESS: ${POS_BUSINESS_ADDRESS:-}
       POS_BUSINESS_TAX_ID: ${POS_BUSINESS_TAX_ID:-}
-      POS_REGISTER_DOMAIN: ${POS_REGISTER_DOMAIN:?}
-      POS_ADMIN_DOMAIN: ${POS_ADMIN_DOMAIN:?}
+      POS_REGISTER_DOMAIN: ${POS_REGISTER_DOMAIN:-}
+      POS_ADMIN_DOMAIN: ${POS_ADMIN_DOMAIN:-}
       POS_TLS_ISSUER: ${POS_TLS_ISSUER:-acme}
     ports:
       - "80:80"
