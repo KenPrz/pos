@@ -6,13 +6,29 @@ import { DataTable } from '../../components/DataTable'
 import { EmptyState } from '../../components/EmptyState'
 import { SectionHeader } from '../../components/SectionHeader'
 import { StatCard } from '../../components/StatCard'
-import { StatusPill } from '../../components/StatusPill'
-import { Card } from '../../components/ui/card'
-import { ApiError, api, type AuditLogEntry } from '../../lib/api'
+import { StatusPill, type StatusPillTone } from '../../components/StatusPill'
+import { Card, CardTitle } from '../../components/ui/card'
+import { ApiError, api, type AuditLogEntry, type Register, type StockReportRow } from '../../lib/api'
 import { cents, formatMoney } from '../../lib/money'
 
 const CURRENCY = 'USD' // display only; the server owns all arithmetic
 const fm = (n: number) => formatMoney(cents(n), CURRENCY)
+
+/**
+ * One row shape for the "Needs attention" `DataTable` — a low-stock variant and an
+ * inactive register are different wire types, but the panel shows both the same way
+ * (name, a detail column, a `StatusPill`), so they're normalized to this before
+ * rendering rather than hand-rolling two branches of markup.
+ */
+type AttentionRow = { id: string; name: string; detail: string; tone: StatusPillTone; status: string }
+
+function lowStockAttentionRow(row: StockReportRow): AttentionRow {
+  return { id: `stock-${row.variant_id}`, name: row.name, detail: row.qty, tone: 'warning', status: 'Low stock' }
+}
+
+function inactiveRegisterAttentionRow(register: Register): AttentionRow {
+  return { id: `register-${register.id}`, name: register.name, detail: '—', tone: 'error', status: 'Inactive' }
+}
 
 /**
  * The Today landing (Task 2, back-office UI rework) — the post-login default section.
@@ -77,7 +93,10 @@ export function TodaySection({
     (r) => r.location_id === locationId && !r.is_active
   )
   const recentActivity = data?.audit.rows ?? []
-  const needsAttention = lowStockRows.length > 0 || inactiveRegisters.length > 0
+  const attentionRows: AttentionRow[] = [
+    ...lowStockRows.map(lowStockAttentionRow),
+    ...inactiveRegisters.map(inactiveRegisterAttentionRow),
+  ]
 
   return (
     <div className="flex flex-col gap-xl">
@@ -91,31 +110,21 @@ export function TodaySection({
       </div>
 
       <Card>
-        <h2 className="type-card-title mb-md text-ink">Needs attention</h2>
-        {needsAttention ? (
-          <ul className="flex flex-col gap-sm">
-            {lowStockRows.map((row) => (
-              <li key={row.variant_id} className="flex items-center justify-between gap-md">
-                <span className="type-body-sm text-ink">
-                  {row.name} — {row.qty}
-                </span>
-                <StatusPill tone="warning">Low stock</StatusPill>
-              </li>
-            ))}
-            {inactiveRegisters.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-md">
-                <span className="type-body-sm text-ink">{r.name}</span>
-                <StatusPill tone="error">Inactive</StatusPill>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState title="All clear" description="Nothing needs your attention right now." />
-        )}
+        <CardTitle className="mb-md">Needs attention</CardTitle>
+        <DataTable<AttentionRow>
+          columns={[
+            { key: 'name', header: 'Name', render: (r) => r.name },
+            { key: 'detail', header: 'Qty', render: (r) => r.detail },
+            { key: 'status', header: 'Status', render: (r) => <StatusPill tone={r.tone}>{r.status}</StatusPill> },
+          ]}
+          rows={attentionRows}
+          rowKey={(r) => r.id}
+          empty={{ title: 'All clear', description: 'Nothing needs your attention right now.' }}
+        />
       </Card>
 
       <div>
-        <h2 className="type-card-title mb-md text-ink">Recent activity</h2>
+        <CardTitle className="mb-md">Recent activity</CardTitle>
         <DataTable<AuditLogEntry>
           columns={[
             { key: 'created_at', header: 'When', render: (r) => r.created_at },

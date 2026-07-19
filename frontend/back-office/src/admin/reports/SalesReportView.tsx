@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError, api, type Location, type SalesReportRow } from '../../lib/api'
 import { centsToDecimalString, downloadCsv, toCsv } from '../../lib/csv'
+import { isoDate } from '../../lib/date'
 import { cents, formatMoney } from '../../lib/money'
 
 const CURRENCY = 'USD' // display only; the server owns all arithmetic
@@ -16,10 +17,6 @@ const GROUP_BY_CHIPS: Array<{ id: GroupBy; label: string }> = [
   { id: 'category', label: 'Category' },
   { id: 'user', label: 'User' },
 ]
-
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10)
-}
 
 /** Last 7 days (inclusive), the brief's default range. */
 function defaultRange(): { from: string; to: string } {

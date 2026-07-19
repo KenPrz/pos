@@ -6,6 +6,8 @@
  * surfaces should never accidentally share credentials.
  */
 
+import { isoDate } from './date'
+
 /** Success is always `{ data: ... }`; errors are always `{ error: ... }`. Never both. */
 export type ApiSuccess<T> = { data: T }
 
@@ -422,10 +424,10 @@ export const api = {
   },
 
   today: {
-    // Today's local date in the browser — same convention SalesReportView's
-    // `defaultRange` already uses (isoDate via `toISOString().slice(0, 10)`).
+    // Same `isoDate` SalesReportView's `defaultRange` uses — one shared helper
+    // (`lib/date.ts`) rather than two copies of `toISOString().slice(0, 10)`.
     overview: (locationId: string): Promise<TodayOverview> => {
-      const date = new Date().toISOString().slice(0, 10)
+      const date = isoDate(new Date())
       return Promise.all([
         api.reports.sales({ location_id: locationId, from: date, to: date, group_by: 'day' }),
         api.reports.stock({ location_id: locationId, low_only: true }),

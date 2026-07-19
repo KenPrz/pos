@@ -44,7 +44,7 @@ sidebar switcher is set to, right now, with nothing to configure.
 - **Needs attention**: every low-stock variant (name and quantity) and every inactive
   register at this location, each with a colored status dot — yellow for low stock,
   red for a register that can't clock in a shift. Nothing to flag shows **"All
-  clear."** instead of an empty table.
+  clear"** instead of an empty table.
 - **Recent activity**: the first page of the **Audit** log — **When**, **Action**,
   **User** — the same trail **Audit** itself shows in full, trimmed to a glance.
 
