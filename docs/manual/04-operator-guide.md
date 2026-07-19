@@ -15,7 +15,7 @@ working tree, with nothing else installed on the host.
 
 ## First run
 
-Four commands, in this order:
+Five steps, in order — the third is a paste, not a command:
 
 1. `cp .env.example .env` — copies the documented shape of the root `.env` file. Only
    needed the first time.
@@ -171,7 +171,13 @@ variance that needs approval.
 > Note: variance approval must come from a **different** register at the same
 > location than the one that just closed. Closing a shift revokes every staff session
 > bound to that register, so a request from the just-closed till 401s — the check is
-> on location, not the specific terminal, so any other open till there can approve it.
+> on location, not the specific terminal, so a request from any other open till there
+> succeeds. This version's register app doesn't have a screen for it, though: a till
+> only ever shows its own currently open shift, never another till's, so there's no
+> button to tap at that other till either. Approving today means calling the API
+> directly — `POST /api/v1/shifts/{id}/approve-variance` — with a staff session from
+> that other till, the way `scripts/e2e-lunch-service.sh` does it (see the
+> [Supervisor Guide](02-supervisor-guide.md)).
 
 **Port already in use.** Override the host-side port in `.env` rather than stopping
 whatever's already listening: `POS_DEV_API_PORT`, `POS_DEV_WEB_PORT`,

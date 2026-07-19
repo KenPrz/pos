@@ -40,7 +40,7 @@ Three roles cover everything. They're deliberately coarse:
 - **Cashier** — rings up sales, opens and closes their own shift, takes payments.
 - **Supervisor** — everything a cashier can do, plus the actions that let money or
   stock leave the business without a customer noticing: voids, discounts, refunds,
-  no-sale drawer opens, and approving a till's cash variance.
+  and approving a till's cash variance.
 - **Admin** — full access, including the back office (catalog, staff, locations,
   reports, the audit trail). Admin is a property of the person, not a role assigned
   per location — an admin is an admin everywhere.
@@ -48,9 +48,13 @@ Three roles cover everything. They're deliberately coarse:
 Cashier and supervisor are assigned **per location**: someone can be a cashier at one
 store and a supervisor at another, and the two don't mix.
 
-> Note: a supervisor action taken at the till (a void, a discount, a refund) prompts
-> for a supervisor's PIN on the spot — the cashier working the till doesn't need to
-> be logged out and back in.
+> Note: a supervisor action isn't a separate PIN prompt layered on top of a cashier's
+> session — there is no such prompt. Every supervisor-only screen and button is simply
+> gated by whoever is currently clocked in at that till. In practice, a cashier who
+> hits something that needs a supervisor (a void, a discount, a refund) clocks out, the
+> supervisor clocks in with their own PIN to do the one thing and clocks out again — or
+> the supervisor is already the one running that till for the shift. See the Supervisor
+> Guide.
 
 ## Signing in
 

@@ -121,22 +121,32 @@ broken down for **Refunds**, then **Paid in**, **Payouts**, **Drops**, and
 > is watching for, which is exactly why it's counted separately: reading **Orders
 > voided** as "genuine voids for the day" stays safe.
 
-## Approve a variance — from a different register
+## Approve a variance — a documented gap in this version
 
-When a shift closes outside the store's variance threshold, its result screen shows
+When a shift closes outside the store's variance threshold, its own result screen shows
 **Variance exceeds the threshold — needs supervisor approval.** with an **Approve
-variance** button, visible to whoever holds that permission.
+variance** button. Tapping it right there always fails: closing a shift immediately
+revokes every staff session tied to that register, so the very screen showing that
+button is already running on a dead session — the click lands as a session error and
+signs you straight back out to **Enter PIN**.
 
-Do this from a **different** register than the one that just closed — never the one
-that closed it. Closing a shift immediately revokes every staff session tied to that
-register, so tapping **Approve variance** on the till that just closed fails with a
-session error and signs you straight back out to **Enter PIN**. The same action
-succeeds from any other open till at the same location, because approval is checked
-against the location, not a specific terminal.
+The rule behind it is real and correctly location-scoped: approval is checked against
+the location, not a specific terminal, so a *different*, still-open till at the same
+location is allowed to approve it. But like the two gaps above, no register screen
+exists yet for that — each till's screen only ever knows about its own currently open
+shift (`GET /api/v1/shifts/current`), never a *different* till's. Nothing here lists
+another till's shift or renders an Approve button for it.
+
+Today, approving from elsewhere means calling the API directly —
+`POST /api/v1/shifts/{id}/approve-variance`, using a staff session from that other till
+— the same way `scripts/e2e-lunch-service.sh` does it, not a button anywhere in this
+app yet.
 
 > Note: this is expected behavior, not a bug to route around — see the Operator Guide's
 > [Troubleshooting](04-operator-guide.md#troubleshooting) for the same rule from the
-> other side of the counter.
+> other side of the counter. The revocation itself is deliberate (`docs/06-roadmap.md`'s
+> M5 notes); it's the register screen for reaching the approval from elsewhere that
+> doesn't exist yet.
 
 ## See also
 

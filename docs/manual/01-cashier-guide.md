@@ -133,7 +133,9 @@ counts on your drawer, not the till it came from.
 
 ## Close your shift
 
-1. Tap **Close shift**, next to your name at the top of the sale screen.
+1. Tap **Close shift**, in the sale screen's own header row (beside the order heading)
+   — not the carbon bar at the very top of the screen, which just holds your name and
+   **Clock out**.
 2. Physically count the drawer *before* looking at anything on screen — the expected
    figure is masked (`•••••`) until after you submit your count. This is deliberate: see
    the note below.
@@ -159,9 +161,13 @@ counts on your drawer, not the till it came from.
 - **"Only *N* units remain."** — the item ran out mid-sale. Pull it from the order, or
   ask a supervisor about a stock correction.
 - **A scan or an add-item comes back with an error instead of updating the cart.** —
-  usually the order changed under you: a supervisor voided a line, or two taps landed at
-  once. The screen already knows the current state; just try the action again and it
-  goes through against the latest totals, not the stale ones you were looking at.
+  usually the order changed since this screen last saw it: a supervisor voided a line,
+  or two taps landed at once. The server's message says what it found. If some *other*
+  action on this same screen has succeeded since (another line added, a void that went
+  through), the cart and totals in front of you are already current; if not, check
+  what's actually in the cart and repeat the action from there — don't assume a bare
+  retry will land, since the screen doesn't refresh itself just because one action
+  failed.
 - **"Cannot reach the server."** — the till lost its connection. Re-scanning the same
   barcode right after is safe; it won't add the item twice once the connection's back.
 
