@@ -63,8 +63,24 @@ migrate: ## Run pending migrations
 # Only Downtown's tokens are needed: e2e-retail-day.sh and the Till-1 leg of
 # e2e-lunch-service.sh / e2e-admin-day.sh all resolve through Bob/Alice, who
 # only hold roles at Downtown (see DatabaseSeeder::seedStaff).
-e2e: ## Reseed, then run all three committed e2e proofs (needs the api container reachable at http://127.0.0.1:8000 — the scripts hardcode it; override POS_DEV_API_PORT back to 8000 in root .env if something else is squatting on it)
-	@$(MAKE) seed | tee /tmp/pos-seed-out.txt
+#
+# Each `$(MAKE) seed` below is captured to a file with a plain redirect
+# (`> file 2>&1`), never piped through `tee` — a pipeline's exit status is
+# its LAST command's (tee always succeeds), which would silently swallow a
+# failed seed and let the target stumble on to grep an empty/stale file. The
+# `|| { cat file; exit 1; }` surfaces the real error and fails the target
+# at the seed step, exactly where it broke; the `cat` on the success path
+# re-prints the table so the target's own terminal output is unchanged.
+#
+# Leaves data behind: this target reseeds (destructively — `migrate:fresh`)
+# TWICE and runs three scripts' worth of orders/shifts/payments against
+# whichever seed came last, so the dev db is NOT empty when this finishes —
+# it holds the second seed's fixtures plus e2e-admin-day.sh's writes. Run
+# `make seed` again afterward for a clean slate before using the dev stack
+# for anything else.
+e2e: ## Reseed (twice — see comment above), run all three committed e2e proofs, THEN LEAVE THE DEV DB DIRTY with two seeds' + e2e-admin-day's data (re-run `make seed` after for a clean slate). Needs the api container reachable at http://127.0.0.1:8000 — the scripts hardcode it; override POS_DEV_API_PORT back to 8000 in root .env if something else is squatting on it.
+	@$(MAKE) seed > /tmp/pos-seed-out.txt 2>&1 || { cat /tmp/pos-seed-out.txt; exit 1; }
+	@cat /tmp/pos-seed-out.txt
 	@grep '| DT / Till 1 ' /tmp/pos-seed-out.txt | sed -E 's/^\| *DT \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > /tmp/pos-e2e-till1.txt
 	@grep '| DT / Till 2 ' /tmp/pos-seed-out.txt | sed -E 's/^\| *DT \/ Till 2 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > /tmp/pos-e2e-till2.txt
 	@test -s /tmp/pos-e2e-till1.txt && test -s /tmp/pos-e2e-till2.txt || { echo "could not extract DT / Till 1|2 device tokens — seeder's printed table format may have changed"; exit 1; }
@@ -84,7 +100,8 @@ e2e: ## Reseed, then run all three committed e2e proofs (needs the api container
 	@# Till 1 to food mode and reissues its token, which e2e-lunch-service.sh
 	@# depends on still being retail-mode — so admin-day must stay last, and a
 	@# second reseed is the only fix that touches neither script nor ordering.
-	@$(MAKE) seed | tee /tmp/pos-seed-out2.txt
+	@$(MAKE) seed > /tmp/pos-seed-out2.txt 2>&1 || { cat /tmp/pos-seed-out2.txt; exit 1; }
+	@cat /tmp/pos-seed-out2.txt
 	@grep '| DT / Till 1 ' /tmp/pos-seed-out2.txt | sed -E 's/^\| *DT \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > /tmp/pos-e2e-till1b.txt
 	@test -s /tmp/pos-e2e-till1b.txt || { echo "could not extract DT / Till 1 device token on the second reseed"; exit 1; }
 	POS_ADMIN_EMAIL=admin@pos.test POS_ADMIN_PASSWORD=admin-dev-password POS_DEVICE_TOKEN=$$(cat /tmp/pos-e2e-till1b.txt) POS_E2E_PIN=9876 bash scripts/e2e-admin-day.sh
