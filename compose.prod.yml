@@ -19,13 +19,22 @@ services:
       POSTGRES_DB: pos
       POSTGRES_USER: pos
       POSTGRES_PASSWORD: ${POS_DB_PASSWORD:?}
+      # Deterministic collation. Left to the host locale, index ordering can
+      # differ between machines (and a glibc upgrade can silently corrupt text
+      # indexes even on one machine). Only takes effect on a fresh volume —
+      # initdb args are read once, at first cluster creation; re-running
+      # against an existing pgdata volume is a no-op.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pos -d pos"]
+      # Depends on the DB accepting queries, not just the port being open —
+      # pg_isready returns true during recovery, before it can serve anything.
+      test: ["CMD-SHELL", "pg_isready -U pos -d pos -q && psql -U pos -d pos -qtAc 'select 1' >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
   api:
     build: { context: backend, target: prod }

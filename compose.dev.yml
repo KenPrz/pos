@@ -9,15 +9,24 @@ services:
       POSTGRES_DB: pos
       POSTGRES_USER: pos
       POSTGRES_PASSWORD: ${POS_DEV_DB_PASSWORD:-pos}
+      # Deterministic collation. Left to the host locale, index ordering can
+      # differ between machines (and a glibc upgrade can silently corrupt text
+      # indexes even on one machine). Only takes effect on a fresh volume —
+      # initdb args are read once, at first cluster creation; re-running
+      # against an existing pgdata volume is a no-op.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
     ports:
       - "${POS_DEV_DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pos -d pos"]
+      # Depends on the DB accepting queries, not just the port being open —
+      # pg_isready returns true during recovery, before it can serve anything.
+      test: ["CMD-SHELL", "pg_isready -U pos -d pos -q && psql -U pos -d pos -qtAc 'select 1' >/dev/null"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
   api:
     build: { context: backend, target: dev }
@@ -36,7 +45,13 @@ services:
       db: { condition: service_healthy }
     environment:
       APP_ENV: local
-      APP_KEY: ${POS_DEV_APP_KEY:?run 'make dev-key' once and put it in .env}
+      # Soft default, not `:?required` — a required var with no default fails
+      # interpolation for the WHOLE compose file (every service, every
+      # command, including `up -d db` alone and `dev-key`'s own `build api`),
+      # which is exactly what a blank .env.example-copied POS_DEV_APP_KEY did.
+      # The loud failure lives in backend/docker/entrypoint.sh instead, so only
+      # the api service (the one that actually needs the key) refuses to boot.
+      APP_KEY: ${POS_DEV_APP_KEY:-}
       APP_DEBUG: "true"
       DB_CONNECTION: pgsql
       DB_HOST: db

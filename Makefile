@@ -14,9 +14,14 @@ COMPOSE_VAR := $(if $(filter prod,$(COMPOSE)),$(COMPOSE_PROD),$(COMPOSE_DEV))
 help: ## List available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
+# The echo below deliberately doesn't print concrete ports: .env's
+# POS_DEV_*_PORT overrides land in docker compose (which reads .env itself),
+# not in make's recipe shell (nothing here `include`s .env), so hardcoding the
+# defaults here would lie the moment someone actually overrides a port. `make
+# ps` asks Docker, which knows the truth.
 dev: ## Bring up the full dev stack (db, api, register, back office)
 	$(COMPOSE_DEV) up -d --build
-	@echo "api http://localhost:8000  register http://localhost:5174  back office http://localhost:5175"
+	@echo "stack is up — see 'make ps' for the actual host ports (defaults: api 8000, register 5174, back office 5175, overridable via POS_DEV_*_PORT in .env)"
 
 dev-down: ## Stop the dev stack (volumes survive)
 	$(COMPOSE_DEV) down
@@ -27,15 +32,18 @@ logs: ## Tail dev stack logs
 ps: ## Dev stack status
 	$(COMPOSE_DEV) ps
 
-# Mints from the api dev image compose itself builds (pos-dev-api), NOT the
-# pos-api:dev tag from Task 1's raw `docker build` — that image never gets
-# app code, so `artisan` isn't in it. The dev stage's own USER is `pos`
-# (backend/Dockerfile), which is uid 1000 — matches the host user by
-# construction, so files this writes under the bind mount are never root's.
-# See .env.example for the full explanation.
-dev-key: ## Mint an APP_KEY for the root .env
-	$(COMPOSE_DEV) build api
-	docker run --rm -v "$(CURDIR)/backend:/app" pos-dev-api php artisan key:generate --show
+# Deliberately compose-free and vendor-free: this has to work before .env has
+# a key in it at all, and compose.dev.yml's api service can't even be built —
+# let alone run `artisan key:generate` — until it does (a blank
+# POS_DEV_APP_KEY used to be a hard `:?required` in compose.dev.yml, which
+# fails interpolation for the WHOLE file, including this target's own
+# `build api`). An APP_KEY is nothing but base64 of 32 random bytes, so mint
+# it with plain PHP instead, from the Dockerfile's `base` target (has PHP,
+# never touches vendor/ or app code): build that image, run it once for its
+# one line of output, done. Nothing here needs Postgres, compose, or a key
+# that already exists — just Docker and this repo.
+dev-key: ## Mint an APP_KEY for the root .env — no vendor, no compose, no existing key needed
+	docker run --rm $$(docker build -q --target base backend) php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
 
 # compose.dev.yml's api/web/back-office services start as root (to chown a
 # fresh named volume once) then hand off to a non-root user for good — pos
@@ -78,15 +86,25 @@ migrate: ## Run pending migrations
 # it holds the second seed's fixtures plus e2e-admin-day.sh's writes. Run
 # `make seed` again afterward for a clean slate before using the dev stack
 # for anything else.
+# Target-specific variable, simply-expanded (`:=`): computed once, the first
+# time make binds variables for this target's recipe — every recipe line
+# below is still its own separate shell (make doesn't do .ONESHELL here), but
+# make substitutes the same literal directory path into all of them at
+# expansion time, so they share one private temp dir without needing a shell
+# variable to survive across shells. `mktemp -d` is mode 0700 — unlike the old
+# fixed /tmp/pos-*.txt names (mode 0644, predictable, readable by any local
+# user), nothing but this user can even list what's inside, which matters
+# here because these files hold live device tokens.
+e2e: E2E_TMP := $(shell mktemp -d)
 e2e: ## Reseed (twice — see comment above), run all three committed e2e proofs, THEN LEAVE THE DEV DB DIRTY with two seeds' + e2e-admin-day's data (re-run `make seed` after for a clean slate). Needs the api container reachable at http://127.0.0.1:8000 — the scripts hardcode it; override POS_DEV_API_PORT back to 8000 in root .env if something else is squatting on it.
-	@$(MAKE) seed > /tmp/pos-seed-out.txt 2>&1 || { cat /tmp/pos-seed-out.txt; exit 1; }
-	@cat /tmp/pos-seed-out.txt
-	@grep '| DT / Till 1 ' /tmp/pos-seed-out.txt | sed -E 's/^\| *DT \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > /tmp/pos-e2e-till1.txt
-	@grep '| DT / Till 2 ' /tmp/pos-seed-out.txt | sed -E 's/^\| *DT \/ Till 2 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > /tmp/pos-e2e-till2.txt
-	@test -s /tmp/pos-e2e-till1.txt && test -s /tmp/pos-e2e-till2.txt || { echo "could not extract DT / Till 1|2 device tokens — seeder's printed table format may have changed"; exit 1; }
-	@echo "extracted: DT/Till1=$$(cut -c1-8 /tmp/pos-e2e-till1.txt)... DT/Till2=$$(cut -c1-8 /tmp/pos-e2e-till2.txt)..."
-	POS_DEVICE_TOKEN=$$(cat /tmp/pos-e2e-till1.txt) bash scripts/e2e-retail-day.sh
-	POS_DEVICE_TOKEN=$$(cat /tmp/pos-e2e-till2.txt) POS_DEVICE_TOKEN_2=$$(cat /tmp/pos-e2e-till1.txt) bash scripts/e2e-lunch-service.sh
+	@$(MAKE) seed > $(E2E_TMP)/pos-seed-out.txt 2>&1 || { cat $(E2E_TMP)/pos-seed-out.txt; exit 1; }
+	@cat $(E2E_TMP)/pos-seed-out.txt
+	@grep '| DT / Till 1 ' $(E2E_TMP)/pos-seed-out.txt | sed -E 's/^\| *DT \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-till1.txt
+	@grep '| DT / Till 2 ' $(E2E_TMP)/pos-seed-out.txt | sed -E 's/^\| *DT \/ Till 2 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-till2.txt
+	@test -s $(E2E_TMP)/pos-e2e-till1.txt && test -s $(E2E_TMP)/pos-e2e-till2.txt || { echo "could not extract DT / Till 1|2 device tokens — seeder's printed table format may have changed"; exit 1; }
+	@echo "extracted: DT/Till1=$$(cut -c1-8 $(E2E_TMP)/pos-e2e-till1.txt)... DT/Till2=$$(cut -c1-8 $(E2E_TMP)/pos-e2e-till2.txt)..."
+	POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-till1.txt) bash scripts/e2e-retail-day.sh
+	POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-till2.txt) POS_DEVICE_TOKEN_2=$$(cat $(E2E_TMP)/pos-e2e-till1.txt) bash scripts/e2e-lunch-service.sh
 	@# e2e-admin-day.sh's sales-report checks are location+date scoped, not shift-
 	@# scoped like the other two scripts' Z-reports, and it asserts an absolute
 	@# Downtown day-gross of exactly 510c — an assumption baked in when it was
@@ -100,11 +118,12 @@ e2e: ## Reseed (twice — see comment above), run all three committed e2e proofs
 	@# Till 1 to food mode and reissues its token, which e2e-lunch-service.sh
 	@# depends on still being retail-mode — so admin-day must stay last, and a
 	@# second reseed is the only fix that touches neither script nor ordering.
-	@$(MAKE) seed > /tmp/pos-seed-out2.txt 2>&1 || { cat /tmp/pos-seed-out2.txt; exit 1; }
-	@cat /tmp/pos-seed-out2.txt
-	@grep '| DT / Till 1 ' /tmp/pos-seed-out2.txt | sed -E 's/^\| *DT \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > /tmp/pos-e2e-till1b.txt
-	@test -s /tmp/pos-e2e-till1b.txt || { echo "could not extract DT / Till 1 device token on the second reseed"; exit 1; }
-	POS_ADMIN_EMAIL=admin@pos.test POS_ADMIN_PASSWORD=admin-dev-password POS_DEVICE_TOKEN=$$(cat /tmp/pos-e2e-till1b.txt) POS_E2E_PIN=9876 bash scripts/e2e-admin-day.sh
+	@$(MAKE) seed > $(E2E_TMP)/pos-seed-out2.txt 2>&1 || { cat $(E2E_TMP)/pos-seed-out2.txt; exit 1; }
+	@cat $(E2E_TMP)/pos-seed-out2.txt
+	@grep '| DT / Till 1 ' $(E2E_TMP)/pos-seed-out2.txt | sed -E 's/^\| *DT \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-till1b.txt
+	@test -s $(E2E_TMP)/pos-e2e-till1b.txt || { echo "could not extract DT / Till 1 device token on the second reseed"; exit 1; }
+	POS_ADMIN_EMAIL=admin@pos.test POS_ADMIN_PASSWORD=admin-dev-password POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-till1b.txt) POS_E2E_PIN=9876 bash scripts/e2e-admin-day.sh
+	@rm -rf $(E2E_TMP)
 
 test: test-backend test-web test-bo ## All suites, in containers
 
