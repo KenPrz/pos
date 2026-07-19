@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { adminToken, api, type AdminSession, type AdminUser } from '../lib/api'
+import { useQuery } from '@tanstack/react-query'
+import { useCallback, useEffect, useState } from 'react'
+import { ApiError, adminToken, api, type AdminSession, type AdminUser } from '../lib/api'
 import { LoginScreen } from './LoginScreen'
 import { Shell } from './Shell'
 
@@ -18,6 +19,11 @@ export function AdminApp() {
   // tree — so the machine boots neutral and resolves its real stage after mount.
   const [stage, setStage] = useState<Stage>({ name: 'booting' })
   const [user, setUser] = useState<AdminUser | null>(null)
+  // The sidebar's location switcher (Plate layout, Task 2) lives here — the ONE place
+  // that owns "which location" for the whole shell. Today reads it now; Reports/Stock
+  // keep their own per-screen pickers until Task 5 threads this down and removes them
+  // (the frozen contract's named switcher-relocation exception).
+  const [locationId, setLocationId] = useState<string | null>(null)
 
   useEffect(() => {
     // A reload has no in-memory `user` yet — hydrate it from the cache Task 8's review
@@ -40,17 +46,38 @@ export function AdminApp() {
   // The shared 401 convention (register app idiom): whichever screen's query or mutation
   // hits a 401 calls this, same effect as logout minus the (pointless — the token is
   // already dead) server round trip.
-  const handleUnauthorized = () => {
+  const handleUnauthorized = useCallback(() => {
     adminToken.clear()
     adminToken.clearUser()
     setUser(null)
     setStage({ name: 'login' })
-  }
+  }, [])
+
+  // Cached the same way PlacesSection/ReportsSection already fetch locations — same
+  // queryKey, so this doesn't cost a second request once a section mounts its own.
+  const locations = useQuery({
+    queryKey: ['admin', 'locations'],
+    queryFn: api.locations.list,
+    enabled: stage.name === 'shell',
+  })
+
+  useEffect(() => {
+    if (locations.error instanceof ApiError && locations.error.status === 401) handleUnauthorized()
+  }, [locations.error, handleUnauthorized])
+
+  // Default to the first location once the list arrives, same convention
+  // SalesReportView/StockReportView already use for their own pickers.
+  useEffect(() => {
+    if (!locationId && locations.data && locations.data.length > 0) {
+      setLocationId(locations.data[0].id)
+    }
+  }, [locations.data, locationId])
 
   // Booting and login are chrome-less relative to the shell: Shell is the one that
-  // owns the full chassis (carbon bar + nav rail), same as the register's Register()
-  // owns its single <main className="shell"> for every stage — nesting a second
-  // <main> inside Shell's would be wrong, so these two earlier stages get their own.
+  // owns the full chassis (the Plate sidebar + section body), same as the register's
+  // Register() owns its single <main className="shell"> for every stage — nesting a
+  // second <main> inside Shell's would be wrong, so these two earlier stages get their
+  // own.
   if (stage.name === 'booting') {
     return (
       <main className="shell">
@@ -76,5 +103,16 @@ export function AdminApp() {
     )
   }
 
-  return <Shell user={user} onLogout={logout} onUnauthorized={handleUnauthorized} />
+  const selectedLocation = locations.data?.find((l) => l.id === locationId) ?? null
+
+  return (
+    <Shell
+      user={user}
+      onLogout={logout}
+      onUnauthorized={handleUnauthorized}
+      location={selectedLocation}
+      locations={locations.data ?? []}
+      onLocationChange={setLocationId}
+    />
+  )
 }

@@ -87,7 +87,7 @@ export function AppSidebar({
                       className={cn(
                         'flex w-full items-center justify-between gap-xs border-l-2 border-transparent',
                         'px-xs py-sm text-left type-body-sm text-ink-muted hover:bg-surface-1',
-                        isActive && 'border-primary font-semibold text-ink'
+                        isActive && 'border-primary bg-surface-1 font-semibold text-ink'
                       )}
                     >
                       <span>{item.label}</span>
