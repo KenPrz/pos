@@ -1,0 +1,72 @@
+/**
+ * Receipt + print styles — the one survivor of the UI-rework cutover (Task 9).
+ * The printable receipt stays plain and functional, unchanged from the pre-rework
+ * register (thermal printers don't do design systems). Everything else from the
+ * legacy index.css/tokens.css is gone; the values those files supplied via custom
+ * properties are inlined here so this file stands alone.
+ */
+
+.receipt {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px dashed #5a5f8c;
+  background: #ffffff;
+}
+
+.receipt h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.receipt .muted {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #3d4f97;
+}
+
+.receipt table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.receipt td {
+  padding: 4px 0;
+  border-bottom: 1px solid #dedede;
+}
+
+.receipt tr.total td {
+  font-weight: 700;
+  border-top: 1px solid #21242e;
+  border-bottom: none;
+}
+
+.receipt .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  button,
+  form {
+    display: none;
+  }
+
+  body {
+    background: none;
+    color: #000;
+  }
+
+  .hero-amount {
+    color: #000;
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+    /* !important: carbon.css loads after this file, so its unlayered
+       .type-display-md (42px) wins an equal-specificity tie on the migrated
+       hero — print must stay 24px regardless of source order. */
+    font-size: 24px !important;
+  }
+
+  .receipt {
+    border: none;
+  }
+}

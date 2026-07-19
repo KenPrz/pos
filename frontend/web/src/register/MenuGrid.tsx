@@ -3,17 +3,18 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { api, type CatalogProduct, type CatalogVariant } from '../lib/api'
-import { cents, formatMoney } from '../lib/money'
+import { MoneyText } from '@/components/MoneyText'
+import { TileButton } from '@/components/TileButton'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ModifierSheet } from './ModifierSheet'
 
 const CURRENCY = 'USD'
-const fm = (n: number) => formatMoney(cents(n), CURRENCY)
 
 /**
- * Food-mode ordering surface: a category rail plus a tile grid, replacing the idle area
- * below SaleScreen's scan field. Consumes `api.catalog()` only — it knows nothing about
- * orders, mutations, or idempotency; the pick path (open-order-on-first-pick, keyed
- * addLine) lives in SaleScreen, same as the scan path already does.
+ * Food-mode ordering surface: a category tab strip plus a tile grid, replacing the idle
+ * area below SaleScreen's scan field. Consumes `api.catalog()` only — it knows nothing
+ * about orders, mutations, or idempotency; the pick path (open-order-on-first-pick,
+ * keyed addLine) lives in SaleScreen, same as the scan path already does.
  *
  * A product with exactly one variant is picked directly by product name (the seeder's
  * "Default" variant is deliberately hidden from staff). A product with several variants
@@ -38,9 +39,9 @@ export function MenuGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only the "haven't picked yet" transition should run this
   }, [categories.length])
 
-  if (catalog.isLoading) return <p className="muted">Loading menu…</p>
-  if (catalog.isError) return <p className="error">Could not load the menu.</p>
-  if (categories.length === 0) return <p className="muted">No menu configured for this register.</p>
+  if (catalog.isLoading) return <p className="type-body-sm text-ink-muted">Loading menu…</p>
+  if (catalog.isError) return <p className="type-body-sm text-error">Could not load the menu.</p>
+  if (categories.length === 0) return <p className="type-body-sm text-ink-muted">No menu configured for this register.</p>
 
   const products = (catalog.data?.products ?? []).filter((p) => p.category_id === activeCategoryId)
   const variantsFor = (product: CatalogProduct) =>
@@ -60,45 +61,47 @@ export function MenuGrid({
   const pendingGroupIds = new Set(pendingGroups.map((g) => g.id))
   const pendingModifiers = pending ? (catalog.data?.modifiers ?? []).filter((m) => pendingGroupIds.has(m.group_id)) : []
 
-  return (
-    <div className="menu-grid">
-      <nav className="menu-rail" aria-label="Menu categories">
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            type="button"
-            className={`menu-rail-tab${cat.id === activeCategoryId ? ' active' : ''}`}
-            aria-pressed={cat.id === activeCategoryId}
-            onClick={() => setActiveCategoryId(cat.id)}
-          >
-            {cat.name}
-          </button>
-        ))}
-      </nav>
+  const tileMeta = (variant: CatalogVariant) => (
+    <MoneyText cents={variant.price_cents} currency={CURRENCY} size="line" className="text-ink" />
+  )
 
-      <div className="menu-tiles">
+  return (
+    <div className="flex flex-col gap-md">
+      <Tabs value={activeCategoryId ?? ''} onValueChange={setActiveCategoryId}>
+        <TabsList aria-label="Menu categories" className="flex-wrap">
+          {categories.map((cat) => (
+            <TabsTrigger key={cat.id} value={cat.id} className="min-h-[48px]">
+              {cat.name}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-sm">
         {products.map((product) => {
           const variants = variantsFor(product)
           if (variants.length === 0) return null
           if (variants.length === 1) {
             const variant = variants[0]
             return (
-              <button key={product.id} type="button" className="menu-tile" onClick={() => handlePick(product, variant)}>
-                <span className="menu-tile-name">{product.name}</span>
-                <span className="menu-tile-price num">{fm(variant.price_cents)}</span>
-              </button>
+              <TileButton
+                key={product.id}
+                title={product.name}
+                meta={tileMeta(variant)}
+                onClick={() => handlePick(product, variant)}
+              />
             )
           }
           return variants.map((variant) => (
-            <button key={variant.id} type="button" className="menu-tile" onClick={() => handlePick(product, variant)}>
-              <span className="menu-tile-name">
-                {product.name} — {variant.name}
-              </span>
-              <span className="menu-tile-price num">{fm(variant.price_cents)}</span>
-            </button>
+            <TileButton
+              key={variant.id}
+              title={`${product.name} — ${variant.name}`}
+              meta={tileMeta(variant)}
+              onClick={() => handlePick(product, variant)}
+            />
           ))
         })}
-        {products.length === 0 && <p className="muted">Nothing in this category.</p>}
+        {products.length === 0 && <p className="type-body-sm text-ink-muted">Nothing in this category.</p>}
       </div>
 
       {pending && (

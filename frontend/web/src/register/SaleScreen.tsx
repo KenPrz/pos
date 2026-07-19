@@ -41,7 +41,8 @@ type Phase =
 
 /** The lines/discount/tax/total table shared by the single-order and split done plates.
     Deliberately still on the legacy `.receipt` classes: the printable receipt and its
-    @media print CSS are preserved as-is (plain, functional) — do not restyle. */
+    @media print CSS survived the Task 9 cutover as src/styles/print.css, preserved
+    as-is (plain, functional) — do not restyle. */
 function ReceiptCard({ receipt }: { receipt: Receipt }) {
   return (
     <div className="receipt">

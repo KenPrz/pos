@@ -189,8 +189,9 @@ RBAC. Seed with `php artisan migrate:fresh --seed`; it prints development PINs.
 open/close with variance. Seeder prints development device tokens for the register SPA.
 
 **M4 complete** — retail: voids, discounts, refunds with restock, external card, cash
-movements, stock ops, Z-report; register UI restyled to DESIGN.md console chrome and
-ported to Next.js + React Query.
+movements, stock ops, Z-report; register UI restyled and ported to Next.js + React
+Query (design authority today: the root `DESIGN.md` — the old console-chrome spec at
+`frontend/web/DESIGN.md` is gone).
 
 **M5 complete** — food service: open tabs with `table_ref`, modifiers end-to-end
 (repeats legal), fired-course coursing (`prep_state`), qty edits, transfer between

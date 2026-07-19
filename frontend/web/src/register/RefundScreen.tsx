@@ -4,6 +4,10 @@ import { useMutation } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Order, type Refund } from '../lib/api'
 import { cents, formatMoney } from '../lib/money'
+import { MoneyText } from '@/components/MoneyText'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 
 const CURRENCY = 'USD'
 const fm = (n: number) => formatMoney(cents(n), CURRENCY)
@@ -72,14 +76,18 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
 
   if (result) {
     return (
-      <section className="form-panel ok">
-        <h2>Refund complete</h2>
-        <div className="hero-panel">
-          <p className="hero-eyebrow">Refund — cash from the drawer</p>
-          <p className="hero-amount">{fm(result.amount_cents)}</p>
+      <section className="flex max-w-[640px] flex-col gap-lg">
+        <h2 className="type-headline">Refund complete</h2>
+        {/* Same hero plate as SaleScreen's change-due panel; `hero-amount` stays for
+            print parity (print.css pins it to 24px). */}
+        <div className="flex flex-col items-center gap-xs border border-hairline bg-surface-1 px-lg py-xl print:border-0 print:bg-transparent">
+          <p className="type-caption text-ink-muted">Refund — cash from the drawer</p>
+          <MoneyText cents={result.amount_cents} currency={CURRENCY} size="total" className="hero-amount" />
         </div>
-        <p className="muted">Order {order?.number} · {result.lines.length} line{result.lines.length === 1 ? '' : 's'} · {result.reason}</p>
-        <button className="btn btn-submit" onClick={onDone}>Back to register</button>
+        <p className="type-body-sm text-ink-muted">Order {order?.number} · {result.lines.length} line{result.lines.length === 1 ? '' : 's'} · {result.reason}</p>
+        <div>
+          <Button size="lg" onClick={onDone}>Back to register</Button>
+        </div>
       </section>
     )
   }
@@ -87,65 +95,70 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
   const refundableLines = (order?.lines ?? []).filter((l) => !l.voided_at)
 
   return (
-    <section className="form-panel">
-      <header className="row">
-        <h2>Refund a sale</h2>
-        <button type="button" className="btn btn-secondary" onClick={onDone}>Back</button>
+    <section className="flex max-w-[640px] flex-col gap-lg">
+      <header className="flex items-center justify-between gap-md">
+        <h2 className="type-headline">Refund a sale</h2>
+        <Button type="button" variant="secondary" onClick={onDone}>Back</Button>
       </header>
 
-      <form onSubmit={submitLookup}>
-        <label>
-          Receipt number
-          <input
+      <form onSubmit={submitLookup} className="flex flex-col gap-md">
+        <label className="block">
+          <span className="type-body-sm text-ink-muted">Receipt number</span>
+          <Input
             autoFocus placeholder="DT-20260716-0001"
             value={number} onChange={(e) => setNumber(e.target.value)}
+            className="mt-xs h-[56px]"
           />
         </label>
-        <button type="submit" className="btn btn-utility" disabled={lookup.isPending}>
-          {lookup.isPending ? 'Finding…' : 'Find order'}
-        </button>
+        <div>
+          <Button type="submit" variant="tertiary" size="lg" disabled={lookup.isPending}>
+            {lookup.isPending ? 'Finding…' : 'Find order'}
+          </Button>
+        </div>
       </form>
 
       {order && (
-        <form onSubmit={submitRefund}>
-          <hr className="dotted-divider" />
-          <p className="picker-label">Order {order.number} — {fm(order.total_cents)} paid</p>
-          <div className="cart">
+        <form onSubmit={submitRefund} className="flex flex-col gap-md border-t border-hairline pt-lg">
+          <p className="type-body-sm text-ink-muted">Order {order.number} — {fm(order.total_cents)} paid</p>
+          <div className="border border-hairline">
             {refundableLines.map((l) => {
               const pick = picks[l.id] ?? { qty: '', restock: true }
               return (
-                <div className="cart-row refund-row" key={l.id}>
-                  <span className="cart-row-name">{l.name}</span>
-                  <span className="cart-row-qty">of {l.qty}</span>
-                  <input
-                    className="refund-qty" inputMode="decimal" placeholder="0"
+                <div className="flex min-h-[56px] items-center gap-sm border-b border-hairline px-md py-sm last:border-b-0" key={l.id}>
+                  <span className="type-body-lg min-w-0 flex-1">{l.name}</span>
+                  <span className="type-body-sm shrink-0 text-ink-muted">of {l.qty}</span>
+                  <Input
+                    inputMode="decimal" placeholder="0"
                     aria-label={`Quantity of ${l.name} to refund`}
                     value={pick.qty}
                     onChange={(e) => setPicks({ ...picks, [l.id]: { ...pick, qty: e.target.value } })}
+                    className="type-money w-[72px] shrink-0 text-right"
                   />
-                  <label className="restock-check">
-                    <input
-                      type="checkbox" checked={pick.restock}
-                      onChange={(e) => setPicks({ ...picks, [l.id]: { ...pick, restock: e.target.checked } })}
+                  <span className="flex min-h-[48px] shrink-0 items-center gap-xs px-xs">
+                    <Checkbox
+                      id={`restock-${l.id}`} checked={pick.restock}
+                      onCheckedChange={(checked) => setPicks({ ...picks, [l.id]: { ...pick, restock: checked === true } })}
                     />
-                    Restock
-                  </label>
+                    {/* The label is the hit area — clicks anywhere on it toggle the checkbox. */}
+                    <label htmlFor={`restock-${l.id}`} className="type-body-sm cursor-pointer">Restock</label>
+                  </span>
                 </div>
               )
             })}
           </div>
-          <label>
-            Reason
-            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Faulty" />
+          <label className="block">
+            <span className="type-body-sm text-ink-muted">Reason</span>
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Faulty" className="mt-xs" />
           </label>
-          <hr className="dotted-divider" />
-          <button type="submit" className="btn btn-submit" disabled={refund.isPending}>
-            {refund.isPending ? 'Refunding…' : 'Refund cash'}
-          </button>
+          <div>
+            <Button type="submit" size="lg" disabled={refund.isPending}>
+              {refund.isPending ? 'Refunding…' : 'Refund cash'}
+            </Button>
+          </div>
         </form>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="type-body-sm text-error">{error}</p>}
     </section>
   )
 }
