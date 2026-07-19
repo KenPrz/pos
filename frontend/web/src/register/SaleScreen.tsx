@@ -444,7 +444,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
           <div className="flex flex-col items-center gap-xs border border-hairline bg-surface-1 px-lg py-xl print:border-0 print:bg-transparent">
             <p className="type-caption text-ink-muted">{paidCash ? 'Change' : 'Card'}</p>
             {paidCash ? (
-              <MoneyText cents={payment.change_cents ?? 0} currency={CURRENCY} size="total" />
+              <MoneyText cents={payment.change_cents ?? 0} currency={CURRENCY} size="total" className="hero-amount" />
             ) : (
               <p className="type-display-md">No change due</p>
             )}
@@ -584,7 +584,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
         )}
 
         {order && phase.name === 'tender' && !splitPromptOpen && (
-          <form id="tender-form" onSubmit={submitPay} className="flex flex-col gap-md">
+          <form onSubmit={submitPay} className="flex flex-col gap-md">
             <div className="flex gap-sm" role="group" aria-label="Payment method">
               <Button
                 type="button" size="lg" className="flex-1"

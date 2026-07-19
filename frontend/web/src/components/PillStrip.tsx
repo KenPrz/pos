@@ -13,10 +13,13 @@ export interface PillStripProps {
   items: PillStripItem[]
 }
 
-// The split-payment strip: one chip per check, its label ("Check 1") and the amount
-// still due as a preformatted string (the screen owns formatting — 'Paid' when
-// settled). Purely presentational: `active` is the check being tendered now (info
-// blue), `settled` is paid (success), `pending` is waiting its turn (neutral).
+/**
+ * The split-payment strip: one chip per check, its label ("Check 1") and the amount
+ * still due as a preformatted string (the screen owns formatting — 'Paid' when
+ * settled). Purely presentational: `active` is the check being tendered now (info
+ * blue), `settled` is paid (success), `pending` is waiting its turn (neutral).
+ * Each pill exposes `data-state="active"|"settled"|"pending"` as its public state hook.
+ */
 const STATE_VARIANT: Record<PillState, 'info' | 'success' | 'neutral'> = {
   active: 'info',
   settled: 'success',
