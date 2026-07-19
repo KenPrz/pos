@@ -465,7 +465,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
           <div className="flex flex-col gap-sm border-b border-hairline pb-lg print:border-0" key={outcome.order.id}>
             <header className="flex items-center justify-between gap-md">
               <h3 className="type-card-title">Check {ix + 1} — order {outcome.order.number}</h3>
-              {receipt && <Button type="button" variant="ghost" onClick={() => window.print()}>Print</Button>}
+              {receipt && <Button type="button" variant="ghost" className="min-h-[48px]" onClick={() => window.print()}>Print</Button>}
             </header>
             <p className="type-body-sm text-ink-muted">
               {outcome.payment.driver === 'cash'
@@ -520,11 +520,11 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
                   ))}
                 </div>
                 <Input
-                  placeholder="Reason (required)…"
+                  placeholder="Reason (required)…" className="min-h-[48px]"
                   value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}
                 />
                 <div>
-                  <Button type="button" variant="ghost" onClick={() => setDiscountOpen(false)}>Cancel</Button>
+                  <Button type="button" variant="ghost" className="min-h-[48px]" onClick={() => setDiscountOpen(false)}>Cancel</Button>
                 </div>
               </div>
             )}
@@ -538,7 +538,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
                 }}
               >
                 <Input
-                  autoFocus placeholder="Reason for voiding the whole order…"
+                  autoFocus placeholder="Reason for voiding the whole order…" className="min-h-[48px]"
                   value={voidReason} onChange={(e) => setVoidReason(e.target.value)}
                 />
                 <Button type="submit" variant="danger" size="lg">Void order</Button>
@@ -640,7 +640,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
         {/* Present through scanning and tender exactly as before; the done plates never
             offered it (they were separate screens pre-rework) and still don't. */}
         {inSale && (
-          <Button type="button" variant="ghost" onClick={onCloseShift}>Close shift</Button>
+          <Button type="button" variant="ghost" className="min-h-[48px]" onClick={onCloseShift}>Close shift</Button>
         )}
       </header>
 
@@ -686,11 +686,11 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
                 }}
               >
                 <Input
-                  autoFocus placeholder="Reason for the void…"
+                  autoFocus placeholder="Reason for the void…" className="min-h-[48px]"
                   value={voidReason} onChange={(e) => setVoidReason(e.target.value)}
                 />
-                <Button type="submit" variant="danger">Confirm void</Button>
-                <Button type="button" variant="ghost" onClick={() => setVoidingLineId(null)}>Keep</Button>
+                <Button type="submit" variant="danger" className="min-h-[48px]">Confirm void</Button>
+                <Button type="button" variant="ghost" className="min-h-[48px]" onClick={() => setVoidingLineId(null)}>Keep</Button>
               </form>
             )}
           </div>

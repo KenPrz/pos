@@ -28,7 +28,7 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
             onDone()
           }}
         >
-          <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="1|xxxxxxxx…" autoFocus />
+          <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="1|xxxxxxxx…" autoFocus className="min-h-[48px]" />
           <Button type="submit" size="lg" className="w-full">Save</Button>
         </form>
       </CardContent>

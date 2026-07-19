@@ -98,7 +98,7 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
     <section className="flex max-w-[640px] flex-col gap-lg">
       <header className="flex items-center justify-between gap-md">
         <h2 className="type-headline">Refund a sale</h2>
-        <Button type="button" variant="secondary" onClick={onDone}>Back</Button>
+        <Button type="button" variant="secondary" className="min-h-[48px]" onClick={onDone}>Back</Button>
       </header>
 
       <form onSubmit={submitLookup} className="flex flex-col gap-md">
@@ -132,7 +132,7 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
                     aria-label={`Quantity of ${l.name} to refund`}
                     value={pick.qty}
                     onChange={(e) => setPicks({ ...picks, [l.id]: { ...pick, qty: e.target.value } })}
-                    className="type-money w-[72px] shrink-0 text-right"
+                    className="type-money min-h-[48px] w-[72px] shrink-0 text-right"
                   />
                   <span className="flex min-h-[48px] shrink-0 items-center gap-xs px-xs">
                     <Checkbox
@@ -148,7 +148,7 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
           </div>
           <label className="block">
             <span className="type-body-sm text-ink-muted">Reason</span>
-            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Faulty" className="mt-xs" />
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Faulty" className="mt-xs min-h-[48px]" />
           </label>
           <div>
             <Button type="submit" size="lg" disabled={refund.isPending}>
