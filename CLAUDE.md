@@ -129,7 +129,8 @@ cd frontend/back-office && npm test && npm run typecheck && npm run build
 The test database is created once:
 
 ```bash
-docker exec pos-postgres psql -U pos -d pos -c "create database pos_test owner pos;"
+docker compose -f compose.dev.yml exec db psql -U pos -d pos -c "create database pos_test owner pos;"
+# (make test-backend creates it automatically; the manual line is for native pest runs)
 ```
 
 **Tests run against real Postgres, never SQLite.** We depend on partial unique indexes,
