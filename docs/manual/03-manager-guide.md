@@ -249,33 +249,43 @@ A register can be retired the same way as everything else here — uncheck **Act
 confirm **"Deactivate *Name*? It can no longer clock in a shift."** — and brought back
 with **Reactivate**.
 
-### Replace a lost terminal
+### Issue an activation code
 
-A register's device token is its identity — whoever holds it can act as that till. If
-one goes missing (a stolen tablet, a till that needs re-imaging), reissue its token
-rather than trying to track the old one down.
+A till proves itself with a device token, but a manager never handles that token
+directly — the back office only ever deals in **activation codes**, a short one-time
+code the till itself exchanges for its device token. Every register's editor shows an
+**Activation** status pill: **Enrolled**, **Code pending — expires *date***, **Code
+expired**, or **Not enrolled**.
 
-This is also how a brand-new register gets its very first token — there's no separate
-"issue a token" screen. **New register** → fill in **Location**, **Name**, **Mode** →
-**Save** takes you back to the list without a token in sight (the editor doesn't offer
-one for a register that doesn't exist yet); reopen that same till with **Edit** and the
-steps below apply exactly as they do to a lost terminal.
+This is also how a brand-new register gets online for the first time — there's no
+separate "first code" screen. **New register** → fill in **Location**, **Name**,
+**Mode** → **Save** takes you back to the list (the **Activation** panel only appears
+once the register exists); reopen that same till with **Edit** and the steps below
+apply exactly as they do to replacing a lost or stolen terminal's code.
 
 1. **Locations & Registers** → **Registers** tab → **Edit** on the till.
-2. Under **Device token**, tap **Reissue token**.
-3. Confirm: **"Reissue *Name*'s token? The current till goes dark immediately."**
-4. The new token appears once, in a copy-me plate: **"New token — copy it now, it will
-   not be shown again:"** followed by the token itself. Copy it now — closing this
-   screen and it's gone for good (it's never written anywhere the back office can show
-   you again).
-5. Enroll the replacement terminal with it (Getting Started's
-   [Signing in](00-getting-started.md#signing-in) section).
+2. Under **Activation**, tap **Issue activation code**.
+3. Confirm: **"Issue a new activation code for *Name*? The current till goes dark
+   immediately."**
+4. The new code appears once, in a copy-me plate: **"Activation code — single use,
+   valid for 7 days. Copy it now, it will not be shown again:"** followed by the code
+   itself (`XXXXX-XXXXX`). Copy it now — closing this screen and it's gone for good
+   (it's never written anywhere the back office can show you again).
+5. Type the code into the terminal's own **Activate this terminal** screen (Getting
+   Started's [Signing in](00-getting-started.md#signing-in) section).
 
-> Note: reissuing kills every existing token for that register **in the same
-> transaction** that mints the new one — there's no window where the lost terminal and
-> its replacement are both live. The old till drops back to **Enroll this terminal** the
-> instant it next tries to talk to the server; anyone still holding it is locked out
-> immediately, not eventually.
+> Note: issuing a code revokes the register's current device token **and every staff
+> session bound to it, in the same transaction** that stores the new code — there's no
+> window where a lost terminal and its replacement are both live. The old till drops
+> back to a **Terminal disabled** screen the instant it next tries to talk to the
+> server — **"Your activation code has been disabled. Please contact an admin and
+> request a new activation code."**, with the activation-code entry form right below
+> it — so anyone still holding it is locked out immediately, not eventually, and can
+> get back in the moment the new code is typed in.
+>
+> Note: an activation code is single-use and expires 7 days after it's issued. A code
+> that expired unused shows **Code expired** on the status pill — issue a fresh one the
+> same way.
 
 ## Reports
 
@@ -335,7 +345,8 @@ the variant's price both **from** and **to**, so "who changed this and what was 
 before" is always answerable without asking anyone to remember.
 
 > Note: this is where a store owner actually finds out who did what — a repriced variant
-> shows up as `admin.variant.update`, a token reissue as `admin.register.token_reissue`,
+> shows up as `admin.variant.update`, an activation-code issue as
+> `admin.register.code_issue`,
 > a new product as `admin.product.create`, and so on for every entity — not a separate
 > history screen per entity.
 
