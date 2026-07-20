@@ -245,13 +245,21 @@ export type Location = {
   is_active: boolean
 }
 
+export type RegisterActivation = {
+  state: 'enrolled' | 'code_pending' | 'code_expired' | 'not_enrolled'
+  code_expires_at: string | null
+}
+
 export type Register = {
   id: string
   location_id: string
   name: string
   mode: 'retail' | 'food'
   is_active: boolean
+  activation: RegisterActivation
 }
+
+export type IssuedActivationCode = { activation_code: string; expires_at: string }
 
 // ---------------------------------------------------------------------------
 // Reports & audit wire types (Task 11) — verified against
@@ -404,11 +412,13 @@ export const api = {
   locations: catalogEntity<Location>('locations', 'location'),
   registers: {
     ...catalogEntity<Register>('registers', 'register'),
-    // Revokes every existing token for the register and mints a fresh one — the old
-    // till goes dark the instant this succeeds (ReissueDeviceToken.php). 201, not 200:
-    // this mints a new credential, same status class as create.
-    reissueToken: (registerId: string): Promise<string> =>
-      post<{ token: string }>(`/admin/registers/${registerId}/token`, {}).then((r) => r.token),
+    // Issues (or reissues) the register's one-time activation code. The server revokes
+    // the register's device token AND its staff sessions in the same transaction — the
+    // old till goes dark the instant this succeeds (IssueActivationCode.php) and shows
+    // its lockout screen until the new code is typed in. The code comes back exactly
+    // once; raw device tokens never cross the API anymore.
+    issueActivationCode: (registerId: string): Promise<IssuedActivationCode> =>
+      post<IssuedActivationCode>(`/admin/registers/${registerId}/activation-code`, {}),
   },
 
   // ---------------------------------------------------------------------------

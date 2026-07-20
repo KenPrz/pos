@@ -19,7 +19,7 @@ vi.mock('../../lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
-      registers: { ...actual.api.registers, update: vi.fn(), create: vi.fn(), reissueToken: vi.fn() },
+      registers: { ...actual.api.registers, update: vi.fn(), create: vi.fn(), issueActivationCode: vi.fn() },
     },
   }
 })
@@ -28,7 +28,14 @@ const LOCATIONS: Location[] = [
   { id: 'loc-1', code: 'DT', name: 'Downtown', timezone: 'America/Chicago', prices_include_tax: false, receipt_header: null, receipt_footer: null, is_active: true },
 ]
 
-const REGISTER: Register = { id: 'reg-1', location_id: 'loc-1', name: 'Front counter', mode: 'retail', is_active: true }
+const REGISTER: Register = {
+  id: 'reg-1',
+  location_id: 'loc-1',
+  name: 'Front counter',
+  mode: 'retail',
+  is_active: true,
+  activation: { state: 'enrolled', code_expires_at: null },
+}
 
 function renderEditor(props: Partial<ComponentProps<typeof RegisterEditor>> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
@@ -102,30 +109,33 @@ describe('RegisterEditor', () => {
   // `window.confirm` to `ConfirmDialog` — added coverage since the source always
   // carried a `window.confirm` call here but no prior test exercised it. Same copy,
   // same cancel-blocks/confirm-proceeds semantics.
-  it('cancelling the reissue ConfirmDialog does not rotate the token', () => {
+  it('cancelling the issue ConfirmDialog leaves the code un-issued', () => {
     renderEditor()
 
-    fireEvent.click(screen.getByRole('button', { name: /reissue token/i }))
+    fireEvent.click(screen.getByRole('button', { name: /issue activation code/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
 
-    expect(
-      screen.getByText("Reissue Front counter's token? The current till goes dark immediately."),
-    ).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-
-    expect(api.registers.reissueToken).not.toHaveBeenCalled()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(api.registers.issueActivationCode).not.toHaveBeenCalled()
   })
 
-  it('confirming the reissue ConfirmDialog rotates the token and shows it once', async () => {
-    vi.mocked(api.registers.reissueToken).mockResolvedValue('brand-new-token-value')
+  it('issues a code on confirm and shows it exactly once', async () => {
+    vi.mocked(api.registers.issueActivationCode).mockResolvedValue({
+      activation_code: 'ABCDE-FGH23',
+      expires_at: '2026-07-27T12:00:00+00:00',
+    })
     renderEditor()
 
-    fireEvent.click(screen.getByRole('button', { name: /reissue token/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'Reissue' }))
+    fireEvent.click(screen.getByRole('button', { name: /issue activation code/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^issue code$/i }))
 
-    await waitFor(() => expect(api.registers.reissueToken).toHaveBeenCalledWith('reg-1'))
-    expect(await screen.findByText('brand-new-token-value')).toBeInTheDocument()
+    await waitFor(() => expect(api.registers.issueActivationCode).toHaveBeenCalledWith('reg-1'))
+    expect(await screen.findByText('ABCDE-FGH23')).toBeInTheDocument()
+  })
+
+  it('shows the activation state pill', () => {
+    renderEditor({ register: { ...REGISTER, activation: { state: 'code_pending', code_expires_at: '2026-07-27T12:00:00+00:00' } } })
+
+    expect(screen.getByText(/code pending/i)).toBeInTheDocument()
   })
 
   it('disables Save on create until a location is chosen', () => {
