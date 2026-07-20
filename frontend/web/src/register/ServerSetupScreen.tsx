@@ -10,7 +10,7 @@ import { Input } from '../components/ui/input'
  * implicit origin, so it must be told which server to talk to. `check` and `save` are
  * injected so this is testable without Tauri.
  */
-export function SetupScreen({
+export function ServerSetupScreen({
   onConnected,
   save,
   check,

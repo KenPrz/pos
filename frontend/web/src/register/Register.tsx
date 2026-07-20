@@ -7,10 +7,7 @@ import { Button } from '@/components/ui/button'
 import { inShell } from '../lib/transport'
 import { checkServer, getConfig, setServerUrl } from '../lib/shell'
 import { PinScreen, SetupScreen } from './SessionScreens'
-// Aliased: this module's own SetupScreen (device enrolment, "Enroll Terminal") is a
-// different, pre-existing, frozen screen from the shell's server-address setup below —
-// same name, different file, both legitimately called "setup".
-import { SetupScreen as ShellSetupScreen } from './SetupScreen'
+import { ServerSetupScreen } from './ServerSetupScreen'
 import { CloseShiftScreen, OpenShiftScreen } from './ShiftScreens'
 import { SaleScreen } from './SaleScreen'
 import { RefundScreen } from './RefundScreen'
@@ -132,7 +129,7 @@ export function Register() {
   if (configured === null) return null
   if (!configured) {
     return (
-      <ShellSetupScreen onConnected={() => setConfigured(true)} save={setServerUrl} check={checkServer} />
+      <ServerSetupScreen onConnected={() => setConfigured(true)} save={setServerUrl} check={checkServer} />
     )
   }
 

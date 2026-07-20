@@ -1,20 +1,20 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SetupScreen } from './SetupScreen'
+import { ServerSetupScreen } from './ServerSetupScreen'
 
 // @testing-library/react's auto-cleanup never registers itself in this suite (see
 // ModifierSheet.test.tsx), so DOM from one test's render() would otherwise still be
 // present for the next — do it by hand.
 afterEach(cleanup)
 
-describe('SetupScreen', () => {
+describe('ServerSetupScreen', () => {
   it('saves a valid address and reports success', async () => {
     const onConnected = vi.fn()
     const save = vi.fn(async () => {})
     const check = vi.fn(async () => true)
 
-    render(<SetupScreen onConnected={onConnected} save={save} check={check} />)
+    render(<ServerSetupScreen onConnected={onConnected} save={save} check={check} />)
 
     fireEvent.change(screen.getByLabelText('Server address'), {
       target: { value: 'https://pos.example.com' },
@@ -30,7 +30,7 @@ describe('SetupScreen', () => {
     const save = vi.fn(async () => {})
     const check = vi.fn(async () => false)
 
-    render(<SetupScreen onConnected={onConnected} save={save} check={check} />)
+    render(<ServerSetupScreen onConnected={onConnected} save={save} check={check} />)
 
     fireEvent.change(screen.getByLabelText('Server address'), {
       target: { value: 'https://typo.example.com' },
