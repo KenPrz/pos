@@ -183,3 +183,30 @@ it('a non-admin token gets 403 on register routes', function (): void {
     $headers = ['Authorization' => 'Bearer '.$staff->createToken('t')->plainTextToken];
     $this->getJson('/api/v1/admin/registers', $headers)->assertStatus(403);
 });
+
+it('reports activation state on the admin register list', function (): void {
+    $location = Location::factory()->create();
+    $register = Register::factory()->create(['location_id' => $location->id]);
+
+    // Fresh register: no token, no code.
+    $this->getJson('/api/v1/admin/registers', $this->headers)
+        ->assertJsonPath('data.items.0.activation.state', 'not_enrolled');
+
+    // Code issued → pending, with its expiry surfaced.
+    $code = $this->postJson("/api/v1/admin/registers/{$register->id}/activation-code", [], $this->headers)
+        ->json('data.activation_code');
+    $response = $this->getJson('/api/v1/admin/registers', $this->headers);
+    $response->assertJsonPath('data.items.0.activation.state', 'code_pending');
+    expect($response->json('data.items.0.activation.code_expires_at'))->not->toBeNull();
+
+    // Redeemed → enrolled.
+    $this->postJson('/api/v1/registers/activate', ['activation_code' => $code])->assertCreated();
+    $this->getJson('/api/v1/admin/registers', $this->headers)
+        ->assertJsonPath('data.items.0.activation.state', 'enrolled');
+
+    // A new code locks it out again; 8 days later that code has expired.
+    $this->postJson("/api/v1/admin/registers/{$register->id}/activation-code", [], $this->headers);
+    $this->travel(8)->days();
+    $this->getJson('/api/v1/admin/registers', $this->headers)
+        ->assertJsonPath('data.items.0.activation.state', 'code_expired');
+});
