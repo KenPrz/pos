@@ -28,4 +28,4 @@ dist-ssr
 next-env.d.ts
 
 # static export (shell build)
-out/
+/out/

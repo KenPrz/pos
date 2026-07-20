@@ -79,8 +79,15 @@ offline-state screen keeps working without change.
 
 ```
 default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:;
-style-src 'self' 'unsafe-inline'; font-src 'self' data:; form-action 'self'
+style-src 'self' 'unsafe-inline'; font-src 'self' data:; form-action 'self'; base-uri 'self'
 ```
+
+This policy is only ever attached in the bundled build: Tauri injects it into the
+`tauri://localhost` asset-protocol handler's response headers, and `tauri dev` instead
+points the window at the external `http://localhost:5174` Next dev server, which never
+goes through that handler — so under `tauri dev` there is no CSP at all. Anything
+verified against `npm run dev` verifies nothing about the CSP; only a `tauri build` (or
+an installed `.deb`/AppImage) exercises it.
 
 `'self'` is `tauri://localhost` (the bundled page's own origin) — never the API's origin,
 which the webview never names. `connect-src` allows only the IPC bridge (`ipc:` /
@@ -89,7 +96,11 @@ so `fetch`/XHR/WebSocket to any other origin is refused before it leaves the pag
 `form-action 'self'` closes the one gap `connect-src` does not cover — CSP's `default-src`
 fallback list does not include form submission, so without it a compromised page could
 still exfiltrate via a plain `<form action="https://attacker...">` (a non-preflighted
-request that needs no response to be read). `style-src 'self' 'unsafe-inline'` is required
+request that needs no response to be read). `base-uri 'self'` closes a sibling gap the
+same way: `base-uri` is also a document directive with no `default-src` fallback, so
+without it an injected `<base href="https://attacker...">` could rewrite every relative
+URL on the page — including where those form submissions and asset requests actually
+resolve to. `style-src 'self' 'unsafe-inline'` is required
 because the SPA is Tailwind + inline `style` attributes; `unsafe-inline` does **not**
 extend to scripts — `script-src` is left at the `default-src 'self'` fallback, so an
 injected `<script>` still cannot execute. `img-src 'self' data:` covers the self-hosted
@@ -97,7 +108,9 @@ injected `<script>` still cannot execute. `img-src 'self' data:` covers the self
 
 This closes `fetch`/XHR, image-beacon, and form-based exfiltration of the device token.
 It does **not** and cannot close top-level navigation (`window.location = 'https://...'`)
-— no CSP directive restricts that, in this app or any other — but that path is visible to
+— no directive this app can practically use restricts that (`sandbox` technically
+constrains top-level navigation, but at the cost of restrictions this app can't take on)
+— but that path is visible to
 the person standing at the till (the page navigates away), unlike a silent background
 request.
 

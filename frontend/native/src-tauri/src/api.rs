@@ -117,4 +117,21 @@ mod tests {
     fn accepts_a_legitimate_path_with_dots_in_the_query() {
         assert!(validate_path("/orders/123/receipt?format=v1.2").is_ok());
     }
+
+    /// Pins the TS↔Rust IPC contract from the Rust side. `frontend/web/src/lib/transport.test.ts`
+    /// asserts the TypeScript `invoke("api_request", ...)` call against a hardcoded copy of its
+    /// own argument literal — it can't see a field rename here. This test deserializes the exact
+    /// JSON the shell sends over the wire, so a rename to `ApiRequest` fails loudly on this side
+    /// instead of leaving both tests green while the shell breaks at runtime.
+    #[test]
+    fn deserializes_the_exact_json_the_shell_sends() {
+        let json = r#"{"path":"/health","method":"GET","headers":{},"body":null}"#;
+        let req: ApiRequest =
+            serde_json::from_str(json).expect("shell's literal must deserialize into ApiRequest");
+
+        assert_eq!(req.path, "/health");
+        assert_eq!(req.method, "GET");
+        assert!(req.headers.is_empty());
+        assert_eq!(req.body, None);
+    }
 }
