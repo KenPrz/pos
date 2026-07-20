@@ -1,0 +1,20 @@
+{
+  "name": "native",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tauri dev",
+    "build:spa": "cd ../web && POS_STATIC_EXPORT=1 npm run build",
+    "build": "npm run build:spa && tauri build",
+    "test": "cd src-tauri && cargo test",
+    "lint": "cd src-tauri && cargo fmt --check && cargo clippy -- -D warnings"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@tauri-apps/cli": "2.9.0"
+  }
+}
