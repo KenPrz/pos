@@ -43,7 +43,7 @@ make dev              # full stack: Postgres, API, register, back office
 make seed             # demo data — prints dev PINs and device tokens
 ```
 
-- Register: <http://localhost:5174> — paste a printed device token, clock in with a PIN
+- Register: <http://localhost:5174> — issue the till an activation code in the back office, type it in once, clock in with a PIN
 - Back office: <http://localhost:5175> — the printed admin email/password
 - API health: <http://localhost:8000/api/v1/health>
 
