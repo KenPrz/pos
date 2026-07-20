@@ -548,6 +548,10 @@ POST /api/v1/admin/registers/{id}/activation-code
   → { activation_code, expires_at }        # shown exactly once
 ```
 
+Admins see and handle only the opaque activation code — the raw device token is minted
+directly to the terminal by `POST /registers/activate` and never crosses the admin
+surface at all.
+
 Issuing (or reissuing) a code is the enrollment and the lost/stolen-terminal path in one:
 it stores a new single-use code and, **in the same transaction**, deletes every device
 token for the register and every staff session bound to it — the till goes dark
