@@ -338,6 +338,22 @@ describe('staffLogin', () => {
   })
 })
 
+describe('activateRegister', () => {
+  it('exchanges the code, then stores the device token and register info', async () => {
+    const fetchMock = stubFetch(() =>
+      jsonResponse({ data: { register: { id: 'reg-1', name: 'Till 1', mode: 'retail' }, device_token: '3|abc' } }, 201),
+    )
+
+    const register = await api.activateRegister('ABCDE-FGH23')
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(JSON.parse(String(init?.body))).toEqual({ activation_code: 'ABCDE-FGH23' })
+    expect(register).toEqual({ id: 'reg-1', name: 'Till 1', mode: 'retail' })
+    expect(tokens.device()).toBe('3|abc')
+    expect(tokens.registerInfo()).toEqual({ id: 'reg-1', name: 'Till 1', mode: 'retail' })
+  })
+})
+
 describe('error envelope', () => {
   it('turns a non-2xx error envelope into an ApiError carrying the stable code', async () => {
     stubFetch(() => jsonResponse({ error: { code: 'order_version_conflict', message: 'Someone else changed this order.', details: {} } }, 409))
