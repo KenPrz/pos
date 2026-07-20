@@ -31,8 +31,8 @@ use App\Http\Controllers\Admin\Locations\CreateLocationController;
 use App\Http\Controllers\Admin\Locations\ListLocationsController;
 use App\Http\Controllers\Admin\Locations\UpdateLocationController;
 use App\Http\Controllers\Admin\Registers\CreateRegisterController;
+use App\Http\Controllers\Admin\Registers\IssueActivationCodeController;
 use App\Http\Controllers\Admin\Registers\ListRegistersController;
-use App\Http\Controllers\Admin\Registers\ReissueDeviceTokenController;
 use App\Http\Controllers\Admin\Registers\UpdateRegisterController;
 use App\Http\Controllers\Admin\Reports\SalesReportController;
 use App\Http\Controllers\Admin\Reports\StockReportController;
@@ -157,11 +157,12 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/registers', CreateRegisterController::class)->name('admin.registers.create');
         Route::patch('/registers/{register}', UpdateRegisterController::class)->name('admin.registers.update');
 
-        // Revokes every existing token for the register and mints a fresh one — the
-        // lost/stolen-terminal path. The enrol endpoint below (device tier bootstrap)
-        // is the other legal way to get a register its first token.
-        Route::post('/registers/{register}/token', ReissueDeviceTokenController::class)
-            ->name('admin.registers.token_reissue');
+        // Issues (or reissues) the register's one-time activation code — the only way a
+        // terminal gets a device token. Reissue is the lost/stolen-terminal path: the till
+        // goes dark immediately (device token + staff sessions revoked) and stays dark until
+        // the new code is typed at the terminal. See ActivateRegister.
+        Route::post('/registers/{register}/activation-code', IssueActivationCodeController::class)
+            ->name('admin.registers.activation_code');
 
         // Reports (M6 task 6). Reads only — no audit. day/user are ledger-basis (from
         // payments + refunds); category is line-basis (non-voided lines of closed

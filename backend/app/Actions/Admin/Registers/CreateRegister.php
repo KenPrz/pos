@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Creates a register row with no device token. This is the admin-UI path; the register
  * only becomes usable once it is enrolled (POST /registers/enroll, which mints the first
- * token) or its token is (re)issued via ReissueDeviceToken. Both are legal.
+ * token) or its activation code is issued via IssueActivationCode. Both are legal.
  */
 final class CreateRegister
 {
