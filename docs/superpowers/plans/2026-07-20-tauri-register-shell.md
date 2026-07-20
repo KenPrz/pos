@@ -31,7 +31,7 @@
 | `frontend/web/next.config.ts` | Dual output: standalone (prod) / export (shell) |
 | `frontend/web/src/lib/transport.ts` | Browser-vs-shell transport seam |
 | `frontend/web/src/lib/shell.ts` | Shell detection + hardware/config command wrappers |
-| `frontend/web/src/register/SetupScreen.tsx` | First-run "Connect this terminal" |
+| `frontend/web/src/register/ServerSetupScreen.tsx` | First-run "Connect this terminal" |
 | `frontend/native/src-tauri/src/main.rs` | Window + command registration |
 | `frontend/native/src-tauri/src/config.rs` | Server URL persistence + URL normalization |
 | `frontend/native/src-tauri/src/api.rs` | `api_request` — the HTTP detour |
@@ -962,7 +962,7 @@ git commit -m "Shell: server-url config and the api_request detour"
 ### Task 5: First-run "Connect this terminal" screen
 
 **Files:**
-- Create: `frontend/web/src/lib/shell.ts`, `frontend/web/src/register/SetupScreen.tsx`, `frontend/web/src/register/SetupScreen.test.tsx`
+- Create: `frontend/web/src/lib/shell.ts`, `frontend/web/src/register/ServerSetupScreen.tsx`, `frontend/web/src/register/ServerSetupScreen.test.tsx`
 - Modify: `frontend/web/src/register/Register.tsx`
 
 **Interfaces:**
@@ -1009,7 +1009,7 @@ export async function checkServer(url: string): Promise<boolean> {
 
 - [ ] **Step 2: Write the failing test**
 
-Create `frontend/web/src/register/SetupScreen.test.tsx`:
+Create `frontend/web/src/register/ServerSetupScreen.test.tsx`:
 
 ```tsx
 // @vitest-environment jsdom
@@ -1060,7 +1060,7 @@ Expected: FAIL — cannot resolve `./SetupScreen`.
 
 - [ ] **Step 4: Build the screen**
 
-Create `frontend/web/src/register/SetupScreen.tsx`:
+Create `frontend/web/src/register/ServerSetupScreen.tsx`:
 
 ```tsx
 'use client'
@@ -1188,8 +1188,8 @@ Expected: PASS — 98 tests, clean typecheck, successful build. The 92 pre-exist
 - [ ] **Step 8: Commit**
 
 ```bash
-git add frontend/web/src/lib/shell.ts frontend/web/src/register/SetupScreen.tsx \
-        frontend/web/src/register/SetupScreen.test.tsx frontend/web/src/register/Register.tsx
+git add frontend/web/src/lib/shell.ts frontend/web/src/register/ServerSetupScreen.tsx \
+        frontend/web/src/register/ServerSetupScreen.test.tsx frontend/web/src/register/Register.tsx
 git commit -m "Register: first-run server-address setup in the shell"
 ```
 
