@@ -563,7 +563,7 @@ This creates `src-tauri/` with `Cargo.toml`, `src/main.rs`, `tauri.conf.json`, `
 Edit `frontend/native/src-tauri/tauri.conf.json` so `identifier` and `bundle` read:
 
 ```json
-  "identifier": "test.pos.register",
+  "identifier": "com.bellesoftsystems.pos.register",
   "bundle": {
     "active": true,
     "targets": ["deb", "appimage"],
@@ -2019,7 +2019,7 @@ The shell renders in **WebKitGTK**, not Chrome, and the reworked UI was only eve
 Confirm the mock driver produced files:
 
 ```bash
-ls ~/.local/share/test.pos.register/print-jobs/
+ls ~/.local/share/com.bellesoftsystems.pos.register/print-jobs/
 ```
 
 Expected: one `.bin` per print and per drawer kick. Inspect one with `xxd` — it should begin `1b 40` and end `1d 56 00`.

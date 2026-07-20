@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "POS Register",
   "version": "0.1.0",
-  "identifier": "test.pos.register",
+  "identifier": "com.bellesoftsystems.pos.register",
   "build": {
     "frontendDist": "../../web/out",
     "devUrl": "http://localhost:5174"
@@ -18,7 +18,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; form-action 'self'"
     }
   },
   "bundle": {

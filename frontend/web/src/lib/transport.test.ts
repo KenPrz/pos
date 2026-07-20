@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { invoke } from '@tauri-apps/api/core'
 import { inShell, send } from './transport'
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
+}))
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -35,5 +40,22 @@ describe('send', () => {
       status: 422,
       body: '{"error":{}}',
     })
+  })
+
+  it('detours through invoke("api_request") in the shell, upper-casing method and nulling a non-string body', async () => {
+    vi.stubGlobal('__TAURI_INTERNALS__', {})
+    vi.mocked(invoke).mockResolvedValue({ status: 200, body: '{"data":1}' })
+
+    const result = await send('/health', { method: 'get', body: { not: 'a string' } as unknown as BodyInit })
+
+    expect(invoke).toHaveBeenCalledWith('api_request', {
+      req: {
+        path: '/health',
+        method: 'GET',
+        headers: {},
+        body: null,
+      },
+    })
+    expect(result).toEqual({ status: 200, body: '{"data":1}' })
   })
 })

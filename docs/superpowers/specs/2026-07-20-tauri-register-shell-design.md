@@ -47,7 +47,12 @@ properties follow from putting the detour in Rust rather than using a generic HT
 plugin:
 
 - **The base URL lives in Rust-held config, not in JS.** The webview passes a *path*, never
-  a host. A compromised page cannot redirect a device token to an attacker's server.
+  a host. Combined with a restrictive CSP (`connect-src`, `img-src`, and `form-action` all
+  scoped to `'self'` plus the IPC bridge — see the Content Security Policy section below),
+  a compromised page cannot use `fetch`/XHR, an image beacon, or a form submission to send
+  the device token to an attacker's server. Top-level navigation (`window.location`) is not
+  something CSP can restrict and remains a theoretical, visible-to-the-user path — no CSP
+  directive closes that gap, in this app or any other.
 - **The scope is enforced at runtime**, which a build-time capability URL allowlist cannot
   do for a server address that is configured on first run.
 
@@ -67,6 +72,34 @@ tests are unaffected. Detection is a single `isTauri()` check at module load.
 `ApiError('network_unreachable', 'Cannot reach the server.', 0)` and has UI for it. The
 Rust transport maps its own transport failures onto that exact shape, so every existing
 offline-state screen keeps working without change.
+
+### Content Security Policy
+
+`tauri.conf.json`'s `app.security.csp` is not `null`:
+
+```
+default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:;
+style-src 'self' 'unsafe-inline'; font-src 'self' data:; form-action 'self'
+```
+
+`'self'` is `tauri://localhost` (the bundled page's own origin) — never the API's origin,
+which the webview never names. `connect-src` allows only the IPC bridge (`ipc:` /
+`http://ipc.localhost`, how `invoke()` is transported under the hood) alongside `'self'`,
+so `fetch`/XHR/WebSocket to any other origin is refused before it leaves the page.
+`form-action 'self'` closes the one gap `connect-src` does not cover — CSP's `default-src`
+fallback list does not include form submission, so without it a compromised page could
+still exfiltrate via a plain `<form action="https://attacker...">` (a non-preflighted
+request that needs no response to be read). `style-src 'self' 'unsafe-inline'` is required
+because the SPA is Tailwind + inline `style` attributes; `unsafe-inline` does **not**
+extend to scripts — `script-src` is left at the `default-src 'self'` fallback, so an
+injected `<script>` still cannot execute. `img-src 'self' data:` covers the self-hosted
+`@fontsource` build's inlined glyphs and any `data:` image the UI uses, nothing external.
+
+This closes `fetch`/XHR, image-beacon, and form-based exfiltration of the device token.
+It does **not** and cannot close top-level navigation (`window.location = 'https://...'`)
+— no CSP directive restricts that, in this app or any other — but that path is visible to
+the person standing at the till (the page navigates away), unlike a silent background
+request.
 
 ### Dual build
 
