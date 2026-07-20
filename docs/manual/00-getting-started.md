@@ -33,6 +33,23 @@ code, and a manager's laptop never needs a device token. Both talk to the same A
 underneath, so a sale rung up at the till shows up in the back office's reports
 immediately.
 
+## The desktop shell
+
+The register also runs as a small desktop app — a Tauri shell wrapped around the exact
+same register described throughout this manual, at `frontend/native/`. It exists for one
+reason: a browser tab can't drive a receipt printer or open the cash drawer, and the
+shell can. Everything else about the register is identical either way — running it in an
+ordinary browser tab remains fully supported; the shell only adds hardware access on top,
+it doesn't replace anything.
+
+See the Operator Guide's
+[Connect the desktop shell to a server](04-operator-guide.md#connect-the-desktop-shell-to-a-server)
+for the one extra step a shell terminal takes before enrollment, the Cashier Guide's
+[Ring up a retail sale](01-cashier-guide.md#ring-up-a-retail-sale) for what printing does
+differently there, and the Supervisor Guide's
+[Open the drawer with no sale](02-supervisor-guide.md#open-the-drawer-with-no-sale) for
+what else the shell adds once it's running.
+
 ## Roles
 
 Three roles cover everything. They're deliberately coarse:

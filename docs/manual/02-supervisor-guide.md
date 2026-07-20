@@ -113,6 +113,31 @@ Paid-ins, payouts, and drops against the drawer are real, audited actions
 > section: a kind, an amount, and a reason) rather than a till button, until a screen for
 > it ships.
 
+## Open the drawer with no sale
+
+The top bar carries a **No sale** button (only visible if you can open the drawer this
+way, and only in the desktop shell — a browser tab has no drawer to pop, so it doesn't
+show the button there; see Getting Started's
+[desktop shell](00-getting-started.md#the-desktop-shell) note). It's for opening the
+drawer with nothing being sold — making change for another till, say — and it's gated
+exactly like everything else in this chapter: by the `drawer.no_sale` permission, held by
+whoever's clocked in at this till right now (see
+[How an override actually happens at the till](#how-an-override-actually-happens-at-the-till),
+above).
+
+1. Tap **No sale** in the top bar.
+2. Type why in **Reason for opening the drawer…** (required) — the confirm button won't
+   submit without one.
+3. Tap **Open drawer** to confirm. This is the No sale form's own confirm button, not the
+   **Open drawer** button that starts a shift in the
+   [Cashier Guide](01-cashier-guide.md#open-a-shift) — tapping this one only pops the
+   drawer, it has nothing to do with opening or closing a shift.
+
+> Note: the server records the opening — who did it, at which register, and when —
+> before the drawer actually pops, and that row shows up in the back office's audit log
+> (`drawer.no_sale`) exactly like a void or a discount does. There's no way to pop the
+> drawer this way and leave no trace.
+
 ## Read the Z-report
 
 Once a shift closes, its result screen shows a **Z-report**: **Sales — cash**,

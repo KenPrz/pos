@@ -46,7 +46,13 @@ What you see: a **New sale** panel with a scan field at the top and an empty car
    - **Card:** type the terminal's authorization into **Card terminal reference (owed:
      …)** (e.g. `auth 004321`), then tap **Take payment**. This till only *records* the
      card result — it doesn't talk to a card terminal itself.
-5. Tap **Print** for a paper receipt, or **New sale** to move on.
+5. Tap **Print** for a paper receipt, or **New sale** to move on. In the desktop shell,
+   **Print** sends the receipt to the till's receipt printer; in an ordinary browser tab,
+   it opens the browser's print dialog exactly as before.
+
+> Note: only a mock printer driver ships today — it writes the receipt to a file instead
+> of actually printing, so **Print** in the shell doesn't yet produce paper on real
+> hardware. A browser tab's print dialog works as always.
 
 > Note: if a supervisor's discount brings the total to exactly zero, **Pay** is replaced
 > by **Close — fully comped** (or **Close empty order** for an empty cart) — tap it to

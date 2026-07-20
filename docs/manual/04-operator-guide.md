@@ -46,6 +46,27 @@ Once it's up: the API is at `http://127.0.0.1:8000`, the register app at
 the actual host ports if you've overridden any of them (see `POS_DEV_*_PORT` in
 [Troubleshooting](#troubleshooting)).
 
+## Connect the desktop shell to a server
+
+Only in the desktop shell (`frontend/native/`) — a browser tab already knows its own
+origin, so this step doesn't apply there. Before a shell terminal can even reach the
+**Enroll this terminal** screen (see [Signing in](00-getting-started.md#signing-in)), it
+needs to know which server to talk to.
+
+1. On first launch, the shell shows its own **Connect this terminal** screen, asking for
+   a **Server address**.
+2. Type the POS server's own address into **Server address** (placeholder
+   `https://pos.example.com`).
+3. Tap **Connect**.
+
+> Note: the address is checked before it's saved — a wrong address fails right here with
+> **"Cannot reach that server. Check the address and try again."**, not at the first sale
+> of the morning. While it checks, the button reads **Connecting…**.
+
+Once it connects, the address is saved on the terminal for good — you won't be asked
+again on that machine — and the shell moves straight into the ordinary enrollment flow
+above.
+
 ## Everyday commands
 
 `make help` lists every target. The ones you'll reach for:
