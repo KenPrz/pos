@@ -64,6 +64,7 @@ use App\Http\Controllers\Payments\TakePaymentController;
 use App\Http\Controllers\Payments\VoidPaymentController;
 use App\Http\Controllers\Refunds\RefundOrderController;
 use App\Http\Controllers\Reports\GetZReportController;
+use App\Http\Controllers\Drawer\OpenDrawerNoSaleController;
 use App\Http\Controllers\Shifts\ApproveVarianceController;
 use App\Http\Controllers\Shifts\CloseShiftController;
 use App\Http\Controllers\Shifts\CurrentShiftController;
@@ -196,6 +197,11 @@ Route::prefix('v1')->group(function (): void {
                 ->name('shifts.close');
             Route::post('/shifts/{shift}/approve-variance', ApproveVarianceController::class)
                 ->name('shifts.approve-variance');
+
+            // No idempotency middleware: a repeat is a genuinely separate drawer opening
+            // and must produce its own audit row, not silently replay the first one.
+            Route::post('/drawer/no-sale', OpenDrawerNoSaleController::class)
+                ->name('drawer.no-sale');
 
             // Staff tier, not device tier: this is the register app cross-referencing
             // sibling tills at the same location (e.g. "approve my variance from another
