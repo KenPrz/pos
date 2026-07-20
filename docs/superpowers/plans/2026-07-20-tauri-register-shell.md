@@ -920,16 +920,22 @@ pub async fn api_request(app: tauri::AppHandle, req: ApiRequest) -> Result<ApiRe
 
 - [ ] **Step 9: Register the modules and commands**
 
-Replace `frontend/native/src-tauri/src/main.rs` with:
+**Wire these into `lib.rs`, NOT `main.rs`.** Tauri v2's `tauri init` splits the app: `main.rs`
+is only `fn main() { app_lib::run(); }`, and `lib.rs` holds the `tauri::Builder` chain plus a
+`.setup(...)` block that installs the log plugin in debug builds. Putting a second builder in
+`main.rs` would compile but silently orphan `lib.rs` — dropping the log plugin and breaking the
+staticlib/cdylib split Tauri v2's mobile support relies on.
+
+**Leave `main.rs` exactly as it is.** In `frontend/native/src-tauri/src/lib.rs`, add the two
+module declarations above `run()`, and add the `invoke_handler` to the existing chain — keeping
+the existing `.setup(...)` block intact:
 
 ```rust
-// Prevents an extra console window on Windows in release.
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
 mod api;
 mod config;
 
-fn main() {
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             config::get_config,
@@ -937,8 +943,18 @@ fn main() {
             config::check_server,
             api::api_request,
         ])
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
-        .expect("error while running the POS register shell");
+        .expect("error while running tauri application");
 }
 ```
 
@@ -1477,7 +1493,8 @@ Create `frontend/native/src-tauri/src/hardware/mod.rs`:
 pub mod escpos;
 ```
 
-Add to `frontend/native/src-tauri/src/main.rs`, below the existing `mod` lines:
+Add to `frontend/native/src-tauri/src/lib.rs` (NOT `main.rs` — Tauri v2's template keeps the
+builder in `lib.rs` and leaves `main.rs` as a one-line shim), below the existing `mod` lines:
 
 ```rust
 mod hardware;
@@ -1653,7 +1670,8 @@ pub fn open_drawer(app: tauri::AppHandle) -> Result<(), String> {
 }
 ```
 
-Add the two commands to the handler list in `frontend/native/src-tauri/src/main.rs`:
+Add the two commands to the handler list in `frontend/native/src-tauri/src/lib.rs` (NOT
+`main.rs` — see Task 4's Step 9 note):
 
 ```rust
         .invoke_handler(tauri::generate_handler![
