@@ -145,7 +145,8 @@ POST /api/v1/drawer/no-sale
   403        → the staff member lacks drawer.no_sale
   409        → no open shift — reuses the existing NoOpenShift exception
                (errorCode 'no_open_shift'), no new exception class
-  422        → reason missing or empty
+  400        → reason missing or empty — ApiErrorEnvelope maps ValidationException
+               to `400 validation_failed`; 422 is reserved for domain rules
 ```
 
 Modelled directly on `RecordCashMovement`, whose own comment makes the argument for the

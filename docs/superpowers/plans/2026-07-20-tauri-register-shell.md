@@ -106,9 +106,11 @@ it('refuses a cashier — the permission is supervisor-only', function (): void 
 });
 
 it('requires a reason — an unexplained drawer opening is the whole thing we are preventing', function (): void {
+    // 400, not 422: ApiErrorEnvelope.php:43 maps ValidationException to
+    // `400 validation_failed`; 422 is reserved for domain rules.
     $this->postJson('/api/v1/drawer/no-sale', ['reason' => ''],
         staffHeaders($this->register, $this->supervisor))
-        ->assertStatus(422);
+        ->assertStatus(400);
 
     $this->assertDatabaseMissing('audit_log', ['action' => 'drawer.no_sale']);
 });
