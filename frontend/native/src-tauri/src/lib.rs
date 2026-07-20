@@ -10,6 +10,8 @@ pub fn run() {
             config::set_server_url,
             config::check_server,
             api::api_request,
+            hardware::print_receipt,
+            hardware::open_drawer,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
