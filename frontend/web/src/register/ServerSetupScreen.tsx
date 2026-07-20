@@ -24,7 +24,12 @@ export function ServerSetupScreen({
   const [error, setError] = useState<string | null>(null)
 
   return (
-    <main className="fixed inset-0 flex items-center justify-center overflow-auto bg-canvas p-lg text-ink">
+    // Shown only inside the shell (Register.tsx never reaches this branch in a browser —
+    // `configured` starts `true` there), so `.app-viewport-shell-fixed`'s WebKitGTK
+    // workaround always applies here. It's still `@media screen`-only in CSS (see
+    // print.css) rather than assumed harmless for print, on the same reasoning as
+    // Register.tsx's <main>.
+    <main className="app-viewport-min app-viewport-shell-fixed flex items-center justify-center bg-canvas p-lg text-ink">
       <Card className="w-full max-w-[28rem] p-lg">
         <CardTitle>Connect this terminal</CardTitle>
         <p className="type-body-sm mt-sm text-ink-muted">

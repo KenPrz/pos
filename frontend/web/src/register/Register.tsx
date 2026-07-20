@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { ApiError, api, tokens, type Order, type Shift, type StaffSession } from '../lib/api'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { inShell } from '../lib/transport'
 import { checkServer, getConfig, hasHardware, openDrawer, setServerUrl } from '../lib/shell'
 import { PinScreen, SetupScreen } from './SessionScreens'
@@ -53,9 +54,18 @@ export function Register() {
   // In the shell, nothing can be fetched until we know which server to ask. `null` means
   // "still checking", which must not flash the setup screen at a configured till.
   const [configured, setConfigured] = useState<boolean | null>(inShell() ? null : true)
+  // Whether to apply the WebKitGTK viewport workaround (see print.css's
+  // `.app-viewport-shell-fixed`) to <main>. Starts false and flips in an effect rather
+  // than reading `inShell()` straight into the className: this component is prerendered
+  // for static export with no `window`, so a value that differs between that prerender
+  // and the shell's first real paint would be a hydration mismatch — the same reason
+  // `stage` above boots neutral and resolves after mount instead of reading `tokens.*`
+  // at render time.
+  const [shellViewport, setShellViewport] = useState(false)
 
   useEffect(() => {
     if (!inShell()) return
+    setShellViewport(true)
     void getConfig().then((config) => setConfigured(config?.server_url != null))
   }, [])
 
@@ -80,9 +90,11 @@ export function Register() {
   // viewport-sized layout (and anything an autofocused field scrolls into view against)
   // off the bottom of the shell's window. `window.innerHeight` measures the real thing in
   // every engine tested, so screens that need "the viewport, minus some fixed chrome"
-  // (SaleScreen's cart/context pane) read `--app-vh` instead of `dvh`. Harmless in the
-  // browser too — it's just a more reliable version of the same number.
+  // (SaleScreen's cart/context pane) read `--app-vh` instead of `dvh`. Gated to the shell:
+  // real browsers don't have the WebKitGTK bug this works around, so running the resize
+  // listener there would just be the JS round-trip `dvh` exists to avoid, for no benefit.
   useEffect(() => {
+    if (!inShell()) return
     const setVh = () => document.documentElement.style.setProperty('--app-vh', `${window.innerHeight}px`)
     setVh()
     window.addEventListener('resize', setVh)
@@ -149,7 +161,16 @@ export function Register() {
   }
 
   return (
-    <main className="fixed inset-0 flex flex-col overflow-y-auto bg-canvas text-ink">
+    <main
+      className={cn(
+        // `.app-viewport-min` (print.css) is a min-height fallback pair — normal document
+        // flow, so window.print() always paginates. `.app-viewport-shell-fixed` is the
+        // WebKitGTK workaround; it's `@media screen`-only in CSS (never affects print)
+        // and JS-gated to the shell here (never affects a real browser) — see print.css.
+        'app-viewport-min flex flex-col bg-canvas text-ink',
+        shellViewport && 'app-viewport-shell-fixed'
+      )}
+    >
       {/* Slim Carbon top bar (DESIGN.md top-nav: 48px, canvas, 1px bottom hairline) —
           brand block, section word, stage toggles, staff name + Clock out. Hidden in
           print so a Z-report/receipt page prints without chrome. */}
