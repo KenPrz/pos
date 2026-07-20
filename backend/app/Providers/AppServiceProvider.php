@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Auth\ActivationCodes;
 use App\Domain\Auth\Pins;
 use App\Domain\Payments\CashDriver;
 use App\Domain\Payments\DriverRegistry;
@@ -24,6 +25,9 @@ class AppServiceProvider extends ServiceProvider
         // Config is read at the edge and injected, so the value object stays pure and its
         // tests need no container. See docs/04-backend-conventions.md.
         $this->app->singleton(Pins::class, fn (): Pins => new Pins((string) config('app.key')));
+
+        $this->app->singleton(ActivationCodes::class,
+            fn (): ActivationCodes => new ActivationCodes((string) config('app.key')));
 
         // Adding a processor = a driver class + one entry here. No action changes.
         $this->app->singleton(DriverRegistry::class,
