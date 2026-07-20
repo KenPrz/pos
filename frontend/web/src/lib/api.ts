@@ -551,6 +551,13 @@ export const api = {
 
   receipt: (orderId: string) => request<Receipt>(`/orders/${orderId}/receipt`),
 
+  drawerNoSale: (reason: string) =>
+    request<{ authorized: boolean; shift_id: string }>('/drawer/no-sale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    }),
+
   // original_order_id + lines derive the amount server-side from the original lines'
   // frozen price/tax snapshot (RefundOrder.php) — the client only chooses qty/restock.
   refund: (

@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { inShell } from './transport'
+import type { Receipt } from './api'
 
 /**
  * Thin wrappers over the desktop shell's commands. Every one of these is a no-op in a
@@ -26,4 +27,15 @@ export async function setServerUrl(url: string): Promise<void> {
 export async function checkServer(url: string): Promise<boolean> {
   if (!inShell()) return false
   return invoke<boolean>('check_server', { url })
+}
+
+/** True when the shell can actually drive hardware — a browser tab never can. */
+export const hasHardware = inShell
+
+export async function printReceipt(receipt: Receipt, currency: string): Promise<void> {
+  await invoke('print_receipt', { receipt, currency })
+}
+
+export async function openDrawer(): Promise<void> {
+  await invoke('open_drawer')
 }

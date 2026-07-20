@@ -5,13 +5,14 @@ import { useEffect, useState } from 'react'
 import { ApiError, api, tokens, type Order, type Shift, type StaffSession } from '../lib/api'
 import { Button } from '@/components/ui/button'
 import { inShell } from '../lib/transport'
-import { checkServer, getConfig, setServerUrl } from '../lib/shell'
+import { checkServer, getConfig, hasHardware, openDrawer, setServerUrl } from '../lib/shell'
 import { PinScreen, SetupScreen } from './SessionScreens'
 import { ServerSetupScreen } from './ServerSetupScreen'
 import { CloseShiftScreen, OpenShiftScreen } from './ShiftScreens'
 import { SaleScreen } from './SaleScreen'
 import { RefundScreen } from './RefundScreen'
 import { FloorScreen } from './FloorScreen'
+import { NoSaleButton } from './NoSaleButton'
 
 type StaffUser = StaffSession['user']
 
@@ -166,6 +167,11 @@ export function Register() {
           >
             {stage.name === 'floor' ? 'Register' : 'Tabs'}
           </Button>
+        )}
+        {/* Shell only: in a browser there is no drawer to open, so offering the button
+            would be a lie. Supervisor-gated exactly like the RBAC table says. */}
+        {onShift && hasHardware() && can('drawer.no_sale') && (
+          <NoSaleButton authorize={(reason) => api.drawerNoSale(reason).then(() => undefined)} pulse={openDrawer} />
         )}
         {user && onShift && (
           <span className="ml-auto flex items-center gap-md">
