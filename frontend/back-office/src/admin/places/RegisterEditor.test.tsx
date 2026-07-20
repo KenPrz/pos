@@ -138,6 +138,22 @@ describe('RegisterEditor', () => {
     expect(screen.getByText(/code pending/i)).toBeInTheDocument()
   })
 
+  // The `register` prop is a snapshot from PlacesSection's `editing` state — it never
+  // refetches under an already-open editor, so the pill has to be driven off the issue
+  // mutation's own result rather than off `register.activation` alone.
+  it('updates the activation pill immediately after issuing a code, without waiting for a refetch', async () => {
+    vi.mocked(api.registers.issueActivationCode).mockResolvedValue({
+      activation_code: 'ABCDE-FGH23',
+      expires_at: '2026-07-27T12:00:00+00:00',
+    })
+    renderEditor({ register: { ...REGISTER, activation: { state: 'not_enrolled', code_expires_at: null } } })
+
+    fireEvent.click(screen.getByRole('button', { name: /issue activation code/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^issue code$/i }))
+
+    expect(await screen.findByText('Code pending — expires 2026-07-27')).toBeInTheDocument()
+  })
+
   it('disables Save on create until a location is chosen', () => {
     renderEditor({ register: null, locations: [] })
 

@@ -61,6 +61,11 @@ export function RegisterEditor({
   const [isActive, setIsActive] = useState(register?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
   const [issuedCode, setIssuedCode] = useState<IssuedActivationCode | null>(null)
+  // `register` is a snapshot handed down by PlacesSection's `editing` state — it does not
+  // update when this editor's own mutation changes the row. The server guarantees the
+  // register lands in `code_pending` the instant an issue succeeds, so mirror that here
+  // rather than wait for the editor to be closed and reopened against a refetched list.
+  const [activationOverride, setActivationOverride] = useState<RegisterActivation | null>(null)
   // Archive-style confirm (brief's global constraint) — set only when Save would
   // otherwise deactivate; the dialog's Confirm re-plays the exact body already computed.
   const [pendingDeactivate, setPendingDeactivate] = useState<Record<string, unknown> | null>(null)
@@ -86,6 +91,7 @@ export function RegisterEditor({
     mutationFn: () => api.registers.issueActivationCode(register?.id ?? ''),
     onSuccess: (code) => {
       setIssuedCode(code)
+      setActivationOverride({ state: 'code_pending', code_expires_at: code.expires_at })
       setError(null)
       invalidate()
     },
@@ -188,8 +194,8 @@ export function RegisterEditor({
           <Divider />
           <div className="mb-md flex items-center justify-between gap-md">
             <CardTitle>Activation</CardTitle>
-            <StatusPill tone={ACTIVATION_TONE[register.activation.state]}>
-              {activationLabel(register.activation)}
+            <StatusPill tone={ACTIVATION_TONE[(activationOverride ?? register.activation).state]}>
+              {activationLabel(activationOverride ?? register.activation)}
             </StatusPill>
           </div>
           <p className="type-body-sm text-ink-muted mb-md">
