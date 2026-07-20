@@ -1,6 +1,6 @@
 mod api;
 mod config;
-pub mod hardware;
+mod hardware;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
