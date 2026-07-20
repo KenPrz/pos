@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { ApiError, api, tokens, type Order, type Shift, type StaffSession } from '../lib/api'
+import { Button } from '@/components/ui/button'
 import { PinScreen, SetupScreen } from './SessionScreens'
 import { CloseShiftScreen, OpenShiftScreen } from './ShiftScreens'
 import { SaleScreen } from './SaleScreen'
@@ -22,7 +23,7 @@ type Stage =
   | { name: 'refunds'; shift: Shift }
   | { name: 'closing'; shift: Shift }
 
-// Nav-gold section word on the carbon bar — pure wayfinding, no behavior attached.
+// Section word on the top bar — pure wayfinding, no behavior attached.
 const SECTION_LABEL: Record<Stage['name'], string> = {
   booting: 'Loading',
   setup: 'Enroll Terminal',
@@ -114,46 +115,56 @@ export function Register() {
   const onShift = stage.name === 'selling' || stage.name === 'refunds' || stage.name === 'floor'
 
   return (
-    <main className="shell">
-      <header className="carbon-bar">
-        <span className="pos-pill">POS</span>
-        <span className="carbon-bar-section">{SECTION_LABEL[stage.name]}</span>
+    <main className="flex min-h-dvh flex-col bg-canvas text-ink">
+      {/* Slim Carbon top bar (DESIGN.md top-nav: 48px, canvas, 1px bottom hairline) —
+          brand block, section word, stage toggles, staff name + Clock out. Hidden in
+          print so a Z-report/receipt page prints without chrome. */}
+      <header className="flex h-[48px] shrink-0 items-stretch border-b border-hairline bg-canvas print:hidden">
+        <span className="flex items-center bg-ink px-md text-[14px] font-semibold tracking-[0.16px] text-inverse-ink">POS</span>
+        <span className="type-body-sm flex items-center px-md text-ink-muted">{SECTION_LABEL[stage.name]}</span>
         {onShift && can('refund.create') && (
-          <button
+          <Button
             type="button"
-            className="carbon-bar-link"
+            variant="ghost"
+            className="self-stretch"
             onClick={() =>
               setStage(stage.name === 'refunds' ? { name: 'selling', shift: stage.shift } : { name: 'refunds', shift: stage.shift })
             }
           >
             {stage.name === 'refunds' ? 'Register' : 'Refunds'}
-          </button>
+          </Button>
         )}
         {/* Food mode only — mirrors the Refunds toggle idiom above. Retail registers
             never see the floor at all (M5's tab/table machinery is food-only). */}
         {onShift && foodMode && (
-          <button
+          <Button
             type="button"
-            className="carbon-bar-link"
+            variant="ghost"
+            className="self-stretch"
             onClick={() =>
               setStage(stage.name === 'floor' ? { name: 'selling', shift: stage.shift } : { name: 'floor', shift: stage.shift })
             }
           >
             {stage.name === 'floor' ? 'Register' : 'Tabs'}
-          </button>
+          </Button>
         )}
         {user && onShift && (
-          <span className="carbon-bar-right">
-            <span className="carbon-bar-user">{user.name}</span>
-            <button type="button" className="btn btn-secondary btn-clockout" onClick={clockOut}>
+          <span className="ml-auto flex items-center gap-md">
+            <span className="type-body-sm text-ink-muted">{user.name}</span>
+            <Button type="button" variant="ghost" className="self-stretch" onClick={clockOut}>
               Clock out
-            </button>
+            </Button>
           </span>
         )}
       </header>
 
-      <div className="plate chamfer register-body">
-        {(stage.name === 'booting' || stage.name === 'loading-shift') && <p className="muted">Loading…</p>}
+      {/* The content shell: a single grid slot today; Task 8's sale screen renders its
+          two panes (cart | context) inside it. Screens that predate the rework still
+          draw their own layout in here and keep working untouched. */}
+      <div className="mx-auto grid w-full max-w-[1584px] flex-1 grid-cols-1 content-start p-lg">
+        {(stage.name === 'booting' || stage.name === 'loading-shift') && (
+          <p className="type-body-sm text-ink-muted">Loading…</p>
+        )}
         {stage.name === 'setup' && <SetupScreen onDone={() => setStage({ name: 'pin' })} />}
         {stage.name === 'pin' && (
           <PinScreen

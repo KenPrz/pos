@@ -39,9 +39,11 @@ describe('SplitStrip', () => {
     expect(screen.getByText('Check 2')).toBeInTheDocument()
     expect(screen.getAllByText('$5.00')).toHaveLength(2)
 
-    const chips = document.querySelectorAll('.split-chip')
-    expect(chips[0]).not.toHaveClass('active')
-    expect(chips[1]).toHaveClass('active')
+    // Styling-internal hook moved with the UI rework: the strip is a PillStrip now, so
+    // the old `.split-chip`/`.active` class assertions read PillStrip's `data-state`.
+    const chips = document.querySelectorAll('[data-state]')
+    expect(chips[0]).toHaveAttribute('data-state', 'pending')
+    expect(chips[1]).toHaveAttribute('data-state', 'active')
   })
 
   it('shows a settled child as paid instead of its (zero) due amount', () => {

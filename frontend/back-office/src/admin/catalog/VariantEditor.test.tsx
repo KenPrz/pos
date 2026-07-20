@@ -78,26 +78,30 @@ describe('VariantEditor', () => {
     await waitFor(() => expect(api.variants.update).toHaveBeenCalledWith('var-1', { price_cents: 500 }))
   })
 
-  // Review fix: unchecking Active and hitting Save must not silently archive — the
-  // brief's global "archive behind a confirm" constraint, previously unimplemented.
-  it('does not save an archive when the confirm is cancelled', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
+  // UI-rework rewrite (exception #3): the archive confirm moved from `window.confirm`
+  // to `ConfirmDialog`, same copy, same cancel-blocks/confirm-proceeds semantics —
+  // unchecking Active and hitting Save must not silently archive.
+  it('does not save an archive when the ConfirmDialog is cancelled', () => {
     renderEditor()
 
     fireEvent.click(screen.getByLabelText(/^active$/i))
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Archive'))
+    expect(screen.getByText('Archive Large? It leaves the register catalog but stays in history.')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
     expect(api.variants.update).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('saves the archive once the confirm is accepted', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('saves the archive once the ConfirmDialog is confirmed', async () => {
     vi.mocked(api.variants.update).mockResolvedValue({ ...VARIANT, is_active: false })
     renderEditor()
 
     fireEvent.click(screen.getByLabelText(/^active$/i))
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
 
     await waitFor(() => expect(api.variants.update).toHaveBeenCalledWith('var-1', { is_active: false }))
   })

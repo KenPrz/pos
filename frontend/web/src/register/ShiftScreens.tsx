@@ -2,6 +2,10 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { ApiError, api, tokens, type Shift, type ShiftCloseResult } from '../lib/api'
 import { cents, formatMoney, parseCentsOrNull } from '../lib/money'
 
@@ -36,18 +40,24 @@ export function OpenShiftScreen({ onOpened, onSessionExpired }: {
   }
 
   return (
-    <section className="form-panel">
-      <h2>Open shift</h2>
-      <form onSubmit={submit}>
-        <label>
-          Opening float
-          <input value={float} onChange={(e) => setFloat(e.target.value)} inputMode="decimal" autoFocus />
-        </label>
-        <hr className="dotted-divider" />
-        <button type="submit" className="btn btn-submit">Open drawer</button>
-      </form>
-      {error && <p className="error">{error}</p>}
-    </section>
+    <Card className="mx-auto mt-xxl w-full max-w-[420px]">
+      <CardHeader>
+        <CardTitle>Open shift</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={submit} className="flex flex-col gap-lg">
+          <label className="block">
+            <span className="type-body-sm text-ink-muted">Opening float</span>
+            <Input
+              value={float} onChange={(e) => setFloat(e.target.value)} inputMode="decimal" autoFocus
+              className="type-money mt-xs h-[56px] text-[24px]"
+            />
+          </label>
+          <Button type="submit" size="lg" className="w-full">Open drawer</Button>
+        </form>
+        {error && <p className="type-body-sm mt-md text-error">{error}</p>}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -56,28 +66,35 @@ export function OpenShiftScreen({ onOpened, onSessionExpired }: {
  * (the close revokes this register's staff sessions, so afterwards would be a 401) —
  * sales, refunds, and movements are already final by the time the drawer is being
  * counted, so the running Z is the closing Z.
+ *
+ * Rows are Carbon data-table-style hairline rows: label left, tabular figure right,
+ * 1px hairline between rows. The dt/dd adjacency inside each row is what the tests
+ * (and screen readers) key on — keep dd immediately after dt.
  */
 function ZReportPanel({ z }: { z: ReturnType<typeof useZReport> }) {
-  if (z.isPending) return <p className="muted">Loading the Z-report…</p>
-  if (z.isError) return <p className="muted">Z-report unavailable — it can be pulled later from /reports/z.</p>
+  if (z.isPending) return <p className="type-body-sm text-ink-muted">Loading the Z-report…</p>
+  if (z.isError) return <p className="type-body-sm text-ink-muted">Z-report unavailable — it can be pulled later from /reports/z.</p>
 
   const r = z.data
+  const row = 'flex items-center justify-between gap-md border-b border-hairline py-xs'
+  const label = 'type-body-sm text-ink-muted'
+  const value = 'type-body-sm type-money m-0 text-ink'
   return (
-    <div className="zreport">
-      <p className="picker-label">Z-report</p>
-      <dl>
+    <div className="mt-lg">
+      <p className="type-body-sm mb-xs text-ink">Z-report</p>
+      <dl className="m-0">
         {Object.entries(r.sales_by_driver).map(([driver, amount]) => (
-          <span key={driver} className="zrow"><dt>Sales — {driver}</dt><dd>{fm(amount)}</dd></span>
+          <div key={driver} className={row}><dt className={label}>Sales — {driver}</dt><dd className={value}>{fm(amount)}</dd></div>
         ))}
         {Object.entries(r.refunds_by_driver).map(([driver, amount]) => (
-          <span key={driver} className="zrow"><dt>Refunds — {driver}</dt><dd>−{fm(amount)}</dd></span>
+          <div key={driver} className={row}><dt className={label}>Refunds — {driver}</dt><dd className={value}>−{fm(amount)}</dd></div>
         ))}
-        <span className="zrow"><dt>Paid in</dt><dd>{fm(r.movements.paid_in)}</dd></span>
-        <span className="zrow"><dt>Payouts</dt><dd>−{fm(r.movements.payout)}</dd></span>
-        <span className="zrow"><dt>Drops</dt><dd>−{fm(r.movements.drop)}</dd></span>
-        <span className="zrow"><dt>Orders closed</dt><dd>{r.orders_closed}</dd></span>
-        <span className="zrow"><dt>Orders voided</dt><dd>{r.orders_voided}</dd></span>
-        <span className="zrow"><dt>Orders split</dt><dd>{r.orders_split}</dd></span>
+        <div className={row}><dt className={label}>Paid in</dt><dd className={value}>{fm(r.movements.paid_in)}</dd></div>
+        <div className={row}><dt className={label}>Payouts</dt><dd className={value}>−{fm(r.movements.payout)}</dd></div>
+        <div className={row}><dt className={label}>Drops</dt><dd className={value}>−{fm(r.movements.drop)}</dd></div>
+        <div className={row}><dt className={label}>Orders closed</dt><dd className={value}>{r.orders_closed}</dd></div>
+        <div className={row}><dt className={label}>Orders voided</dt><dd className={value}>{r.orders_voided}</dd></div>
+        <div className={row}><dt className={label}>Orders split</dt><dd className={value}>{r.orders_split}</dd></div>
       </dl>
     </div>
   )
@@ -152,73 +169,90 @@ export function CloseShiftScreen({ shiftId, can, onClosed, onCancel, onSessionEx
   }
 
   if (result) {
+    const row = 'flex items-center justify-between gap-md border-b border-hairline py-xs'
     return (
-      <section className={`form-panel ${result.variance_cents === 0 ? 'ok' : 'bad'}`}>
-        <h2>Drawer reconciled</h2>
-        <dl>
-          <dt>Expected</dt><dd>{revealed ? fm(result.expected_cash_cents) : MASK}</dd>
-          <dt>Counted</dt><dd>{fm(result.shift.counted_cash_cents ?? 0)}</dd>
-          <dt>Variance</dt><dd>{revealed ? fm(result.variance_cents) : MASK}</dd>
-        </dl>
-        {result.requires_approval && (
-          approvedShift?.variance_approved_at ? (
-            <p className="muted">
-              {/* Authoritative state is the response: variance_approved_at non-null is
-                  what gates this line, and its timestamp is what's shown — the API never
-                  resolves variance_approved_by (a user id) to a name, so the name here is
-                  tokens.staffUser()'s own display-only garnish (the currently-signed-in
-                  supervisor is who just clicked Approve), not something the server told us. */}
-              Variance approved by {tokens.staffUser()?.name ?? 'supervisor'} at{' '}
-              {new Date(approvedShift.variance_approved_at).toLocaleTimeString()}
-            </p>
-          ) : (
-            <>
-              <p className="error">Variance exceeds the threshold — needs supervisor approval.</p>
-              {can('shift.approve_variance') && (
-                <button
-                  type="button" className="btn btn-submit"
-                  disabled={approveVariance.isPending}
-                  onClick={() => approveVariance.mutate()}
-                >
-                  {approveVariance.isPending ? 'Approving…' : 'Approve variance'}
-                </button>
-              )}
-            </>
-          )
+      <Card
+        className={cn(
+          // Variance is a semantic state — the 3px top rule is Carbon's inline-notification
+          // accent (green = balanced, red = over/short), the only color on the plate.
+          'mx-auto mt-xxl w-full max-w-[480px] border-t-[3px]',
+          result.variance_cents === 0 ? 'border-t-success' : 'border-t-error'
         )}
-        {error && <p className="error">{error}</p>}
-        <hr className="dotted-divider" />
-        <ZReportPanel z={zReport} />
-        <div className="btn-row">
-          <button className="btn btn-utility" onClick={() => window.print()}>Print</button>
-          <button className="btn btn-submit" onClick={() => onClosed(result)}>Done</button>
-        </div>
-      </section>
+      >
+        <CardHeader>
+          <CardTitle>Drawer reconciled</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className="m-0">
+            <div className={row}><dt className="type-body-sm text-ink-muted">Expected</dt><dd className="type-body-lg type-money m-0 text-ink">{revealed ? fm(result.expected_cash_cents) : MASK}</dd></div>
+            <div className={row}><dt className="type-body-sm text-ink-muted">Counted</dt><dd className="type-body-lg type-money m-0 text-ink">{fm(result.shift.counted_cash_cents ?? 0)}</dd></div>
+            <div className={row}><dt className="type-body-sm text-ink-muted">Variance</dt><dd className="type-body-lg type-money m-0 text-ink">{revealed ? fm(result.variance_cents) : MASK}</dd></div>
+          </dl>
+          {result.requires_approval && (
+            approvedShift?.variance_approved_at ? (
+              <p className="type-body-sm mt-md text-ink-muted">
+                {/* Authoritative state is the response: variance_approved_at non-null is
+                    what gates this line, and its timestamp is what's shown — the API never
+                    resolves variance_approved_by (a user id) to a name, so the name here is
+                    tokens.staffUser()'s own display-only garnish (the currently-signed-in
+                    supervisor is who just clicked Approve), not something the server told us. */}
+                Variance approved by {tokens.staffUser()?.name ?? 'supervisor'} at{' '}
+                {new Date(approvedShift.variance_approved_at).toLocaleTimeString()}
+              </p>
+            ) : (
+              <>
+                <p className="type-body-sm mt-md text-error">Variance exceeds the threshold — needs supervisor approval.</p>
+                {can('shift.approve_variance') && (
+                  <Button
+                    type="button" size="lg" className="mt-sm w-full"
+                    disabled={approveVariance.isPending}
+                    onClick={() => approveVariance.mutate()}
+                  >
+                    {approveVariance.isPending ? 'Approving…' : 'Approve variance'}
+                  </Button>
+                )}
+              </>
+            )
+          )}
+          {error && <p className="type-body-sm mt-md text-error">{error}</p>}
+          <ZReportPanel z={zReport} />
+          <div className="mt-lg flex gap-sm">
+            <Button variant="ghost" size="lg" className="flex-1" onClick={() => window.print()}>Print</Button>
+            <Button size="lg" className="flex-1" onClick={() => onClosed(result)}>Done</Button>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <section className="form-panel">
-      <h2>Close shift — count the drawer</h2>
-      <form onSubmit={submit}>
-        <label>
-          Counted cash
-          <input value={counted} onChange={(e) => setCounted(e.target.value)} inputMode="decimal" autoFocus />
-        </label>
-        <hr className="dotted-divider" />
-        <div className="btn-row">
-          <button type="submit" className="btn btn-submit">Close</button>
-          <button type="button" className="btn btn-secondary" onClick={onCancel}>Back</button>
-        </div>
-      </form>
-      {/* Blind count: the count field above is what the cashier sees first and acts on;
-          this is just a standing reminder that expected cash stays hidden until they do. */}
-      {zReport.data && (
-        <p className="muted blind-count">
-          Expected cash: <span>{revealed ? fm(zReport.data.expected_cash_cents) : MASK}</span>
-        </p>
-      )}
-      {error && <p className="error">{error}</p>}
-    </section>
+    <Card className="mx-auto mt-xxl w-full max-w-[420px]">
+      <CardHeader>
+        <CardTitle>Close shift — count the drawer</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={submit} className="flex flex-col gap-lg">
+          <label className="block">
+            <span className="type-body-sm text-ink-muted">Counted cash</span>
+            <Input
+              value={counted} onChange={(e) => setCounted(e.target.value)} inputMode="decimal" autoFocus
+              className="type-money mt-xs h-[56px] text-[24px]"
+            />
+          </label>
+          <div className="flex gap-sm">
+            <Button type="submit" size="lg" className="flex-1">Close</Button>
+            <Button type="button" variant="secondary" size="lg" className="flex-1" onClick={onCancel}>Back</Button>
+          </div>
+        </form>
+        {/* Blind count: the count field above is what the cashier sees first and acts on;
+            this is just a standing reminder that expected cash stays hidden until they do. */}
+        {zReport.data && (
+          <p className="type-body-sm mt-md text-ink-muted">
+            Expected cash: <span className="type-money tracking-[2px]">{revealed ? fm(zReport.data.expected_cash_cents) : MASK}</span>
+          </p>
+        )}
+        {error && <p className="type-body-sm mt-md text-error">{error}</p>}
+      </CardContent>
+    </Card>
   )
 }

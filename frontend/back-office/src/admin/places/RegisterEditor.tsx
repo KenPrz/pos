@@ -3,6 +3,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Location, type Register } from '../../lib/api'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Divider } from '../../components/Divider'
+import { FieldRow } from '../../components/FieldRow'
+import { Button } from '../../components/ui/button'
+import { Card, CardTitle } from '../../components/ui/card'
+import { Checkbox } from '../../components/ui/checkbox'
+import { Input } from '../../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 
 /**
  * Name, mode (retail/food chips), active toggle, and the REISSUE TOKEN action.
@@ -13,7 +21,7 @@ import { ApiError, api, type Location, type Register } from '../../lib/api'
  * Reissuing revokes every existing token for the register immediately
  * (ReissueDeviceToken.php) — confirmed behind a warning because the till holding the old
  * one goes dark the instant this succeeds — and the fresh token is shown exactly once in
- * a copy-me plate. It lives only in this component's state: never written to the cache,
+ * a copy-me panel. It lives only in this component's state: never written to the cache,
  * never persisted, gone the moment this editor closes.
  */
 export function RegisterEditor({
@@ -36,6 +44,10 @@ export function RegisterEditor({
   const [isActive, setIsActive] = useState(register?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
   const [reissuedToken, setReissuedToken] = useState<string | null>(null)
+  // Archive-style confirm (brief's global constraint) — set only when Save would
+  // otherwise deactivate; the dialog's Confirm re-plays the exact body already computed.
+  const [pendingDeactivate, setPendingDeactivate] = useState<Record<string, unknown> | null>(null)
+  const [pendingReissue, setPendingReissue] = useState(false)
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'registers'] })
   const fail = (err: unknown, fallback: string) => {
@@ -75,101 +87,129 @@ export function RegisterEditor({
     put('mode', mode, register?.mode)
     if (register) put('is_active', isActive, register.is_active)
 
-    // Archive-style confirm (brief's global constraint) — same as every other
+    // Deactivation behind a confirm (brief's global constraint) — same as every other
     // is_active:false transition in this app.
-    if (body.is_active === false && !window.confirm(`Deactivate ${name}? It can no longer clock in a shift.`)) {
+    if (body.is_active === false) {
+      setPendingDeactivate(body)
       return
     }
     save.mutate(body)
   }
 
-  const requestReissue = () => {
-    if (!window.confirm(`Reissue ${register?.name ?? 'this register'}'s token? The current till goes dark immediately.`)) return
-    reissue.mutate()
-  }
-
   return (
-    <section className="form-panel">
-      <header className="row">
-        <h2>{register ? 'Edit register' : 'New register'}</h2>
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+    <Card>
+      <div className="mb-lg flex items-center justify-between gap-md">
+        <CardTitle>{register ? 'Edit register' : 'New register'}</CardTitle>
+        <Button type="button" variant="tertiary" onClick={onCancel}>
           Back
-        </button>
-      </header>
+        </Button>
+      </div>
 
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="flex flex-col gap-md">
         {register ? (
-          <p className="muted">Location: {locations.find((l) => l.id === register.location_id)?.name ?? register.location_id}</p>
+          <p className="type-body-sm text-ink-muted">
+            Location: {locations.find((l) => l.id === register.location_id)?.name ?? register.location_id}
+          </p>
         ) : (
-          <label htmlFor="register-location">
-            Location
-            <select id="register-location" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FieldRow label="Location">
+            <Select value={locationId} onValueChange={setLocationId}>
+              <SelectTrigger id="register-location">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
         )}
-        <label htmlFor="register-name">
-          Name
-          <input id="register-name" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <fieldset>
-          <legend>Mode</legend>
-          {/* btn-secondary (selected) vs btn-utility (not) — a visual toggle without
-              reaching for btn-submit's warm signal color, which DESIGN.md reserves for
-              this form's one primary action (Save). */}
-          <div className="btn-row">
-            <button
+        <FieldRow label="Name">
+          <Input id="register-name" value={name} onChange={(e) => setName(e.target.value)} />
+        </FieldRow>
+        <div className="flex flex-col gap-xxs">
+          <span className="type-body-sm text-ink-muted">Mode</span>
+          {/* secondary (selected) vs tertiary (not) — a visual toggle without reaching
+              for a second primary button; Save below stays this form's one primary action. */}
+          <div className="flex gap-xs" role="group" aria-label="Mode">
+            <Button
               type="button"
-              className={`btn btn-chip ${mode === 'retail' ? 'btn-secondary' : 'btn-utility'}`}
+              variant={mode === 'retail' ? 'secondary' : 'tertiary'}
               aria-pressed={mode === 'retail'}
               onClick={() => setMode('retail')}
             >
               Retail
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className={`btn btn-chip ${mode === 'food' ? 'btn-secondary' : 'btn-utility'}`}
+              variant={mode === 'food' ? 'secondary' : 'tertiary'}
               aria-pressed={mode === 'food'}
               onClick={() => setMode('food')}
             >
               Food
-            </button>
+            </Button>
           </div>
-        </fieldset>
+        </div>
         {register && (
-          <label htmlFor="register-active">
-            Active
-            <input id="register-active" type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-          </label>
+          <FieldRow label="Active">
+            <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(Boolean(checked))} />
+          </FieldRow>
         )}
-        <button type="submit" className="btn btn-submit" disabled={save.isPending || (register === null && locationId === '')}>
-          {save.isPending ? 'Saving…' : 'Save'}
-        </button>
+        <div>
+          <Button type="submit" variant="primary" disabled={save.isPending || (register === null && locationId === '')}>
+            {save.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </form>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="type-body-sm mt-md text-error">{error}</p>}
 
       {register && (
         <>
-          <hr className="dotted-divider" />
-          <h3>Device token</h3>
-          <p className="muted">Lost or stolen terminal? Reissuing kills the old token immediately and mints a new one.</p>
-          <button type="button" className="btn btn-secondary" disabled={reissue.isPending} onClick={requestReissue}>
+          <Divider />
+          <CardTitle className="mb-md">Device token</CardTitle>
+          <p className="type-body-sm text-ink-muted mb-md">
+            Lost or stolen terminal? Reissuing kills the old token immediately and mints a new one.
+          </p>
+          <Button type="button" variant="secondary" disabled={reissue.isPending} onClick={() => setPendingReissue(true)}>
             {reissue.isPending ? 'Reissuing…' : 'Reissue token'}
-          </button>
+          </Button>
           {reissuedToken && (
-            <div className="plate" style={{ marginTop: 'var(--space-sm)', padding: 'var(--space-sm)' }}>
-              <p className="muted">
-                New token — copy it now, it will not be shown again:
-              </p>
-              <code style={{ userSelect: 'all', wordBreak: 'break-all' }}>{reissuedToken}</code>
-            </div>
+            <Card elevated className="mt-md">
+              <p className="type-body-sm text-ink-muted mb-xs">New token — copy it now, it will not be shown again:</p>
+              <code className="type-money block select-all break-all text-ink">{reissuedToken}</code>
+            </Card>
           )}
         </>
       )}
-    </section>
+
+      <ConfirmDialog
+        open={pendingDeactivate !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeactivate(null)
+        }}
+        message={`Deactivate ${name}? It can no longer clock in a shift.`}
+        confirmLabel="Deactivate"
+        destructive
+        onConfirm={() => {
+          if (!pendingDeactivate) return
+          save.mutate(pendingDeactivate)
+          setPendingDeactivate(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingReissue}
+        onOpenChange={setPendingReissue}
+        message={`Reissue ${register?.name ?? 'this register'}'s token? The current till goes dark immediately.`}
+        confirmLabel="Reissue"
+        destructive
+        onConfirm={() => {
+          setPendingReissue(false)
+          reissue.mutate()
+        }}
+      />
+    </Card>
   )
 }

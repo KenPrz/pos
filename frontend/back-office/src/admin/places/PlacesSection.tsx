@@ -6,6 +6,7 @@ import { ApiError, api, type Location, type Register } from '../../lib/api'
 import { EntityTable } from '../catalog/EntityTable'
 import { LocationEditor } from './LocationEditor'
 import { RegisterEditor } from './RegisterEditor'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 
 type Tab = 'locations' | 'registers'
 
@@ -27,21 +28,21 @@ export function PlacesSection({ onUnauthorized }: { onUnauthorized: () => void }
   const [tab, setTab] = useState<Tab>('locations')
 
   return (
-    <div className="menu-grid">
-      <nav className="menu-rail" aria-label="Places tabs">
-        <button type="button" className={`menu-rail-tab${tab === 'locations' ? ' active' : ''}`} aria-pressed={tab === 'locations'} onClick={() => setTab('locations')}>
-          Locations
-        </button>
-        <button type="button" className={`menu-rail-tab${tab === 'registers' ? ' active' : ''}`} aria-pressed={tab === 'registers'} onClick={() => setTab('registers')}>
-          Registers
-        </button>
-      </nav>
+    <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+      <TabsList aria-label="Places tabs">
+        <TabsTrigger value="locations">Locations</TabsTrigger>
+        <TabsTrigger value="registers">Registers</TabsTrigger>
+      </TabsList>
 
-      <div style={{ flex: 1 }}>
-        {tab === 'locations' && <LocationsPanel onUnauthorized={onUnauthorized} />}
-        {tab === 'registers' && <RegistersPanel onUnauthorized={onUnauthorized} />}
+      <div className="pt-lg">
+        <TabsContent value="locations">
+          <LocationsPanel onUnauthorized={onUnauthorized} />
+        </TabsContent>
+        <TabsContent value="registers">
+          <RegistersPanel onUnauthorized={onUnauthorized} />
+        </TabsContent>
       </div>
-    </div>
+    </Tabs>
   )
 }
 
@@ -63,8 +64,8 @@ function LocationsPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
     },
   })
 
-  if (locations.isLoading) return <p className="muted">Loading…</p>
-  if (locations.isError) return <p className="error">Could not load locations.</p>
+  if (locations.isLoading) return <p className="type-body-sm text-ink-muted">Loading…</p>
+  if (locations.isError) return <p className="type-body-sm text-error">Could not load locations.</p>
 
   if (editing !== null) {
     return (
@@ -96,7 +97,7 @@ function LocationsPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
         unarchiveLabel="Reactivate"
         emptyMessage="No locations yet."
       />
-      {error && <p className="error">{error}</p>}
+      {error && <p className="type-body-sm text-error">{error}</p>}
     </>
   )
 }
@@ -120,8 +121,8 @@ function RegistersPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
     },
   })
 
-  if (registers.isLoading || locations.isLoading) return <p className="muted">Loading…</p>
-  if (registers.isError) return <p className="error">Could not load registers.</p>
+  if (registers.isLoading || locations.isLoading) return <p className="type-body-sm text-ink-muted">Loading…</p>
+  if (registers.isError) return <p className="type-body-sm text-error">Could not load registers.</p>
 
   if (editing !== null) {
     return (
@@ -155,7 +156,7 @@ function RegistersPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
         unarchiveLabel="Reactivate"
         emptyMessage="No registers yet."
       />
-      {error && <p className="error">{error}</p>}
+      {error && <p className="type-body-sm text-error">{error}</p>}
     </>
   )
 }

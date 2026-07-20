@@ -8,8 +8,21 @@ import { api, type AuditPage } from '../../lib/api'
 
 afterEach(cleanup)
 
+// jsdom implements none of the layout machinery Radix Select's popper touches —
+// stubbed here (same as any Radix-in-jsdom suite) so the entity-type dropdown can
+// actually open in these tests.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+  window.HTMLElement.prototype.scrollIntoView = vi.fn()
+  window.HTMLElement.prototype.hasPointerCapture = vi.fn()
+  window.HTMLElement.prototype.releasePointerCapture = vi.fn()
 })
 
 vi.mock('../../lib/api', async (importOriginal) => {
@@ -46,11 +59,18 @@ function renderSection() {
   )
 }
 
+/** Open the entity-type dropdown (Radix renders its options only while open). */
+function openEntityTypeSelect() {
+  fireEvent.keyDown(screen.getByRole('combobox', { name: /entity type/i }), { key: 'ArrowDown' })
+}
+
 describe('AuditSection', () => {
   it('offers the complete entity-type set, including OrderDiscount and Location', async () => {
     vi.mocked(api.audit.list).mockResolvedValue(PAGE_1)
     renderSection()
     await waitFor(() => expect(api.audit.list).toHaveBeenCalledTimes(1))
+
+    openEntityTypeSelect()
 
     expect(screen.getByRole('option', { name: 'OrderDiscount' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Location' })).toBeInTheDocument()
@@ -65,7 +85,8 @@ describe('AuditSection', () => {
 
     await waitFor(() => expect(screen.getByText('admin.location.update')).toBeInTheDocument())
 
-    fireEvent.change(screen.getByLabelText(/entity type/i), { target: { value: 'Order' } })
+    openEntityTypeSelect()
+    fireEvent.keyDown(screen.getByRole('option', { name: 'Order' }), { key: 'Enter' })
     fireEvent.click(screen.getByRole('button', { name: /^filter$/i }))
 
     expect(screen.queryByText('admin.location.update')).not.toBeInTheDocument()

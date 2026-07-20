@@ -46,6 +46,11 @@ describe('EntityTable', () => {
 
     expect(screen.getAllByText('ARCHIVED')).toHaveLength(1)
     expect(screen.getAllByRole('button', { name: /unarchive/i })).toHaveLength(1)
+
+    // Regression: archived rows used to dim via a hardcoded `archived-row` CSS class —
+    // restored here as `DataTable`'s data-driven `inactive` prop (opacity-55).
+    expect(screen.getByText('Discontinued Scone').closest('tr')).toHaveClass('opacity-55')
+    expect(screen.getByText('Latte').closest('tr')).not.toHaveClass('opacity-55')
   })
 
   it('never shows the badge for rows with no is_active field at all (categories, modifier groups)', () => {

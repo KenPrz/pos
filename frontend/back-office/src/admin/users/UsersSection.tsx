@@ -17,11 +17,12 @@ function useAdminList<T>(key: string, queryFn: () => Promise<T[]>, onUnauthorize
 }
 
 /**
- * The Users screen (Task 10): one `.bo-table` of every user, with deactivated accounts
- * greyed and reinstate-able rather than removed (users are never deleted — see the
- * account's roles/audit history, which must survive). Roles need the locations list
- * for its "which location" selects, so this loads both the same way ProductsPanel
- * loads categories/modifier-groups alongside products.
+ * The Users screen (Task 10, on the component vocabulary since Task 4): one
+ * `EntityTable`-on-`DataTable` of every user, with deactivated accounts dimmed
+ * (`DataTable`'s `inactive` prop) and reinstate-able rather than removed (users are
+ * never deleted — see the account's roles/audit history, which must survive). Roles
+ * need the locations list for its "which location" selects, so this loads both the
+ * same way ProductsPanel loads categories/modifier-groups alongside products.
  */
 export function UsersSection({ onUnauthorized }: { onUnauthorized: () => void }) {
   const users = useAdminList('users', api.users.list, onUnauthorized)
@@ -42,8 +43,8 @@ export function UsersSection({ onUnauthorized }: { onUnauthorized: () => void })
     },
   })
 
-  if (users.isLoading || locations.isLoading) return <p className="muted">Loading…</p>
-  if (users.isError) return <p className="error">Could not load users.</p>
+  if (users.isLoading || locations.isLoading) return <p className="type-body-sm text-ink-muted">Loading…</p>
+  if (users.isError) return <p className="type-body-sm text-error">Could not load users.</p>
 
   if (editing !== null) {
     return (
@@ -81,7 +82,7 @@ export function UsersSection({ onUnauthorized }: { onUnauthorized: () => void })
         unarchiveLabel="Reactivate"
         emptyMessage="No users yet."
       />
-      {error && <p className="error">{error}</p>}
+      {error && <p className="type-body-sm text-error">{error}</p>}
     </>
   )
 }

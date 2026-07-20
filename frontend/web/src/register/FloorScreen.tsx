@@ -3,10 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError, api, type Order, type OpenShiftRegister } from '../lib/api'
-import { cents, formatMoney } from '../lib/money'
+import { ActionZone } from '@/components/ActionZone'
+import { MoneyText } from '@/components/MoneyText'
+import { TileButton } from '@/components/TileButton'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 const CURRENCY = 'USD'
-const fm = (n: number) => formatMoney(cents(n), CURRENCY)
 
 // Stable references for the "no data yet" case — `.data ?? []` would otherwise mint a
 // new array every render.
@@ -22,10 +26,10 @@ function ageLabel(openedAt: string | undefined): string {
 
 /**
  * The floor view (M5, Task 12): every open order across the location, not just this
- * register's (api.openOrders() === findOrders({status:'open'}), unscoped). A plain list
- * of `plate` tab cards — deliberately not a graphical room layout, per the M5 design
- * spec's Out of scope. Register.tsx only mounts this screen while its TABS toggle is
- * active, so the 10s poll runs only while staff are actually looking at it.
+ * register's (api.openOrders() === findOrders({status:'open'}), unscoped). A plain grid
+ * of tab tiles — deliberately not a graphical room layout, per the M5 design spec's Out
+ * of scope. Register.tsx only mounts this screen while its TABS toggle is active, so
+ * the 10s poll runs only while staff are actually looking at it.
  *
  * RESUME and TRANSFER only ever act on cards this register opened (`order.register_id
  * === registerId`): the floor shows every table so staff can see the whole room, but
@@ -115,99 +119,123 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
   const orders = openOrders.data ?? NO_ORDERS
   const targets = openShiftRegisters.data ?? NO_TARGETS
 
-  const submitNewTab = (e: FormEvent) => {
-    e.preventDefault()
+  // Shared by the pad form's onSubmit (Enter in the table field) and the action zone's
+  // Open tab button — one guard path, same doPay/submitPay idiom as SaleScreen.
+  const doOpenTab = () => {
     if (newTab.isPending) return
     setError(null)
     newTab.mutate(tableRefInput.trim())
   }
 
-  return (
-    <section className="form-panel">
-      <h2>Floor</h2>
+  const submitNewTab = (e: FormEvent) => {
+    e.preventDefault()
+    doOpenTab()
+  }
 
-      {newTabOpen ? (
-        <form className="inline-reason" onSubmit={submitNewTab}>
-          <input
+  return (
+    <section className="flex flex-col gap-md pb-[80px]">
+      <h2 className="type-headline">Floor</h2>
+
+      {newTabOpen && (
+        <form onSubmit={submitNewTab} className="max-w-[24rem]">
+          <Input
             autoFocus placeholder="Table (optional)…" maxLength={20}
             value={tableRefInput} onChange={(e) => setTableRefInput(e.target.value)}
+            className="h-[56px] text-[18px]"
           />
-          <button type="submit" className="btn btn-submit" disabled={newTab.isPending}>
-            {newTab.isPending ? 'Opening…' : 'Open tab'}
-          </button>
-          <button
-            type="button" className="btn btn-secondary"
-            onClick={() => { newTabKeyRef.current = null; setNewTabOpen(false) }}
-          >
-            Cancel
-          </button>
         </form>
-      ) : (
-        <div className="btn-row">
-          <button
-            type="button" className="btn btn-submit"
-            onClick={() => { newTabKeyRef.current = crypto.randomUUID(); setNewTabOpen(true) }}
-          >
-            New tab
-          </button>
-        </div>
       )}
 
-      {openOrders.isLoading && <p className="muted">Loading tabs…</p>}
-      {openOrders.isError && <p className="error">Could not load the floor.</p>}
-      {!openOrders.isLoading && orders.length === 0 && <p className="muted">No open tabs.</p>}
+      {openOrders.isLoading && <p className="type-body-sm text-ink-muted">Loading tabs…</p>}
+      {openOrders.isError && <p className="type-body-sm text-error">Could not load the floor.</p>}
+      {!openOrders.isLoading && orders.length === 0 && <p className="type-body-sm text-ink-muted">No open tabs.</p>}
 
-      <div className="floor-grid">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-sm">
         {orders.map((o) => {
           const mine = o.register_id === registerId
           const blockedByActiveOrder = mine && activeOrderId !== null && activeOrderId !== o.id
           const resumeDisabled = !mine || blockedByActiveOrder
           return (
-            <div className="tab-card-wrap" key={o.id}>
-              <button
-                type="button"
-                className={`tab-card${activeOrderId === o.id ? ' active' : ''}`}
+            <div
+              className="flex flex-col gap-xxs" key={o.id}
+              title={!mine ? 'Open at another register.' : undefined}
+            >
+              <TileButton
+                title={o.table_ref ?? o.number}
+                // The tab currently in progress on the (hidden) sale screen — status as
+                // a left edge bar, blue = selected indicator per the semantic map.
+                edge={activeOrderId === o.id ? 'info' : undefined}
                 disabled={resumeDisabled}
-                title={!mine ? 'Open at another register.' : undefined}
                 onClick={() => onResume(o)}
-              >
-                <span className="tab-card-ref">{o.table_ref ?? o.number}</span>
-                <span className="tab-card-meta">{o.opened_by_name ?? 'Unknown'} · {ageLabel(o.opened_at)}</span>
-                <span className="tab-card-due num">{fm(o.due_cents)}</span>
-              </button>
+                meta={
+                  <>
+                    <span className="block">{o.opened_by_name ?? 'Unknown'} · {ageLabel(o.opened_at)}</span>
+                    <MoneyText cents={o.due_cents} currency={CURRENCY} size="line" className="block text-ink" />
+                  </>
+                }
+              />
               {blockedByActiveOrder && (
-                <p className="tab-card-hint">Finish or park the current sale to switch tabs.</p>
+                <p className="type-caption text-ink-subtle">Finish or park the current sale to switch tabs.</p>
               )}
               {mine && canTransfer && targets.length > 0 && (
-                <div className="tab-card-transfer">
-                  <button
-                    type="button" className="btn btn-utility btn-chip"
+                <>
+                  <Button
+                    type="button" variant="tertiary" size="lg"
                     onClick={() => setTransferOpenId(transferOpenId === o.id ? null : o.id)}
                   >
                     Transfer
-                  </button>
-                  {transferOpenId === o.id && (
-                    <div className="transfer-picker">
-                      <p className="picker-label">Send to</p>
-                      {targets.map((t) => (
-                        <button
-                          key={t.register_id} type="button" className="btn btn-utility"
-                          disabled={transfer.isPending}
-                          onClick={() => transfer.mutate({ order: o, targetRegisterId: t.register_id })}
-                        >
-                          {t.register_name} — {t.opened_by_name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  </Button>
+                  <Sheet open={transferOpenId === o.id} onOpenChange={(open) => { if (!open) setTransferOpenId(null) }}>
+                    <SheetContent aria-describedby={undefined}>
+                      <SheetTitle>Send to</SheetTitle>
+                      <div className="mt-md flex flex-col">
+                        {targets.map((t) => (
+                          <Button
+                            key={t.register_id} type="button" variant="ghost" size="lg"
+                            className="justify-start border-b border-hairline text-ink"
+                            disabled={transfer.isPending}
+                            onClick={() => transfer.mutate({ order: o, targetRegisterId: t.register_id })}
+                          >
+                            {t.register_name} — {t.opened_by_name}
+                          </Button>
+                        ))}
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </>
               )}
             </div>
           )
         })}
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="type-body-sm text-error">{error}</p>}
+
+      {/* NEW TAB is the floor's single primary action (spec §register: "NEW TAB as the
+          bottom action-zone primary"); while the pad is open the zone becomes its
+          Open tab / Cancel pair, same swap idiom as SplitPrompt's GO/Cancel. */}
+      <ActionZone>
+        {newTabOpen ? (
+          <>
+            <Button size="xl" type="button" disabled={newTab.isPending} onClick={doOpenTab}>
+              {newTab.isPending ? 'Opening…' : 'Open tab'}
+            </Button>
+            <Button
+              size="xl" type="button" variant="ghost"
+              onClick={() => { newTabKeyRef.current = null; setNewTabOpen(false) }}
+            >
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="xl" type="button"
+            onClick={() => { newTabKeyRef.current = crypto.randomUUID(); setNewTabOpen(true) }}
+          >
+            New tab
+          </Button>
+        )}
+      </ActionZone>
     </section>
   )
 }

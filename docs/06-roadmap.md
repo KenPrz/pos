@@ -442,6 +442,42 @@ items surfaced while proving the restore drill and `make e2e`.
 
 ---
 
+## UI rework — one language, two surfaces
+
+Not a milestone with new capability — a whole-product reskin, after M7. Both frontends
+moved onto one design language: the root `DESIGN.md`, an IBM/Carbon-calibrated spec —
+flat squares (0px corners everywhere, pills only on status badges), hairlines and
+surface change instead of drop shadows, IBM Plex Sans with weight-300 display type,
+sentence case, IBM Blue as the only accent. The register kept its two-pane till shape
+and gained a hard 48px touch floor (primary flows at 56–64px); the back office became
+a plate-layout admin — fixed sidebar with a location switcher, a **Today** landing,
+content on white plates over a gray canvas.
+
+What held it together:
+
+- **The frozen contract.** Every existing user-visible label, flow, route, and behavior
+  stayed byte-identical through the rework — proven by the unchanged label assertions
+  riding through every task's gates (462 backend / 92 register / 131 back-office tests)
+  and all three e2e scripts green after the cutover, untouched. Exactly three named
+  exceptions, each documented in the Manager Guide in the same task that made it true:
+  the **Today** landing (a new screen, so new labels), the **location switcher**
+  relocated to the sidebar (the per-screen location pickers died with it), and
+  `window.confirm` → styled Dialog (same copy verbatim; tests rewritten to
+  same-semantics Dialog assertions).
+- **Component vocabulary, review-enforced.** If two screens render the same visual
+  pattern, it is a component — screens compose the library, never inline styling. All
+  DESIGN.md values enter code in exactly one file, `src/styles/carbon.css`, and the
+  shared set (`carbon.css`, `src/lib/utils.ts`, all of `src/components/ui/*`,
+  `StatusPill`/`EmptyState`/`ConfirmDialog`) is byte-identical between the two apps,
+  diff-verified at the close.
+- **Ergonomics live in the composites, not the screens.** Register composites carry the
+  till's sizing in their own classes (`ActionZone` 64px, `TileButton` ≥96px,
+  `PrepChip`/`PillStrip`/`CartLine` at the 48px floor); back-office composites
+  (`DataTable`, `StatCard`, `FieldRow`, `SectionHeader`) carry the plate idiom. A
+  screen that needs the pattern gets the ergonomics for free.
+
+---
+
 ## Sequencing rationale
 
 - **Money before schema** — everything computes on it.

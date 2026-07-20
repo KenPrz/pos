@@ -4,6 +4,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Discount } from '../../lib/api'
 import { parseCentsOrNull } from '../../lib/money'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { FieldRow } from '../../components/FieldRow'
+import { Button } from '../../components/ui/button'
+import { Card, CardTitle } from '../../components/ui/card'
+import { Checkbox } from '../../components/ui/checkbox'
+import { Input } from '../../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { MoneyField } from './MoneyField'
 
 /** '' → null; otherwise a percent typed by a human (e.g. "8.25") to micros. */
@@ -42,6 +49,9 @@ export function DiscountEditor({
   const [requiresSupervisor, setRequiresSupervisor] = useState(discount?.requires_supervisor ?? true)
   const [isActive, setIsActive] = useState(discount?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
+  // Archive behind a confirm (brief's global constraint) — set only when Save would
+  // otherwise archive; the dialog's Confirm re-plays the exact body already computed.
+  const [pendingArchive, setPendingArchive] = useState<Record<string, unknown> | null>(null)
 
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -87,68 +97,85 @@ export function DiscountEditor({
 
     // Archive behind a confirm (brief's global constraint) — unchecking Active and
     // hitting Save must not silently archive. UNARCHIVE (the table action) needs none.
-    if (body.is_active === false && !window.confirm(`Archive ${name}? It leaves the register catalog but stays in history.`)) {
+    if (body.is_active === false) {
+      setPendingArchive(body)
       return
     }
     save.mutate(body)
   }
 
   return (
-    <section className="form-panel">
-      <header className="row">
-        <h2>{discount ? 'Edit discount' : 'New discount'}</h2>
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+    <Card>
+      <div className="mb-lg flex items-center justify-between gap-md">
+        <CardTitle>{discount ? 'Edit discount' : 'New discount'}</CardTitle>
+        <Button type="button" variant="tertiary" onClick={onCancel}>
           Back
-        </button>
-      </header>
+        </Button>
+      </div>
 
-      <form onSubmit={submit}>
-        <label htmlFor="discount-name">
-          Name
-          <input id="discount-name" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label htmlFor="discount-kind">
-          Kind
-          <select id="discount-kind" value={kind} onChange={(e) => setKind(e.target.value as 'percent' | 'fixed')}>
-            <option value="percent">Percent</option>
-            <option value="fixed">Fixed amount</option>
-          </select>
-        </label>
+      <form onSubmit={submit} className="flex flex-col gap-md">
+        <FieldRow label="Name">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="Kind">
+          <Select value={kind} onValueChange={(v) => setKind(v as 'percent' | 'fixed')}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="percent">Percent</SelectItem>
+              <SelectItem value="fixed">Fixed amount</SelectItem>
+            </SelectContent>
+          </Select>
+        </FieldRow>
         {kind === 'percent' ? (
-          <label htmlFor="discount-percent">
-            Percent
-            <input id="discount-percent" inputMode="decimal" placeholder="8.25" value={percentInput} onChange={(e) => setPercentInput(e.target.value)} />
-          </label>
+          <FieldRow label="Percent">
+            <Input inputMode="decimal" placeholder="8.25" value={percentInput} onChange={(e) => setPercentInput(e.target.value)} />
+          </FieldRow>
         ) : (
           <MoneyField id="discount-amount" label="Amount" value={amountInput} onChange={setAmountInput} />
         )}
-        <label htmlFor="discount-scope">
-          Scope
-          <select id="discount-scope" value={scope} onChange={(e) => setScope(e.target.value as 'order' | 'line')}>
-            <option value="order">Order</option>
-            <option value="line">Line</option>
-          </select>
-        </label>
-        <label htmlFor="discount-requires-supervisor">
-          Requires supervisor
-          <input
-            id="discount-requires-supervisor"
-            type="checkbox"
-            checked={requiresSupervisor}
-            onChange={(e) => setRequiresSupervisor(e.target.checked)}
-          />
-        </label>
+        <FieldRow label="Scope">
+          <Select value={scope} onValueChange={(v) => setScope(v as 'order' | 'line')}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="order">Order</SelectItem>
+              <SelectItem value="line">Line</SelectItem>
+            </SelectContent>
+          </Select>
+        </FieldRow>
+        <FieldRow label="Requires supervisor">
+          <Checkbox checked={requiresSupervisor} onCheckedChange={(checked) => setRequiresSupervisor(Boolean(checked))} />
+        </FieldRow>
         {discount && (
-          <label htmlFor="discount-active">
-            Active
-            <input id="discount-active" type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-          </label>
+          <FieldRow label="Active">
+            <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(Boolean(checked))} />
+          </FieldRow>
         )}
-        <button type="submit" className="btn btn-submit" disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save'}
-        </button>
+        <div>
+          <Button type="submit" variant="primary" disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </form>
-      {error && <p className="error">{error}</p>}
-    </section>
+      {error && <p className="type-body-sm mt-md text-error">{error}</p>}
+
+      <ConfirmDialog
+        open={pendingArchive !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingArchive(null)
+        }}
+        message={`Archive ${name}? It leaves the register catalog but stays in history.`}
+        confirmLabel="Archive"
+        destructive
+        onConfirm={() => {
+          if (!pendingArchive) return
+          save.mutate(pendingArchive)
+          setPendingArchive(null)
+        }}
+      />
+    </Card>
   )
 }

@@ -75,12 +75,20 @@ describe('UserEditor', () => {
     expect(await screen.findByText(message)).toBeInTheDocument()
   })
 
+  // UI-rework rewrite (DOM-shape coupling, exception noted in the task report): the
+  // native `<select>` "add location"/"add role" pickers became Radix `Select` (the
+  // vocabulary component, same as every other dropdown migrated in Task 3) — so opening
+  // and choosing an option replaces the old `fireEvent.change` with the
+  // open-trigger/click-option interaction Radix Select needs. Behavior/label assertions
+  // are unchanged: same full replacement role set, same "Add" button.
   it('sends the full replacement role set when a role row is added', async () => {
     vi.mocked(api.users.update).mockResolvedValue(USER)
     renderEditor()
 
-    fireEvent.change(screen.getByLabelText(/add location/i), { target: { value: 'loc-2' } })
-    fireEvent.change(screen.getByLabelText(/add role/i), { target: { value: 'supervisor' } })
+    fireEvent.click(screen.getByLabelText(/add location/i))
+    fireEvent.click(await screen.findByRole('option', { name: 'Uptown' }))
+    fireEvent.click(screen.getByLabelText(/add role/i))
+    fireEvent.click(await screen.findByRole('option', { name: 'Supervisor' }))
     fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
@@ -102,5 +110,34 @@ describe('UserEditor', () => {
 
     expect(api.users.create).not.toHaveBeenCalled()
     expect(screen.getByText(/email or a pin/i)).toBeInTheDocument()
+  })
+
+  // UI-rework rewrite (exception #3): the deactivate confirm moved from `window.confirm`
+  // to `ConfirmDialog`, same copy, same cancel-blocks/confirm-proceeds semantics.
+  it('cancelling the deactivate ConfirmDialog blocks the save', () => {
+    renderEditor()
+
+    fireEvent.click(screen.getByLabelText(/^active$/i))
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(
+      screen.getByText('Deactivate Alex Cashier? They keep their history but can no longer sign in.'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(api.users.update).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('confirming the deactivate ConfirmDialog proceeds with the save', async () => {
+    vi.mocked(api.users.update).mockResolvedValue({ ...USER, is_active: false })
+    renderEditor()
+
+    fireEvent.click(screen.getByLabelText(/^active$/i))
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }))
+
+    await waitFor(() => expect(api.users.update).toHaveBeenCalledWith('user-1', { is_active: false }))
   })
 })

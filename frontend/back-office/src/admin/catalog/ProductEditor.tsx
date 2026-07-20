@@ -3,6 +3,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Category, type ModifierGroup, type Product } from '../../lib/api'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Divider } from '../../components/Divider'
+import { FieldRow } from '../../components/FieldRow'
+import { Badge } from '../../components/ui/badge'
+import { Button } from '../../components/ui/button'
+import { Card, CardTitle } from '../../components/ui/card'
+import { Checkbox } from '../../components/ui/checkbox'
+import { Input } from '../../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
+
+// Radix `Select.Item` rejects an empty-string value — see SimpleEditor's identical
+// sentinel. Category is the one optional select here (a product needn't have one).
+const NONE_CATEGORY = '__none__'
 
 /**
  * Product fields plus the modifier-group attach list. Two independent actions, two
@@ -41,6 +54,9 @@ export function ProductEditor({
   const [isActive, setIsActive] = useState(product?.is_active ?? true)
   const [attachedIds, setAttachedIds] = useState<string[]>(product?.modifier_group_ids ?? [])
   const [error, setError] = useState<string | null>(null)
+  // Archive behind a confirm (brief's global constraint) — set only when Save would
+  // otherwise archive; the dialog's Confirm re-plays the exact body already computed.
+  const [pendingArchive, setPendingArchive] = useState<Record<string, unknown> | null>(null)
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'products'] })
 
@@ -82,7 +98,8 @@ export function ProductEditor({
 
     // Archive behind a confirm (brief's global constraint) — unchecking Active and
     // hitting Save must not silently archive. UNARCHIVE (the table action) needs none.
-    if (body.is_active === false && !window.confirm(`Archive ${name}? It leaves the register catalog but stays in history.`)) {
+    if (body.is_active === false) {
+      setPendingArchive(body)
       return
     }
     save.mutate(body)
@@ -93,90 +110,111 @@ export function ProductEditor({
   }
 
   return (
-    <section className="form-panel">
-      <header className="row">
-        <h2>{product ? 'Edit product' : 'New product'}</h2>
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+    <Card>
+      <div className="mb-lg flex items-center justify-between gap-md">
+        <CardTitle>{product ? 'Edit product' : 'New product'}</CardTitle>
+        <Button type="button" variant="tertiary" onClick={onCancel}>
           Back
-        </button>
-      </header>
+        </Button>
+      </div>
 
-      <form onSubmit={submit}>
-        <label htmlFor="product-name">
-          Name
-          <input id="product-name" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label htmlFor="product-description">
-          Description
-          <input id="product-description" value={description} onChange={(e) => setDescription(e.target.value)} />
-        </label>
-        <label htmlFor="product-category">
-          Category
-          <select id="product-category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">—</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label htmlFor="product-kind">
-          Kind
-          <select id="product-kind" value={kind} onChange={(e) => setKind(e.target.value as 'goods' | 'service')}>
-            <option value="goods">Goods</option>
-            <option value="service">Service</option>
-          </select>
-        </label>
+      <form onSubmit={submit} className="flex flex-col gap-md">
+        <FieldRow label="Name">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="Description">
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+        </FieldRow>
+        <FieldRow label="Category">
+          <Select
+            value={categoryId || NONE_CATEGORY}
+            onValueChange={(v) => setCategoryId(v === NONE_CATEGORY ? '' : v)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE_CATEGORY}>—</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FieldRow>
+        <FieldRow label="Kind">
+          <Select value={kind} onValueChange={(v) => setKind(v as 'goods' | 'service')}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="goods">Goods</SelectItem>
+              <SelectItem value="service">Service</SelectItem>
+            </SelectContent>
+          </Select>
+        </FieldRow>
         {product && (
-          <label htmlFor="product-active">
-            Active
-            <input id="product-active" type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-          </label>
+          <FieldRow label="Active">
+            <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(Boolean(checked))} />
+          </FieldRow>
         )}
-        <button type="submit" className="btn btn-submit" disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save'}
-        </button>
+        <div>
+          <Button type="submit" variant="primary" disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </form>
 
-      <hr className="dotted-divider" />
+      <Divider />
 
-      <h3>Modifier groups</h3>
+      <CardTitle className="mb-md">Modifier groups</CardTitle>
       {product === null ? (
-        <p className="muted">Save the product first to attach modifier groups.</p>
+        <p className="type-body-sm text-ink-muted">Save the product first to attach modifier groups.</p>
       ) : modifierGroups.length === 0 ? (
-        <p className="muted">No modifier groups defined yet.</p>
+        <p className="type-body-sm text-ink-muted">No modifier groups defined yet.</p>
       ) : (
         <>
-          <div className="modifier-chips">
+          <div className="mb-md flex flex-wrap gap-xs">
             {modifierGroups.map((g) => {
               const position = attachedIds.indexOf(g.id)
+              const selected = position >= 0
               return (
-                <label key={g.id} className={`chip${position >= 0 ? ' selected' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={position >= 0}
-                    onChange={() => toggleGroup(g.id)}
-                    style={{ minHeight: 0, width: 14, height: 14 }}
-                  />
+                <label
+                  key={g.id}
+                  className={`type-body-sm flex items-center gap-xs border px-sm py-xs ${
+                    selected ? 'border-primary bg-surface-1' : 'border-hairline'
+                  }`}
+                >
+                  <Checkbox checked={selected} onCheckedChange={() => toggleGroup(g.id)} />
                   {g.name}
-                  {position >= 0 && <span className="chip-count"> #{position + 1}</span>}
+                  {selected && <Badge variant="info">#{position + 1}</Badge>}
                 </label>
               )
             })}
           </div>
-          <button
-            type="button"
-            className="btn btn-utility"
-            disabled={attach.isPending}
-            onClick={() => attach.mutate(attachedIds)}
-          >
+          <Button type="button" variant="tertiary" disabled={attach.isPending} onClick={() => attach.mutate(attachedIds)}>
             {attach.isPending ? 'Saving…' : 'Save modifier groups'}
-          </button>
+          </Button>
         </>
       )}
 
-      {error && <p className="error">{error}</p>}
-    </section>
+      {error && <p className="type-body-sm mt-md text-error">{error}</p>}
+
+      <ConfirmDialog
+        open={pendingArchive !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingArchive(null)
+        }}
+        message={`Archive ${name}? It leaves the register catalog but stays in history.`}
+        confirmLabel="Archive"
+        destructive
+        onConfirm={() => {
+          if (!pendingArchive) return
+          save.mutate(pendingArchive)
+          setPendingArchive(null)
+        }}
+      />
+    </Card>
   )
 }

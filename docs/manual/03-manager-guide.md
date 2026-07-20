@@ -24,9 +24,34 @@ device token involved.
 > incorrect."** — on purpose. A more specific answer would let someone probe which
 > emails exist in the system.
 
-Once in, five sections sit in a rail down the left: **Catalog**, **Users**,
-**Locations & Registers**, **Reports**, **Audit**. Tap **Sign out**, top right, when
+Once in, six sections sit in a rail down the left, grouped under two headings —
+**Operations**: **Today**, **Catalog**, **Users**, **Locations & Registers**;
+**Insights**: **Reports**, **Audit**. A **location switcher** sits above the rail;
+**Today**, **Reports**, and **Stock** all read whichever location it's set to — there
+are no per-screen location pickers. Tap **Sign out**, at the bottom of the rail, when
 you're done.
+
+## Today
+
+**Today** is what you land on right after signing in — a glance at the location the
+sidebar switcher is set to, right now, with nothing to configure.
+
+- A row of four figures: **Net sales today**, **Orders closed**, and **Refunds
+  today** — the same ledger numbers the Sales report shows under its **Day** basis
+  (captured payments and refunds that actually moved money, for today only) — and
+  **Low stock**, a count of variants at or below their reorder threshold (the Stock
+  report's **Low only** filter).
+- **Needs attention**: a table of every low-stock variant and every inactive
+  register at this location — **Name**, **Qty**, **Status** — each status a colored
+  dot — yellow for low stock, red for a register that can't clock in a shift.
+  Nothing to flag shows **"All clear"** instead of an empty table.
+- **Recent activity**: the first page of the **Audit** log — **When**, **Action**,
+  **User** — the same trail **Audit** itself shows in full, trimmed to a glance.
+
+> Note: every number on **Today** already exists elsewhere in the back office —
+> **Sales**, **Stock**, **Locations & Registers**, and **Audit** — gathered onto one
+> screen rather than computed specially. If a figure here ever looks off, the
+> matching report is where to go double-check it.
 
 ## Catalog
 
@@ -256,8 +281,9 @@ steps below apply exactly as they do to a lost terminal.
 
 ### Read the sales report
 
-**Reports** → **Sales** tab: pick a **From**/**To** date range and a **Location**, then
-a group-by chip — **Day**, **Category**, or **User**.
+**Reports** → **Sales** tab: pick a **From**/**To** date range, then a group-by tab —
+**Day**, **Category**, or **User**. The location comes from the sidebar's **location
+switcher** — change it there and the report refetches for the new location.
 
 > **"Basis: ledger (captured payments & refunds)"** shows under **Day** and **User** —
 > these are summed from actual payments and refunds that moved money, with columns
@@ -275,9 +301,10 @@ a group-by chip — **Day**, **Category**, or **User**.
 
 ### Check stock and low-stock items
 
-**Reports** → **Stock** tab: pick a **Location**, optionally tap **Low only** to filter
-down to items running short. The table shows **SKU**, **Name**, **Qty** — a row under
-threshold is highlighted and its quantity marked **— LOW**.
+**Reports** → **Stock** tab: the location comes from the sidebar's **location
+switcher**; optionally tap **Low only** to filter down to items running short. The
+table shows **SKU**, **Name**, **Qty** — a row under threshold is highlighted and its
+quantity marked **— LOW**.
 
 ### Export CSV
 

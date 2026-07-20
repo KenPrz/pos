@@ -164,6 +164,14 @@ Full reasoning lives in the docs; these are the ones that cause real damage.
   mutated. → `docs/00-overview.md`
 - **Order lines snapshot** name, SKU, price, and tax rate. A receipt from last year must
   reprint identically, so never join to the live catalog to render one.
+- **One design language, two surfaces.** The root `DESIGN.md` (IBM/Carbon) is the design
+  authority for both frontends: shadcn-pattern components styled by hand on Tailwind v4,
+  tokens entering code in exactly one place — `src/styles/carbon.css`. If two screens
+  render the same visual pattern, it is a component — inlining a styled pattern the
+  library already has fails review. The shared set (`carbon.css`, `src/lib/utils.ts`,
+  all of `src/components/ui/*`, `StatusPill`/`EmptyState`/`ConfirmDialog`) is
+  byte-identical between `frontend/web` and `frontend/back-office` — edit both copies
+  or neither.
 
 ## Where things are
 
@@ -189,8 +197,9 @@ RBAC. Seed with `php artisan migrate:fresh --seed`; it prints development PINs.
 open/close with variance. Seeder prints development device tokens for the register SPA.
 
 **M4 complete** — retail: voids, discounts, refunds with restock, external card, cash
-movements, stock ops, Z-report; register UI restyled to DESIGN.md console chrome and
-ported to Next.js + React Query.
+movements, stock ops, Z-report; register UI restyled and ported to Next.js + React
+Query (design authority today: the root `DESIGN.md` — the old console-chrome spec at
+`frontend/web/DESIGN.md` is gone).
 
 **M5 complete** — food service: open tabs with `table_ref`, modifiers end-to-end
 (repeats legal), fired-course coursing (`prep_state`), qty edits, transfer between
@@ -212,6 +221,13 @@ compose (single FrankenPHP edge, host-routed TLS, no-CORS preserved end to end),
 backups with a runnable restore drill, CI building all three images on every PR. Same
 462/80/80 tests, now proven inside the stack via `make test`; all three e2e scripts
 green via `make e2e`. Full story in `docs/06-roadmap.md`.
+
+**UI rework complete** — both frontends reskinned onto the root `DESIGN.md` language
+(see the design-language convention above). Labels, flows, routes, and behavior frozen
+throughout, with exactly three named exceptions documented in the Manager Guide (the
+Today landing, the sidebar location switcher, `window.confirm` → Dialog with the same
+copy). Suites now 462 backend / 92 register / 131 back-office; all three e2e scripts
+unchanged and green. Record in `docs/06-roadmap.md`.
 
 Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
 trigger that would revive each (monitoring, load test, runbook, registry/CD, and more).
