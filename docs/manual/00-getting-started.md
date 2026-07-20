@@ -23,7 +23,7 @@ translation.
 
 | Surface | Who uses it | How it signs in |
 | --- | --- | --- |
-| **Register** | Cashiers and supervisors, at a physical till | A device token (once, per terminal) plus a staff PIN (every shift) |
+| **Register** | Cashiers and supervisors, at a physical till | An activation code (once, per terminal — exchanged for a device token) plus a staff PIN (every shift) |
 | **Back office** | Managers and admins | An email and password — no till involved |
 | **API** | The two apps above, and nothing else you should be talking to directly | Whatever the calling app is signed in as |
 
@@ -77,25 +77,25 @@ store and a supervisor at another, and the two don't mix.
 
 There are three separate sign-in flows, one per surface.
 
-### Enroll a register (once per terminal)
+### Activate a register (once per terminal)
 
-The first time a till is used, it shows an **Enroll this terminal** screen asking for
-a device token. This only happens once per terminal — after that, the till remembers
-it.
+The first time a till is used, it shows an **Activate this terminal** screen asking
+for an activation code. This only happens once per terminal — after that, the till
+remembers its credential and goes straight to **Enter PIN**.
 
-1. Get a device token for this register. In development, `make seed` prints one per till
-   (see the Operator Guide's [First run](04-operator-guide.md#first-run)); in production,
-   a manager issues one from the back office by reissuing the register's token — that's
-   also how a brand-new till gets its first one (see the Manager Guide's
-   [Replace a lost terminal](03-manager-guide.md#replace-a-lost-terminal) section, which
-   also covers a brand-new till's first token).
-2. Paste it into the field (placeholder `1|xxxxxxxx…`) on the **Enroll this terminal**
-   screen.
-3. Tap **Save**.
+1. Get an activation code for this register. A manager issues one from the back
+   office — see the Manager Guide's
+   [Issue an activation code](03-manager-guide.md#issue-an-activation-code) section,
+   which also covers a brand-new till's very first code.
+2. Type it into **Activation code** (placeholder `XXXXX-XXXXX`) on the **Activate this
+   terminal** screen.
+3. Tap **Activate**.
 
-> Note: a device token is the terminal's identity, not a person's. It stays valid
-> until a manager reissues it — see the Manager Guide's guidance on replacing a lost
-> terminal.
+> Note: an activation code is single-use and expires after 7 days — it's a one-time
+> credential the till exchanges for its own long-lived device token, not something
+> you type in more than once. That device token, not the code, is the terminal's
+> lasting identity from then on. See the Manager Guide's guidance on issuing a new
+> code for a terminal that needs one.
 
 ### Clock in with a PIN
 

@@ -36,6 +36,8 @@ class Register extends Model
     {
         return [
             'is_active' => 'boolean',
+            'activation_code_expires_at' => 'datetime',
+            'activation_code_redeemed_at' => 'datetime',
         ];
     }
 

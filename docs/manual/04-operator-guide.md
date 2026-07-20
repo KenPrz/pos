@@ -33,8 +33,13 @@ Five steps, in order — the third is a paste, not a command:
 - **Development PINs** — one row per person, with their PIN and role, e.g. Alice /
   `1111` / cashier @ Downtown. Use one of these to clock in at a register.
 - **Device tokens** — one row per till, register name and device token (e.g. `DT /
-  Till 1`). Paste one into a register's **Enroll this terminal** screen (see [Getting
-  Started](00-getting-started.md#signing-in)) to bring that till online.
+  Till 1`). These are for scripts and direct API work (the e2e scripts consume them
+  this way) — the register's activation screen no longer takes a raw token at all.
+  To bring a till online through its own screen, sign in to the back office with the
+  printed admin login below and issue that till an activation code (see the Manager
+  Guide's [Issue an activation code](03-manager-guide.md#issue-an-activation-code)),
+  then type the code into the till (see [Getting
+  Started](00-getting-started.md#signing-in)).
 - **Back-office login** — an email and password (`POST /api/v1/admin/login`) for
   signing in to the back office.
 
@@ -50,7 +55,7 @@ the actual host ports if you've overridden any of them (see `POS_DEV_*_PORT` in
 
 Only in the desktop shell (`frontend/native/`) — a browser tab already knows its own
 origin, so this step doesn't apply there. Before a shell terminal can even reach the
-**Enroll this terminal** screen (see [Signing in](00-getting-started.md#signing-in)), it
+**Activate this terminal** screen (see [Signing in](00-getting-started.md#signing-in)), it
 needs to know which server to talk to.
 
 1. On first launch, the shell shows its own **Connect this terminal** screen, asking for
@@ -64,7 +69,7 @@ needs to know which server to talk to.
 > of the morning. While it checks, the button reads **Connecting…**.
 
 Once it connects, the address is saved on the terminal for good — you won't be asked
-again on that machine — and the shell moves straight into the ordinary enrollment flow
+again on that machine — and the shell moves straight into the ordinary activation flow
 above.
 
 ## Everyday commands
@@ -177,12 +182,15 @@ make e2e     # the three committed end-to-end proofs, against the running stack
 
 ## Troubleshooting
 
-**Register drops back to "Enroll this terminal" on its own.** Its device token was
-rejected (the API returns `invalid_device_token`) — most often because it was
-reissued, which invalidates the old token in the same action. This happens whenever a
-manager replaces a lost terminal. Get a fresh token — in dev, `make seed` prints one
-per till; otherwise a manager reissues one from the back office — and re-enroll the
-till with it (see [Getting Started](00-getting-started.md#signing-in)).
+**Register shows "Terminal disabled" on its own.** Its device token was rejected (the
+API returns `invalid_device_token`) — most often because a manager issued that
+register a new activation code, which revokes the old device token and every staff
+session bound to it in the same action. The lockout screen shows the same message the
+till would show either way: **"Your activation code has been disabled. Please contact
+an admin and request a new activation code."**, with the activation-code entry form
+right below it. Get a fresh code from the back office (see the Manager Guide's [Issue
+an activation code](03-manager-guide.md#issue-an-activation-code)) and type it in on
+that same screen (see [Getting Started](00-getting-started.md#signing-in)).
 
 **A till's drawer won't reconcile at close.** Read the Z-report for that shift first
 — it breaks down sales by tender and any cash movements (payouts, paid-ins) recorded

@@ -3,10 +3,12 @@
 # The M6 'admin day' — the milestone's end-to-end proof, runnable against a freshly
 # seeded stack: an admin builds a menu item from nothing (category, tax rate, product,
 # variant, modifier group + modifiers, attach), hires a cashier, switches a till to food
-# mode and reissues its device token (killing the old one mid-script), a register sale
-# runs on the new token, the admin reprices the sold variant and proves the paid order's
-# receipt didn't move (snapshot), the three sales-report slices attribute the same sale
-# by day/category/user, the audit log turns up every write, and the shift closes clean.
+# mode and issues it a fresh activation code (killing the old device token and every
+# staff session bound to it mid-script), redeems that code for a new device token, a
+# register sale runs on the new token, the admin reprices the sold variant and proves
+# the paid order's receipt didn't move (snapshot), the three sales-report slices
+# attribute the same sale by day/category/user, the audit log turns up every write, and
+# the shift closes clean.
 # Set POS_ADMIN_EMAIL / POS_ADMIN_PASSWORD (back-office login), POS_DEVICE_TOKEN (Till 1
 # at Downtown — printed by php artisan migrate:fresh --seed) and POS_E2E_PIN (any 4-6
 # digit PIN for the cashier this script hires) first. Never a token literal in this file.
@@ -107,7 +109,7 @@ EVE_ROLE=$(echo "$EVE_ROW" | jq -r --arg loc "$DOWNTOWN_ID" '.roles[] | select(.
 [ "$EVE_ROLE" = "cashier" ] || fail "Eve's cashier role @ DT did not stick, got: $EVE_ROLE"
 echo "11. Eve confirmed in GET /admin/users with cashier role @ DT"
 
-# --- 4. Till 1 to food mode, reissue its token ---
+# --- 4. Till 1 to food mode, issue + redeem an activation code ---
 
 REGISTERS=$(req GET /admin/registers -H "$AD")
 TILL1_ID=$(echo "$REGISTERS" | jq -r --arg loc "$DOWNTOWN_ID" '.data.items[] | select(.location_id==$loc and .name=="Till 1") | .id')
@@ -118,16 +120,26 @@ MODE=$(req PATCH "/admin/registers/$TILL1_ID" -H "$AD" -d '{"mode":"food"}')
 [ "$(echo "$MODE" | jq -r .data.register.mode)" = "food" ] || fail "Till 1 did not switch to food mode"
 echo "13. Till 1 set to food mode"
 
-REISSUE=$(req POST "/admin/registers/$TILL1_ID/token" -H "$AD")
-NEW_DEVICE=$(echo "$REISSUE" | jq -r .data.token)
-[ -n "$NEW_DEVICE" ] && [ "$NEW_DEVICE" != "null" ] || fail "token reissue did not return a token"
-echo "14. Till 1's device token reissued"
+ISSUED=$(req POST "/admin/registers/$TILL1_ID/activation-code" -H "$AD")
+ACTIVATION_CODE=$(echo "$ISSUED" | jq -r .data.activation_code)
+[ -n "$ACTIVATION_CODE" ] && [ "$ACTIVATION_CODE" != "null" ] || fail "activation-code issue did not return a code"
+[ "$(echo "$ISSUED" | jq -r .data.expires_at)" != "null" ] || fail "activation-code issue did not return an expiry"
+echo "14. activation code issued for Till 1"
 
 OLD_STATUS=$(status_of GET /catalog -H "Authorization: Bearer $DEVICE")
-[ "$OLD_STATUS" = "401" ] || fail "the old device token should 401 on /catalog after reissue, got $OLD_STATUS"
-echo "15. old device token now 401s on /catalog (reissue kills it in-transaction)"
+[ "$OLD_STATUS" = "401" ] || fail "the old device token should 401 on /catalog once a new code is issued, got $OLD_STATUS"
+echo "15. old device token now 401s on /catalog (issuing a code revokes it in-transaction)"
+
+ACTIVATED=$(req POST /registers/activate -d "{\"activation_code\":\"$ACTIVATION_CODE\"}")
+[ "$(echo "$ACTIVATED" | jq -r .data.register.id)" = "$TILL1_ID" ] || fail "activation did not redeem against Till 1"
+NEW_DEVICE=$(echo "$ACTIVATED" | jq -r .data.device_token)
+[ -n "$NEW_DEVICE" ] && [ "$NEW_DEVICE" != "null" ] || fail "activation did not return a device token"
+echo "16. activation code redeemed for a new device token (register.id confirmed = Till 1)"
 
 D="Authorization: Bearer $NEW_DEVICE"
+NEW_STATUS=$(status_of GET /catalog -H "$D")
+[ "$NEW_STATUS" = "200" ] || fail "the new device token should work on /catalog, got $NEW_STATUS"
+echo "17. new device token confirmed live on /catalog"
 
 # --- 5. register leg, on the new token ---
 
@@ -135,57 +147,57 @@ LOGIN_EVE=$(req POST /staff/login -H "$D" -d "{\"pin\":\"$E2E_PIN\"}")
 EVE_TOKEN=$(echo "$LOGIN_EVE" | jq -r .data.staff_token)
 S="X-Staff-Token: $EVE_TOKEN"
 [ "$(echo "$LOGIN_EVE" | jq -r .data.register.mode)" = "food" ] || fail "Eve's register should be food mode"
-echo "16. Eve logged in at Till 1 (food mode), on the new device token"
+echo "18. Eve logged in at Till 1 (food mode), on the new device token"
 
 SHIFT=$(req POST /shifts/open -H "$D" -H "$S" -d '{"opening_float_cents":5000}')
 SHIFT_ID=$(echo "$SHIFT" | jq -r .data.shift.id)
-echo "17. shift open, float 5000"
+echo "19. shift open, float 5000"
 
 ORDER=$(req POST /orders -H "$D" -H "$S" -d '{"table_ref":"E2E"}')
 ORDER_ID=$(echo "$ORDER" | jq -r .data.order.id)
 BUSINESS_DATE=$(echo "$ORDER" | jq -r .data.order.business_date)
-echo "18. tab opened at E2E: $ORDER_ID (business_date $BUSINESS_DATE)"
+echo "20. tab opened at E2E: $ORDER_ID (business_date $BUSINESS_DATE)"
 
 LINE=$(req POST "/orders/$ORDER_ID/lines" -H "$D" -H "$S" -H 'If-Match: 0' \
   -d "{\"variant_id\":\"$VARIANT_ID\",\"qty\":\"1\",\"modifiers\":[\"$OAT_ID\"]}")
 [ "$(echo "$LINE" | jq .data.order.total_cents)" = "510" ] || fail "expected 510 (450 + 60 oat), got $(echo "$LINE" | jq .data.order.total_cents)"
-echo "19. Flat White + Oat added: total=510 (server-verified)"
+echo "21. Flat White + Oat added: total=510 (server-verified)"
 
 PAY=$(req POST "/orders/$ORDER_ID/payments" -H "$D" -H "$S" -H 'If-Match: 1' -H "Idempotency-Key: $(uuidgen)" \
   -d '{"driver":"cash","amount_cents":510,"tendered_cents":510}')
 [ "$(echo "$PAY" | jq -r .data.order.status)" = "closed" ] || fail "order did not close on cash 510"
-echo "20. paid cash 510, order closed"
+echo "22. paid cash 510, order closed"
 
 RECEIPT=$(req GET "/orders/$ORDER_ID/receipt" -H "$D" -H "$S")
 [ "$(echo "$RECEIPT" | jq .data.lines[0].line_total_cents)" = "510" ] || fail "receipt line should be 510"
 [ "$(echo "$RECEIPT" | jq -r .data.lines[0].modifiers[0].name)" = "Oat" ] || fail "receipt should show the Oat modifier"
-echo "21. receipt shows Flat White + Oat, line total 510"
+echo "23. receipt shows Flat White + Oat, line total 510"
 
 # --- 6. admin leg: reprice, re-fetch the paid receipt, sales reports ---
 
 REPRICE=$(req PATCH "/admin/variants/$VARIANT_ID" -H "$AD" -d '{"price_cents":500}')
 [ "$(echo "$REPRICE" | jq .data.variant.price_cents)" = "500" ] || fail "reprice did not stick"
-echo "22. Flat White repriced 450 -> 500"
+echo "24. Flat White repriced 450 -> 500"
 
 RECEIPT2=$(req GET "/orders/$ORDER_ID/receipt" -H "$D" -H "$S")
 [ "$(echo "$RECEIPT2" | jq .data.lines[0].line_total_cents)" = "510" ] || fail "the paid order's receipt drifted after reprice — snapshot broken"
-echo "23. paid order's receipt still reads 510 — the reprice never touched it (snapshot proof)"
+echo "25. paid order's receipt still reads 510 — the reprice never touched it (snapshot proof)"
 
 SALES_DAY=$(req GET "/admin/reports/sales?location_id=$DOWNTOWN_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=day" -H "$AD")
 [ "$(echo "$SALES_DAY" | jq -r .data.basis)" = "ledger" ] || fail "day report should be ledger-basis"
 [ "$(echo "$SALES_DAY" | jq .data.totals.gross_cents)" = "510" ] || fail "day gross should be exactly 510 on a fresh seed, got $(echo "$SALES_DAY" | jq .data.totals.gross_cents)"
-echo "24. sales report (day, ledger-basis): gross=510"
+echo "26. sales report (day, ledger-basis): gross=510"
 
 SALES_CATEGORY=$(req GET "/admin/reports/sales?location_id=$DOWNTOWN_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=category" -H "$AD")
 [ "$(echo "$SALES_CATEGORY" | jq -r .data.basis)" = "lines" ] || fail "category report should be line-basis"
 DRINKS_CENTS=$(echo "$SALES_CATEGORY" | jq '[.data.rows[] | select(.bucket=="Drinks") | .line_total_cents] | add')
 [ "$DRINKS_CENTS" = "510" ] || fail "Drinks category total should be 510, got $DRINKS_CENTS"
-echo "25. sales report (category, line-basis): Drinks=510"
+echo "27. sales report (category, line-basis): Drinks=510"
 
 SALES_USER=$(req GET "/admin/reports/sales?location_id=$DOWNTOWN_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=user" -H "$AD")
 EVE_CENTS=$(echo "$SALES_USER" | jq '[.data.rows[] | select(.bucket=="Eve") | .gross_cents] | add')
 [ "$EVE_CENTS" = "510" ] || fail "Eve's user-report gross should be 510, got $EVE_CENTS"
-echo "26. sales report (user, ledger-basis): Eve=510"
+echo "28. sales report (user, ledger-basis): Eve=510"
 echo "    (day/user are ledger-basis — payments and refunds; category is line-basis — order lines. They don't reconcile by design.)"
 
 # --- 7. audit viewer ---
@@ -193,19 +205,24 @@ echo "    (day/user are ledger-basis — payments and refunds; category is line-
 AUDIT_PRODUCT=$(req GET "/admin/audit?action=admin.product.create" -H "$AD")
 FOUND_PRODUCT=$(echo "$AUDIT_PRODUCT" | jq -r --arg id "$PRODUCT_ID" '[.data.rows[] | select(.entity_id==$id)] | length')
 [ "$FOUND_PRODUCT" != "0" ] || fail "audit log missing admin.product.create for Flat White"
-echo "27. audit: admin.product.create found for Flat White"
+echo "29. audit: admin.product.create found for Flat White"
 
 AUDIT_VARIANT=$(req GET "/admin/audit?entity_type=ProductVariant&entity_id=$VARIANT_ID" -H "$AD")
 REPRICE_ROW=$(echo "$AUDIT_VARIANT" | jq -c '[.data.rows[] | select(.action=="admin.variant.update")][0]')
 [ "$REPRICE_ROW" != "null" ] || fail "audit log missing the reprice event for the variant"
 [ "$(echo "$REPRICE_ROW" | jq .payload.price_cents.from)" = "450" ] || fail "reprice audit 'from' should be 450"
 [ "$(echo "$REPRICE_ROW" | jq .payload.price_cents.to)" = "500" ] || fail "reprice audit 'to' should be 500"
-echo "28. audit: reprice logged with price_cents from=450 to=500"
+echo "30. audit: reprice logged with price_cents from=450 to=500"
 
-AUDIT_REISSUE=$(req GET "/admin/audit?action=admin.register.token_reissue" -H "$AD")
-FOUND_REISSUE=$(echo "$AUDIT_REISSUE" | jq -r --arg id "$TILL1_ID" '[.data.rows[] | select(.entity_id==$id)] | length')
-[ "$FOUND_REISSUE" != "0" ] || fail "audit log missing admin.register.token_reissue for Till 1"
-echo "29. audit: admin.register.token_reissue found for Till 1"
+AUDIT_ISSUE=$(req GET "/admin/audit?action=admin.register.code_issue" -H "$AD")
+FOUND_ISSUE=$(echo "$AUDIT_ISSUE" | jq -r --arg id "$TILL1_ID" '[.data.rows[] | select(.entity_id==$id)] | length')
+[ "$FOUND_ISSUE" != "0" ] || fail "audit log missing admin.register.code_issue for Till 1"
+echo "31. audit: admin.register.code_issue found for Till 1"
+
+AUDIT_ACTIVATE=$(req GET "/admin/audit?action=register.activate" -H "$AD")
+FOUND_ACTIVATE=$(echo "$AUDIT_ACTIVATE" | jq -r --arg id "$TILL1_ID" '[.data.rows[] | select(.entity_id==$id)] | length')
+[ "$FOUND_ACTIVATE" != "0" ] || fail "audit log missing register.activate for Till 1"
+echo "32. audit: register.activate found for Till 1"
 
 # --- 8. close the shift ---
 
@@ -213,12 +230,12 @@ Z=$(req GET "/reports/z?shift_id=$SHIFT_ID" -H "$D" -H "$S")
 EXPECTED=$(echo "$Z" | jq .data.expected_cash_cents)
 [ "$EXPECTED" = "5510" ] || fail "expected cash should be 5510 (5000 float + 510 sale), got $EXPECTED"
 [ "$(echo "$Z" | jq .data.orders_closed)" = "1" ] || fail "Z-report should show 1 closed order"
-echo "30. Z-report: expected_cash=5510, orders_closed=1"
+echo "33. Z-report: expected_cash=5510, orders_closed=1"
 
 CLOSE=$(req POST "/shifts/$SHIFT_ID/close" -H "$D" -H "$S" -H "Idempotency-Key: $(uuidgen)" -d '{"counted_cash_cents":5510}')
 VARIANCE=$(echo "$CLOSE" | jq .data.variance_cents)
 [ "$VARIANCE" = "0" ] || fail "shift should reconcile clean, got variance $VARIANCE"
-echo "31. shift closed clean: counted=5510 variance=0"
+echo "34. shift closed clean: counted=5510 variance=0"
 
 echo
 echo "=== Admin day summary ==="
@@ -226,7 +243,7 @@ printf "%-22s %s\n" "Location" "Downtown (DT)"
 printf "%-22s %s\n" "Product" "Flat White / FW-1: 450c -> 500c (repriced after sale)"
 printf "%-22s %s\n" "Modifier group" "Milk (min 1, max 1): Oat +60, Whole +0"
 printf "%-22s %s\n" "Staff hired" "Eve — cashier @ DT"
-printf "%-22s %s\n" "Register" "Till 1 — retail -> food, device token reissued"
+printf "%-22s %s\n" "Register" "Till 1 — retail -> food, activation code issued + redeemed"
 echo
 printf "%-10s %-8s %10s %10s\n" "Order" "Table" "Total" "Status"
 printf "%-10s %-8s %10s %10s\n" "${ORDER_ID:0:8}.." "E2E" "510" "closed"

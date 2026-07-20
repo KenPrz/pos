@@ -394,7 +394,7 @@ app/
     Refunds/     RefundOrder
     Shifts/      OpenShift, CloseShift, RecordCashMovement, ApproveVariance
     Catalog/     UpsertProduct, UpsertVariant, ...
-    Auth/        EnrollRegister, StaffLogin, StaffLogout
+    Auth/        ActivateRegister, StaffLogin, StaffLogout
   Domain/
     Money/       Money, Quantity, TaxRate, Allocator
     Pricing/     PriceResolver, OrderTotals, DiscountResolver

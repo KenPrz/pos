@@ -118,19 +118,25 @@ to several — which no simple index expresses.
 
 ```sql
 create table registers (
-  id          uuid primary key default uuidv7(),
-  location_id uuid not null references locations(id),
-  name        text not null,
-  mode        text not null default 'retail' check (mode in ('retail','food')),
-  is_active   boolean not null default true,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now(),
+  id                           uuid primary key default uuidv7(),
+  location_id                  uuid not null references locations(id),
+  name                         text not null,
+  mode                         text not null default 'retail' check (mode in ('retail','food')),
+  is_active                    boolean not null default true,
+  activation_code_lookup       text unique,   -- keyed HMAC of the one-time code; plaintext never stored
+  activation_code_expires_at   timestamptz,
+  activation_code_redeemed_at  timestamptz,
+  created_at                   timestamptz not null default now(),
+  updated_at                   timestamptz not null default now(),
   unique (location_id, name)
 );
 ```
 
 The device's long-lived Sanctum token is polymorphic on `registers` — the register *is*
-the token's owner.
+the token's owner. The token is minted only by redeeming an activation code
+(`POST /registers/activate`); the code itself is never stored in plaintext, only as
+HMAC-SHA256 keyed by `APP_KEY` (same reasoning as `users.pin_lookup`, above), so a
+database dump alone cannot brute-force the code space.
 
 **`mode` is the entire register-UI seam M5 needed** — one column and one check
 constraint, no new order-model table. It ships on the login response

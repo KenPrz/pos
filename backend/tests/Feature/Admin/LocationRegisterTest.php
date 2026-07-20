@@ -6,6 +6,7 @@ declare(strict_types=1);
 use App\Models\Location;
 use App\Models\Register;
 use App\Models\User;
+use Laravel\Sanctum\PersonalAccessToken;
 
 beforeEach(function (): void {
     $admin = User::factory()->create(['email' => 'a@pos.test', 'password_hash' => 'pw', 'is_admin' => true]);
@@ -131,31 +132,81 @@ it('refuses a duplicate register name against a sibling on update', function ():
         ->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
 
-// --- Token reissue -------------------------------------------------------
+// --- Activation code issue ------------------------------------------------
 
-it('reissues a device token: the old one 401s and the new one passes device middleware', function (): void {
+it('issues an activation code and locks the register out: device and staff tokens die', function (): void {
     $location = Location::factory()->create();
     $register = Register::factory()->create(['location_id' => $location->id]);
-    $oldToken = $register->createToken("device:{$register->id}", ['device'])->plainTextToken;
+    $deviceToken = $register->createToken("device:{$register->id}", ['device'])->plainTextToken;
+    $staff = User::factory()->create();
+    $staffToken = $staff->createToken("staff:{$register->id}", ["register:{$register->id}"], now()->addMinutes(480))->plainTextToken;
 
-    $this->getJson('/api/v1/catalog', ['Authorization' => "Bearer {$oldToken}"])->assertOk();
+    $this->getJson('/api/v1/catalog', ['Authorization' => "Bearer {$deviceToken}"])->assertOk();
 
-    $response = $this->postJson("/api/v1/admin/registers/{$register->id}/token", [], $this->headers)
+    $response = $this->postJson("/api/v1/admin/registers/{$register->id}/activation-code", [], $this->headers)
         ->assertCreated();
-    $newToken = $response->json('data.token');
-    expect($newToken)->not->toBeNull();
 
-    // Old token is dead now — the whole point of reissue.
-    $this->getJson('/api/v1/catalog', ['Authorization' => "Bearer {$oldToken}"])->assertStatus(401);
+    expect($response->json('data.activation_code'))->toMatch('/^[23456789A-Z]{5}-[23456789A-Z]{5}$/')
+        ->and($response->json('data.expires_at'))->not->toBeNull();
 
-    // New token works.
-    $this->getJson('/api/v1/catalog', ['Authorization' => "Bearer {$newToken}"])->assertOk();
+    // Full lockout, immediately: the device token is dead...
+    $this->getJson('/api/v1/catalog', ['Authorization' => "Bearer {$deviceToken}"])->assertStatus(401);
+    // ...and the staff session bound to this register died with it.
+    expect(PersonalAccessToken::findToken($staffToken))->toBeNull();
 
-    $this->assertDatabaseHas('audit_log', ['action' => 'admin.register.token_reissue', 'entity_id' => $register->id]);
+    $this->assertDatabaseHas('audit_log', ['action' => 'admin.register.code_issue', 'entity_id' => $register->id]);
+});
+
+it('a second issue supersedes the first code', function (): void {
+    $location = Location::factory()->create();
+    $register = Register::factory()->create(['location_id' => $location->id]);
+
+    $this->postJson("/api/v1/admin/registers/{$register->id}/activation-code", [], $this->headers)->assertCreated();
+    $first = $register->fresh()->activation_code_lookup;
+
+    $this->postJson("/api/v1/admin/registers/{$register->id}/activation-code", [], $this->headers)->assertCreated();
+
+    expect($register->fresh()->activation_code_lookup)->not->toBe($first);
+});
+
+it('a non-admin cannot issue an activation code', function (): void {
+    $location = Location::factory()->create();
+    $register = Register::factory()->create(['location_id' => $location->id]);
+    $staff = User::factory()->create(['email' => 'nonadmin@pos.test', 'password_hash' => 'pw', 'is_admin' => false]);
+    $headers = ['Authorization' => 'Bearer '.$staff->createToken('t')->plainTextToken];
+
+    $this->postJson("/api/v1/admin/registers/{$register->id}/activation-code", [], $headers)->assertStatus(403);
 });
 
 it('a non-admin token gets 403 on register routes', function (): void {
     $staff = User::factory()->create(['email' => 's3@pos.test', 'password_hash' => 'pw', 'is_admin' => false]);
     $headers = ['Authorization' => 'Bearer '.$staff->createToken('t')->plainTextToken];
     $this->getJson('/api/v1/admin/registers', $headers)->assertStatus(403);
+});
+
+it('reports activation state on the admin register list', function (): void {
+    $location = Location::factory()->create();
+    $register = Register::factory()->create(['location_id' => $location->id]);
+
+    // Fresh register: no token, no code.
+    $this->getJson('/api/v1/admin/registers', $this->headers)
+        ->assertJsonPath('data.items.0.activation.state', 'not_enrolled');
+
+    // Code issued → pending, with its expiry surfaced.
+    $code = $this->postJson("/api/v1/admin/registers/{$register->id}/activation-code", [], $this->headers)
+        ->json('data.activation_code');
+    $response = $this->getJson('/api/v1/admin/registers', $this->headers);
+    $response->assertJsonPath('data.items.0.activation.state', 'code_pending');
+    expect($response->json('data.items.0.activation.code_expires_at'))->not->toBeNull();
+
+    // Redeemed → enrolled.
+    $this->postJson('/api/v1/registers/activate', ['activation_code' => $code])->assertCreated();
+    $this->getJson('/api/v1/admin/registers', $this->headers)
+        ->assertJsonPath('data.items.0.activation.state', 'enrolled');
+
+    // A new code locks it out again; 8 days later that code has expired.
+    $this->postJson("/api/v1/admin/registers/{$register->id}/activation-code", [], $this->headers);
+    $this->travel(8)->days();
+    $this->getJson('/api/v1/admin/registers', $this->headers)
+        ->assertJsonPath('data.items.0.activation.state', 'code_expired');
 });

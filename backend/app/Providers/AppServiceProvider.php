@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Auth\ActivationCodes;
 use App\Domain\Auth\Pins;
 use App\Domain\Payments\CashDriver;
 use App\Domain\Payments\DriverRegistry;
@@ -24,6 +25,9 @@ class AppServiceProvider extends ServiceProvider
         // Config is read at the edge and injected, so the value object stays pure and its
         // tests need no container. See docs/04-backend-conventions.md.
         $this->app->singleton(Pins::class, fn (): Pins => new Pins((string) config('app.key')));
+
+        $this->app->singleton(ActivationCodes::class,
+            fn (): ActivationCodes => new ActivationCodes((string) config('app.key')));
 
         // Adding a processor = a driver class + one entry here. No action changes.
         $this->app->singleton(DriverRegistry::class,
@@ -70,6 +74,12 @@ class AppServiceProvider extends ServiceProvider
         // scale in a way a lunch rush never triggers, so this one is by IP, not by
         // credential — the login attempt hasn't identified an account yet.
         RateLimiter::for('admin-login', fn (Request $request): Limit => Limit::perMinute(5)->by($request->ip()));
+
+        // Same class of control as the PIN limiter: a human-typeable code must not be
+        // guessable at network speed. By IP — the request is unauthenticated by definition.
+        RateLimiter::for('activate', fn (Request $request): Limit => Limit::perMinute(
+            (int) config('pos.rate_limits.activate_per_minute')
+        )->by($request->ip()));
     }
 
     /**

@@ -229,6 +229,18 @@ Today landing, the sidebar location switcher, `window.confirm` → Dialog with t
 copy). Suites now 462 backend / 92 register / 131 back-office; all three e2e scripts
 unchanged and green. Record in `docs/06-roadmap.md`.
 
+**Activation-code enrollment complete** — terminals enroll by exchanging a one-time,
+7-day, admin-issued activation code (`POST /registers/activate`) for their long-lived
+device token; raw tokens never cross the API. Reissuing from the back office revokes
+the device token *and* the register's staff sessions in one transaction and the till
+shows a lockout screen until the new code is typed in. `POST /registers/enroll` and
+the raw-token reissue endpoint are gone. Seeder unchanged (still prints device tokens,
+for scripts and direct API work — never pasted into a till screen again);
+`e2e-retail-day.sh`/`e2e-lunch-service.sh` unchanged; `e2e-admin-day.sh` updated to
+prove the new flow (issue code → old token dies → redeem code → new token live) in
+place of the old raw-token reissue it used to exercise. Suites: 476 backend / 112
+register / 133 back-office.
+
 Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
 trigger that would revive each (monitoring, load test, runbook, registry/CD, and more).
 

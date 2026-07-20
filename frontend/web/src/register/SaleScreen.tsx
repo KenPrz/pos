@@ -101,7 +101,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
   // apart from every other card and disable resuming it out from under itself.
   onOrderChange?: (order: Order | null) => void
   onCloseShift: () => void
-  onSessionExpired: () => void
+  onSessionExpired: (err?: unknown) => void
 }) {
   const [order, setOrder] = useState<Order | null>(null)
   const [phase, setPhase] = useState<Phase>({ name: 'scanning' })
@@ -150,7 +150,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
   }, [order, onOrderChange])
 
   const fail = (err: unknown, fallback: string) => {
-    if (err instanceof ApiError && err.status === 401) return onSessionExpired()
+    if (err instanceof ApiError && err.status === 401) return onSessionExpired(err)
     setError(err instanceof ApiError ? err.message : fallback)
   }
 

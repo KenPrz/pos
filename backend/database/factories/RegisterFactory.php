@@ -22,6 +22,10 @@ class RegisterFactory extends Factory
             'location_id' => Location::factory(),
             'name' => 'Till '.fake()->unique()->numberBetween(1, 999),
             'is_active' => true,
+            // Set explicitly, matching the DB default: create() never hydrates DB column
+            // defaults, so a caller reading ->mode straight off a freshly created model
+            // would otherwise see null instead of 'retail'. See CLAUDE.md's gotchas.
+            'mode' => 'retail',
         ];
     }
 }

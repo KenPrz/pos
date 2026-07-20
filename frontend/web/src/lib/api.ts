@@ -394,6 +394,18 @@ export type Receipt = {
 export const api = {
   health: () => request<Health>('/health'),
 
+  // The activation handshake: a one-time, human-typeable code (issued in the back
+  // office) is exchanged for this terminal's long-lived device token. The code is spent
+  // server-side the moment this succeeds; a failure leaves nothing stored.
+  activateRegister: async (activationCode: string): Promise<RegisterInfo> => {
+    const result = await post<{ register: RegisterInfo; device_token: string }>('/registers/activate', {
+      activation_code: activationCode,
+    })
+    tokens.setDevice(result.device_token)
+    tokens.setRegisterInfo(result.register)
+    return result.register
+  },
+
   staffLogin: async (pin: string): Promise<StaffSession> => {
     const session = await post<StaffSession>('/staff/login', { pin })
     tokens.setStaff(session.staff_token)

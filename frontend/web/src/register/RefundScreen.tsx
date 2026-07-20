@@ -14,7 +14,7 @@ const fm = (n: number) => formatMoney(cents(n), CURRENCY)
 
 type LinePick = { qty: string; restock: boolean }
 
-export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void; onSessionExpired: () => void }) {
+export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void; onSessionExpired: (err?: unknown) => void }) {
   const [number, setNumber] = useState('')
   const [order, setOrder] = useState<Order | null>(null)
   const [picks, setPicks] = useState<Record<string, LinePick>>({})
@@ -26,7 +26,7 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
   const [idempotencyKey] = useState(() => crypto.randomUUID())
 
   const fail = (err: unknown, fallback: string) => {
-    if (err instanceof ApiError && err.status === 401) return onSessionExpired()
+    if (err instanceof ApiError && err.status === 401) return onSessionExpired(err)
     setError(err instanceof ApiError ? err.message : fallback)
   }
 

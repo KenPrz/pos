@@ -19,7 +19,7 @@ const MASK = '•••••'
 
 export function OpenShiftScreen({ onOpened, onSessionExpired }: {
   onOpened: (shift: Shift) => void
-  onSessionExpired: () => void
+  onSessionExpired: (err?: unknown) => void
 }) {
   const [float, setFloat] = useState('200.00')
   const [error, setError] = useState<string | null>(null)
@@ -32,7 +32,7 @@ export function OpenShiftScreen({ onOpened, onSessionExpired }: {
       onOpened(await api.openShift(amount))
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        onSessionExpired()
+        onSessionExpired(err)
         return
       }
       setError(err instanceof ApiError ? err.message : 'Could not open the shift.')
@@ -112,14 +112,14 @@ export function CloseShiftScreen({ shiftId, can, onClosed, onCancel, onSessionEx
   can: (permission: string) => boolean
   onClosed: (result: ShiftCloseResult) => void
   onCancel: () => void
-  onSessionExpired: () => void
+  onSessionExpired: (err?: unknown) => void
 }) {
   const zReport = useZReport(shiftId)   // while the session is still alive — see ZReportPanel
   const [counted, setCounted] = useState('')
 
   // 401 anywhere clears the staff session and returns to PIN — including this fetch.
   useEffect(() => {
-    if (zReport.error instanceof ApiError && zReport.error.status === 401) onSessionExpired()
+    if (zReport.error instanceof ApiError && zReport.error.status === 401) onSessionExpired(zReport.error)
   }, [zReport.error, onSessionExpired])
   const [result, setResult] = useState<ShiftCloseResult | null>(null)
   // Blind count (Task 13): presentation state only, flipped the moment the close result
@@ -144,7 +144,7 @@ export function CloseShiftScreen({ shiftId, can, onClosed, onCancel, onSessionEx
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 401) {
-        onSessionExpired()
+        onSessionExpired(err)
         return
       }
       setError(err instanceof ApiError ? err.message : 'Could not approve the variance.')
@@ -161,7 +161,7 @@ export function CloseShiftScreen({ shiftId, can, onClosed, onCancel, onSessionEx
       setRevealed(true)
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        onSessionExpired()
+        onSessionExpired(err)
         return
       }
       setError(err instanceof ApiError ? err.message : 'Could not close the shift.')

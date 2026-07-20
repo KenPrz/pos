@@ -23,7 +23,16 @@ vi.mock('../../lib/api', async (importOriginal) => {
 const EMPTY_OVERVIEW: TodayOverview = {
   sales: { rows: [], totals: { orders_closed: 0, gross_cents: 0, refunds_cents: 0, net_cents: 0 }, basis: 'ledger' },
   stock: { rows: [] },
-  registers: [{ id: 'reg-1', location_id: 'loc-1', name: 'Front till', mode: 'retail', is_active: true }],
+  registers: [
+    {
+      id: 'reg-1',
+      location_id: 'loc-1',
+      name: 'Front till',
+      mode: 'retail',
+      is_active: true,
+      activation: { state: 'not_enrolled', code_expires_at: null },
+    },
+  ],
   audit: { rows: [], page: 1, has_more: false },
 }
 
@@ -34,7 +43,16 @@ const BUSY_OVERVIEW: TodayOverview = {
     basis: 'ledger',
   },
   stock: { rows: [{ variant_id: 'v-1', sku: 'CFE-01', name: 'Whole milk', qty: '2.000', low: true }] },
-  registers: [{ id: 'reg-1', location_id: 'loc-1', name: 'Back till', mode: 'retail', is_active: false }],
+  registers: [
+    {
+      id: 'reg-1',
+      location_id: 'loc-1',
+      name: 'Back till',
+      mode: 'retail',
+      is_active: false,
+      activation: { state: 'not_enrolled', code_expires_at: null },
+    },
+  ],
   audit: {
     rows: [
       {

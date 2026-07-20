@@ -6,36 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ApiError, api, tokens, type StaffSession } from '../lib/api'
 
-export function SetupScreen({ onDone }: { onDone: () => void }) {
-  const [token, setToken] = useState('')
-
-  return (
-    <Card className="mx-auto mt-xxl w-full max-w-[480px]">
-      <CardHeader>
-        <CardTitle>Enroll this terminal</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="type-body-sm mb-lg text-ink-muted">
-          Paste a device token — printed by <code>php artisan migrate:fresh --seed</code>, or issued via
-          POST /api/v1/registers/enroll.
-        </p>
-        <form
-          className="flex flex-col gap-lg"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (!token.trim()) return
-            tokens.setDevice(token.trim())
-            onDone()
-          }}
-        >
-          <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="1|xxxxxxxx…" autoFocus className="min-h-[48px]" />
-          <Button type="submit" size="lg" className="w-full">Save</Button>
-        </form>
-      </CardContent>
-    </Card>
-  )
-}
-
 export function PinScreen({ onLoggedIn, onDeviceInvalid }: {
   onLoggedIn: (session: StaffSession) => void
   onDeviceInvalid: () => void

@@ -18,8 +18,12 @@ final class EnrolledRegisterResource extends JsonResource
         $enrolled = $this->resource;
 
         return [
-            'register' => RegisterResource::make($enrolled->register),
-            // Returned exactly once. Never retrievable again — only revocable.
+            'register' => [
+                'id' => $enrolled->register->id,
+                'name' => $enrolled->register->name,
+                'mode' => $enrolled->register->mode,
+            ],
+            // Returned exactly once. Never retrievable again — only revocable by reissue.
             'device_token' => $enrolled->deviceToken,
         ];
     }

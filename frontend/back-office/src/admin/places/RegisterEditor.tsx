@@ -2,27 +2,44 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { ApiError, api, type Location, type Register } from '../../lib/api'
+import { ApiError, api, type IssuedActivationCode, type Location, type Register, type RegisterActivation } from '../../lib/api'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Divider } from '../../components/Divider'
 import { FieldRow } from '../../components/FieldRow'
+import { StatusPill, type StatusPillTone } from '../../components/StatusPill'
 import { Button } from '../../components/ui/button'
 import { Card, CardTitle } from '../../components/ui/card'
 import { Checkbox } from '../../components/ui/checkbox'
 import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 
+const ACTIVATION_TONE: Record<RegisterActivation['state'], StatusPillTone> = {
+  enrolled: 'success',
+  code_pending: 'info',
+  code_expired: 'warning',
+  not_enrolled: 'neutral',
+}
+
+function activationLabel(activation: RegisterActivation): string {
+  switch (activation.state) {
+    case 'enrolled': return 'Enrolled'
+    case 'code_pending': return `Code pending — expires ${activation.code_expires_at?.slice(0, 10) ?? ''}`
+    case 'code_expired': return 'Code expired'
+    case 'not_enrolled': return 'Not enrolled'
+  }
+}
+
 /**
- * Name, mode (retail/food chips), active toggle, and the REISSUE TOKEN action.
+ * Name, mode (retail/food chips), active toggle, and the ISSUE ACTIVATION CODE action.
  * `location_id` is a create-time-only decision (UpdateRegisterRequest marks it
  * `prohibited` on PATCH — see the comment there), so the location picker only shows up
  * for a brand-new register; editing one shows its location as plain text.
  *
- * Reissuing revokes every existing token for the register immediately
- * (ReissueDeviceToken.php) — confirmed behind a warning because the till holding the old
- * one goes dark the instant this succeeds — and the fresh token is shown exactly once in
- * a copy-me panel. It lives only in this component's state: never written to the cache,
- * never persisted, gone the moment this editor closes.
+ * Issuing a code revokes the register's device token AND its staff sessions in the same
+ * transaction (IssueActivationCode.php) — confirmed behind a warning because the till
+ * holding the old credential goes dark the instant this succeeds — and the fresh code is
+ * shown exactly once in a copy-me panel. It lives only in this component's state: never
+ * written to the cache, never persisted, gone the moment this editor closes.
  */
 export function RegisterEditor({
   register,
@@ -43,11 +60,16 @@ export function RegisterEditor({
   const [mode, setMode] = useState<'retail' | 'food'>(register?.mode ?? 'retail')
   const [isActive, setIsActive] = useState(register?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
-  const [reissuedToken, setReissuedToken] = useState<string | null>(null)
+  const [issuedCode, setIssuedCode] = useState<IssuedActivationCode | null>(null)
+  // `register` is a snapshot handed down by PlacesSection's `editing` state — it does not
+  // update when this editor's own mutation changes the row. The server guarantees the
+  // register lands in `code_pending` the instant an issue succeeds, so mirror that here
+  // rather than wait for the editor to be closed and reopened against a refetched list.
+  const [activationOverride, setActivationOverride] = useState<RegisterActivation | null>(null)
   // Archive-style confirm (brief's global constraint) — set only when Save would
   // otherwise deactivate; the dialog's Confirm re-plays the exact body already computed.
   const [pendingDeactivate, setPendingDeactivate] = useState<Record<string, unknown> | null>(null)
-  const [pendingReissue, setPendingReissue] = useState(false)
+  const [pendingIssue, setPendingIssue] = useState(false)
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'registers'] })
   const fail = (err: unknown, fallback: string) => {
@@ -65,13 +87,15 @@ export function RegisterEditor({
     onError: (err) => fail(err, 'Could not save the register.'),
   })
 
-  const reissue = useMutation({
-    mutationFn: () => api.registers.reissueToken(register?.id ?? ''),
-    onSuccess: (token) => {
-      setReissuedToken(token)
+  const issue = useMutation({
+    mutationFn: () => api.registers.issueActivationCode(register?.id ?? ''),
+    onSuccess: (code) => {
+      setIssuedCode(code)
+      setActivationOverride({ state: 'code_pending', code_expires_at: code.expires_at })
       setError(null)
+      invalidate()
     },
-    onError: (err) => fail(err, 'Could not reissue the token.'),
+    onError: (err) => fail(err, 'Could not issue an activation code.'),
   })
 
   const submit = (e: FormEvent) => {
@@ -168,17 +192,25 @@ export function RegisterEditor({
       {register && (
         <>
           <Divider />
-          <CardTitle className="mb-md">Device token</CardTitle>
+          <div className="mb-md flex items-center justify-between gap-md">
+            <CardTitle>Activation</CardTitle>
+            <StatusPill tone={ACTIVATION_TONE[(activationOverride ?? register.activation).state]}>
+              {activationLabel(activationOverride ?? register.activation)}
+            </StatusPill>
+          </div>
           <p className="type-body-sm text-ink-muted mb-md">
-            Lost or stolen terminal? Reissuing kills the old token immediately and mints a new one.
+            Issuing a new activation code locks this terminal out immediately; it comes back
+            when someone enters the new code on the till.
           </p>
-          <Button type="button" variant="secondary" disabled={reissue.isPending} onClick={() => setPendingReissue(true)}>
-            {reissue.isPending ? 'Reissuing…' : 'Reissue token'}
+          <Button type="button" variant="secondary" disabled={issue.isPending} onClick={() => setPendingIssue(true)}>
+            {issue.isPending ? 'Issuing…' : 'Issue activation code'}
           </Button>
-          {reissuedToken && (
+          {issuedCode && (
             <Card elevated className="mt-md">
-              <p className="type-body-sm text-ink-muted mb-xs">New token — copy it now, it will not be shown again:</p>
-              <code className="type-money block select-all break-all text-ink">{reissuedToken}</code>
+              <p className="type-body-sm text-ink-muted mb-xs">
+                Activation code — single use, valid for 7 days. Copy it now, it will not be shown again:
+              </p>
+              <code className="type-money block select-all break-all text-ink">{issuedCode.activation_code}</code>
             </Card>
           )}
         </>
@@ -200,14 +232,14 @@ export function RegisterEditor({
       />
 
       <ConfirmDialog
-        open={pendingReissue}
-        onOpenChange={setPendingReissue}
-        message={`Reissue ${register?.name ?? 'this register'}'s token? The current till goes dark immediately.`}
-        confirmLabel="Reissue"
+        open={pendingIssue}
+        onOpenChange={setPendingIssue}
+        message={`Issue a new activation code for ${register?.name ?? 'this register'}? The current till goes dark immediately.`}
+        confirmLabel="Issue code"
         destructive
         onConfirm={() => {
-          setPendingReissue(false)
-          reissue.mutate()
+          setPendingIssue(false)
+          issue.mutate()
         }}
       />
     </Card>

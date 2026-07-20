@@ -34,6 +34,12 @@ return [
         'pin_lockout_seconds' => 60,
     ],
 
+    'registers' => [
+        // How long an unredeemed activation code stays valid. Reissue is one click, so
+        // this leans short — it bounds the window a leaked code can enroll a rogue device.
+        'activation_code_ttl_days' => 7,
+    ],
+
     'idempotency' => [
         'ttl_hours' => 24,              // pruning window
     ],
@@ -60,6 +66,7 @@ return [
         'pin_per_minute'     => 5,
         'catalog_per_minute' => 10,
         'default_per_minute' => 300,
+        'activate_per_minute' => 5,
     ],
 
     /*

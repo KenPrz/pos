@@ -22,9 +22,21 @@ Two layers for the register (device, then staff), plus a third, independent tier
 the back office — see `01-architecture.md`.
 
 ```
-POST /api/v1/registers/enroll        # admin-only, one time per device
-  → { register_id, device_token }    # long-lived; store in the device keychain
+POST /api/v1/registers/activate      # unauthenticated — the activation code IS the credential
+  { "activation_code": "XXXXX-XXXXX" }
+  → { register: { id, name, mode }, device_token }   # token is long-lived; store on the device
 ```
+
+Activation codes are issued per-register in the back office
+(`POST /admin/registers/{id}/activation-code`, below), are single-use, and expire after 7
+days. The server never stores the plaintext code — only a keyed HMAC-SHA256 (same
+reasoning as `users.pin_lookup`, see `02-data-model.md`) — so a database dump alone can't
+be turned into working codes. Redemption is throttled by IP (`throttle:activate`, 5/min),
+since the code is the only credential the endpoint checks. An unknown code, an
+already-redeemed code, and a deactivated register all answer the same
+`401 invalid_activation_code` — deliberately one error, so the endpoint can't be used to
+probe which codes exist or which registers are live. An otherwise-valid but expired code
+is the one case that answers differently: `401 activation_code_expired`.
 
 Every subsequent request carries `Authorization: Bearer <device_token>`.
 
@@ -92,12 +104,12 @@ One envelope (`01-architecture.md`):
 | HTTP | `code` examples |
 | --- | --- |
 | 400 | `validation_failed` |
-| 401 | `invalid_device_token`, `invalid_pin`, `staff_session_expired`, `invalid_credentials` |
+| 401 | `invalid_device_token`, `invalid_pin`, `staff_session_expired`, `invalid_credentials`, `invalid_activation_code`, `activation_code_expired` |
 | 403 | `forbidden`, `requires_supervisor`, `wrong_location` (mostly structural — location scoping yields 404s; reserved for record/register location disagreements) |
 | 404 | `not_found` |
 | 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders`, `line_already_voided`, `payment_already_voided`, `payment_shift_closed` |
 | 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use`, `split_too_fine`, `self_lockout` |
-| 429 | `too_many_pin_attempts` |
+| 429 | `too_many_pin_attempts`, `too_many_requests` |
 
 `code` is stable forever once shipped; clients branch on it. `message` is for humans and
 may change freely.
@@ -532,15 +544,23 @@ GET|POST /api/v1/admin/locations        PATCH /api/v1/admin/locations/{id}
 GET|POST /api/v1/admin/registers        PATCH /api/v1/admin/registers/{id}
   { "mode": "retail" | "food" }                       # picks the register's UI
 
-POST /api/v1/admin/registers/{id}/token
-  → { token }
+POST /api/v1/admin/registers/{id}/activation-code
+  → { activation_code, expires_at }        # shown exactly once
 ```
 
-Reissue is the lost/stolen-terminal path: every existing personal-access token for that
-register is deleted and the replacement minted **in the same transaction**, so there is
-no window where a lost credential and its replacement are both live. `registers.mode` is
-the one schema addition M5 needed (`06-roadmap.md`) and simply picks which UI the
-register app renders.
+Admins see and handle only the opaque activation code — the raw device token is minted
+directly to the terminal by `POST /registers/activate` and never crosses the admin
+surface at all.
+
+Issuing (or reissuing) a code is the enrollment and the lost/stolen-terminal path in one:
+it stores a new single-use code and, **in the same transaction**, deletes every device
+token for the register and every staff session bound to it — the till goes dark
+immediately and shows its "activation code disabled" screen until someone types the new
+code in. There is never a window where a lost credential and its replacement are both
+live. `GET /api/v1/admin/registers` items carry `activation: { state, code_expires_at }`,
+where `state` is one of `enrolled`, `code_pending`, `code_expired`, `not_enrolled` and
+`code_expires_at` is set only for `code_pending`. `registers.mode` is the one schema
+addition M5 needed (`06-roadmap.md`) and simply picks which UI the register app renders.
 
 ```
 GET /api/v1/registers/open-shifts        # staff tier, not admin

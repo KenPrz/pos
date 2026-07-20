@@ -478,6 +478,59 @@ What held it together:
 
 ---
 
+## Activation-code enrollment
+
+A post-UI-rework feature, not a milestone: raw device tokens never cross the API
+anymore. A terminal enrolls by typing a short, human-typeable, one-time **activation
+code** — the till itself trades the code for its long-lived device token server-side.
+
+- **Schema:** one migration, three nullable columns on `registers`
+  (`activation_code_lookup` — unique, a keyed HMAC, never the plaintext —
+  `activation_code_expires_at`, `activation_code_redeemed_at`). No new table.
+- **Routes:** `POST /api/v1/registers/activate` (public, throttled 5/min by IP) replaces
+  `POST /api/v1/registers/enroll` outright — gone, not deprecated.
+  `POST /api/v1/admin/registers/{id}/activation-code` replaces
+  `POST /api/v1/admin/registers/{id}/token` — also gone; an admin can no longer see or
+  hand out a raw device token at all, only the opaque code.
+  `GET /api/v1/admin/registers` items gained `activation: { state, code_expires_at }`
+  (`enrolled` / `code_pending` / `code_expired` / `not_enrolled`).
+- **The lockout is deliberately total.** Issuing (or reissuing) a code deletes every
+  device token *and* every staff session bound to that register, in the same
+  transaction that stores the new code's HMAC — there is no window where an old
+  credential and a new one are both live. The till finds out the instant it next talks
+  to the server (`invalid_device_token` on any request) and shows **"Terminal
+  disabled"**: *"Your activation code has been disabled. Please contact an admin and
+  request a new activation code."*, with the activation-code entry form directly below
+  it — the same screen component (`ActivationScreen`) as first-run, just in its
+  `disabled` variant.
+- **Codes are stored the same way PINs are.** `ActivationCodes` (10 chars from a
+  30-character alphabet with no `0/O`, `1/I/L`, `U` — legible over a phone call or a
+  sticky note, displayed `XXXXX-XXXXX`) is looked up by a keyed HMAC-SHA256, the same
+  "useless without `APP_KEY`" shape as `users.pin_lookup`. Single use (`redeemed_at`),
+  expires after `pos.registers.activation_code_ttl_days` (7, config not database — an
+  engineer's deployment knob, not a runtime admin setting).
+- **Back office:** the register editor's old "Reissue token" panel became **"Issue
+  activation code"** — same destructive-confirm pattern, but the response is a code
+  shown exactly once in a copy-me panel, never a token. An **Activation** status pill
+  (Enrolled / Code pending — expires *date* / Code expired / Not enrolled) updates
+  immediately on issue, without waiting for a refetch.
+- **`scripts/e2e-admin-day.sh` updated, not left behind.** It used to reissue Till 1's
+  raw device token mid-script; that endpoint is gone, so the script now issues an
+  activation code, asserts the old device token 401s, redeems the code via
+  `POST /registers/activate`, confirms the new token works, and checks both audit
+  actions (`admin.register.code_issue`, `register.activate`) — proving the full
+  lockout-then-recovery cycle instead of a plain swap. `e2e-retail-day.sh` and
+  `e2e-lunch-service.sh` don't touch registers this way and needed no change.
+- **Docs:** `docs/03-api.md`, `docs/02-data-model.md`, and `docs/manual/` (Getting
+  Started, Operator Guide, Manager Guide) all rewritten for the new story — no
+  surviving reference to the old enroll-with-a-pasted-token screen or a reissued raw
+  token anywhere current.
+
+**Status: complete.** 476 backend tests, 112 register-app tests, 133 back-office-app
+tests. All three e2e scripts green via `make e2e`.
+
+---
+
 ## Sequencing rationale
 
 - **Money before schema** — everything computes on it.
