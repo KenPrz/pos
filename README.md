@@ -9,12 +9,13 @@ the same tables, the same lifecycle, different screens.
 
 ## What's in the box
 
-Three surfaces over one Laravel API and one Postgres database:
+Four surfaces over one Laravel API and one Postgres database:
 
 | Surface | What it does |
 | --- | --- |
 | **Register** (`frontend/web`) | The till. Scanner-first for retail, menu grid + floor view for food service — tabs, modifiers, coursing, split checks, refunds, cash drawer with a blind count. |
 | **Back office** (`frontend/back-office`) | The manager's side: catalog, staff and per-location roles, register settings, sales/stock reports, and a viewer for the append-only audit trail. |
+| **Desktop shell** (`frontend/native`) | Tauri v2. Hosts the same register and adds what a browser tab cannot do: a thermal printer and a cash drawer. Mock driver only so far — it writes the ESC/POS bytes to a file. |
 | **API** (`backend`) | Laravel 13 action-class architecture. Every mutation audited, every financial record append-only, all money in integer cents. |
 
 Principles that shape everything (the reasoning lives in [`docs/`](docs/README.md)):
@@ -27,6 +28,9 @@ Principles that shape everything (the reasoning lives in [`docs/`](docs/README.m
   assumed: the food-service milestone shipped with zero new order tables.
 - **Config is deployed, data is administered.** Engineers change config; admins change
   the database; nothing lives in both.
+- **The server decides, the terminal obeys.** The API says what a receipt contains and
+  whether a drawer may open, and audits who authorized it; the shell only turns that
+  into bytes and a pulse. No money decision lives where it cannot be audited.
 
 ## Quick start
 
@@ -46,6 +50,16 @@ make seed             # demo data — prints dev PINs and device tokens
 `make help` lists every target — tests, e2e story proofs, backups (including
 `make restore-drill`, because an untested backup is a rumor), and production
 (`make prod-up`: one FrankenPHP edge, automatic TLS, host-routed domains).
+
+The desktop shell is built separately, and needs a Rust toolchain plus WebKitGTK
+(`libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev`):
+
+```bash
+cd frontend/native && npm install && npm run build   # bundles the register into a desktop app
+```
+
+On first launch it asks for the API's address, then enrols like any other terminal. See
+[`frontend/native/README.md`](frontend/native/README.md).
 
 ## Documentation
 
@@ -75,5 +89,9 @@ concurrency invariants that keep money correct.
 
 Milestones M0–M7 complete: money primitives, full schema, the retail vertical slice,
 retail complete, food service, back office, and containerized deployment — each shipped
-end-to-end with live proofs. See [`docs/06-roadmap.md`](docs/06-roadmap.md) for what
-each milestone taught and what's deliberately deferred.
+end-to-end with live proofs. Since then: a UI rework onto one design language across both
+web surfaces, and the Tauri desktop shell. See [`docs/06-roadmap.md`](docs/06-roadmap.md)
+for what each milestone taught and what's deliberately deferred.
+
+Deferred by choice, not oversight: real printer drivers (network/USB/serial slot in
+behind the trait that already exists), offline-tolerant writes, and auto-update/signing.
