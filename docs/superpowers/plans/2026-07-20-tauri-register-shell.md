@@ -646,10 +646,17 @@ git commit -m "Shell: Tauri v2 scaffold hosting the register SPA"
 - Modify: `frontend/native/src-tauri/src/main.rs`, `frontend/native/src-tauri/Cargo.toml`
 
 **Interfaces:**
-- Produces three Tauri commands consumed by Task 5:
+- Produces four Tauri commands consumed by Task 5:
   - `get_config() -> { server_url: Option<String> }`
   - `set_server_url(url: String) -> Result<(), String>`
+  - `check_server(url: String) -> bool`
   - `api_request(req: { path, method, headers, body }) -> Result<{ status: u16, body: String }, String>`
+
+**Why `check_server` exists:** the setup screen must validate an address *before* it is
+saved, but a webview `fetch` to that address would be cross-origin from
+`tauri://localhost` and die on CORS — the exact thing this whole detour avoids. It cannot
+use `api_request` either, because that reads the *saved* URL and nothing is saved yet. So
+the probe is its own command taking a candidate URL.
 
 - [ ] **Step 1: Add dependencies**
 
@@ -781,6 +788,29 @@ pub fn set_server_url(app: tauri::AppHandle, url: String) -> Result<(), String> 
     config.server_url = Some(normalized);
     save(&app, &config)
 }
+
+/// Probes a CANDIDATE address before it is saved. This cannot be a webview `fetch` (that
+/// would be cross-origin from `tauri://localhost` and die on CORS) and it cannot be
+/// `api_request` (which reads the saved URL, and nothing is saved yet). Returns a plain
+/// bool: the setup screen only needs "can I reach a POS server here?".
+#[tauri::command]
+pub async fn check_server(url: String) -> bool {
+    let Ok(normalized) = normalize_server_url(&url) else {
+        return false;
+    };
+
+    let Ok(response) = reqwest::Client::new()
+        .get(format!("{normalized}/api/v1/health"))
+        .send()
+        .await
+    else {
+        return false;
+    };
+
+    // /health answers 503 when the database is down. That is still a POS server at this
+    // address, which is all the setup screen is asking.
+    response.status().is_success() || response.status().as_u16() == 503
+}
 ```
 
 - [ ] **Step 5: Run the config tests**
@@ -902,6 +932,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             config::get_config,
             config::set_server_url,
+            config::check_server,
             api::api_request,
         ])
         .run(tauri::generate_context!())
@@ -961,6 +992,16 @@ export async function getConfig(): Promise<ShellConfig | null> {
 export async function setServerUrl(url: string): Promise<void> {
   if (!inShell()) return
   await invoke('set_server_url', { url })
+}
+
+/**
+ * Probes a candidate address through Rust. Deliberately NOT a webview `fetch`: that would
+ * be cross-origin from `tauri://localhost` and die on CORS, which is the whole reason API
+ * traffic detours through Rust in the first place.
+ */
+export async function checkServer(url: string): Promise<boolean> {
+  if (!inShell()) return false
+  return invoke<boolean>('check_server', { url })
 }
 ```
 
@@ -1107,7 +1148,7 @@ In `frontend/web/src/register/Register.tsx`, add to the imports:
 ```tsx
 import { useEffect, useState } from 'react'
 import { inShell } from '../lib/transport'
-import { getConfig, setServerUrl } from '../lib/shell'
+import { checkServer, getConfig, setServerUrl } from '../lib/shell'
 import { SetupScreen } from './SetupScreen'
 ```
 
@@ -1132,18 +1173,7 @@ And as the first statement of the component's `return`, before the existing `<ma
   if (configured === null) return null
   if (!configured) {
     return (
-      <SetupScreen
-        onConnected={() => setConfigured(true)}
-        save={setServerUrl}
-        check={async (url) => {
-          try {
-            const response = await fetch(`${url}/api/v1/health`)
-            return response.ok
-          } catch {
-            return false
-          }
-        }}
-      />
+      <SetupScreen onConnected={() => setConfigured(true)} save={setServerUrl} check={checkServer} />
     )
   }
 ```
