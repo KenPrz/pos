@@ -4,7 +4,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { ApiError, api, tokens, type Order, type Shift, type StaffSession } from '../lib/api'
 import { Button } from '@/components/ui/button'
+import { inShell } from '../lib/transport'
+import { checkServer, getConfig, setServerUrl } from '../lib/shell'
 import { PinScreen, SetupScreen } from './SessionScreens'
+// Aliased: this module's own SetupScreen (device enrolment, "Enroll Terminal") is a
+// different, pre-existing, frozen screen from the shell's server-address setup below —
+// same name, different file, both legitimately called "setup".
+import { SetupScreen as ShellSetupScreen } from './SetupScreen'
 import { CloseShiftScreen, OpenShiftScreen } from './ShiftScreens'
 import { SaleScreen } from './SaleScreen'
 import { RefundScreen } from './RefundScreen'
@@ -46,6 +52,15 @@ export function Register() {
   // state, not read from tokens.registerInfo() at render time, for the same SSR reason
   // `stage` does: localStorage doesn't exist while Next prerenders this tree.
   const [foodMode, setFoodMode] = useState(false)
+  // In the shell, nothing can be fetched until we know which server to ask. `null` means
+  // "still checking", which must not flash the setup screen at a configured till.
+  const [configured, setConfigured] = useState<boolean | null>(inShell() ? null : true)
+
+  useEffect(() => {
+    if (!inShell()) return
+    void getConfig().then((config) => setConfigured(config?.server_url != null))
+  }, [])
+
   // The order in progress on the (mounted-hidden) sale screen, if any — fed by
   // SaleScreen's onOrderChange so the floor screen can disable resuming a DIFFERENT
   // tab out from under an in-progress sale (Task 12).
@@ -113,6 +128,13 @@ export function Register() {
   const permissions = user?.permissions ?? []
   const can = (permission: string) => user !== null && (user.is_admin || permissions.includes(permission))
   const onShift = stage.name === 'selling' || stage.name === 'refunds' || stage.name === 'floor'
+
+  if (configured === null) return null
+  if (!configured) {
+    return (
+      <ShellSetupScreen onConnected={() => setConfigured(true)} save={setServerUrl} check={checkServer} />
+    )
+  }
 
   return (
     <main className="flex min-h-dvh flex-col bg-canvas text-ink">
