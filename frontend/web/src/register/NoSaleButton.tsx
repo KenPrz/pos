@@ -18,10 +18,20 @@ export function NoSaleButton({
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   if (!open) {
     return (
-      <Button type="button" variant="ghost" className="self-stretch" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="ghost"
+        className="self-stretch"
+        onClick={() => {
+          setReason('')
+          setError(null)
+          setOpen(true)
+        }}
+      >
         No sale
       </Button>
     )
@@ -32,7 +42,8 @@ export function NoSaleButton({
       className="flex items-center gap-sm"
       onSubmit={async (e) => {
         e.preventDefault()
-        if (reason.trim() === '') return
+        if (busy || reason.trim() === '') return
+        setBusy(true)
         setError(null)
         try {
           // Server first, always: a drawer that opened before the audit row existed is
@@ -40,9 +51,17 @@ export function NoSaleButton({
           await authorize(reason.trim())
         } catch {
           setError('Could not open the drawer.')
+          setBusy(false)
           return
         }
-        await pulse()
+        try {
+          await pulse()
+        } catch {
+          setError('Could not open the drawer.')
+          setBusy(false)
+          return
+        }
+        setBusy(false)
         setOpen(false)
         setReason('')
       }}
@@ -54,10 +73,19 @@ export function NoSaleButton({
         value={reason}
         onChange={(e) => setReason(e.target.value)}
       />
-      <Button type="submit" size="lg">
+      <Button type="submit" className="min-h-[48px]" disabled={busy}>
         Open drawer
       </Button>
-      <Button type="button" variant="ghost" size="lg" onClick={() => setOpen(false)}>
+      <Button
+        type="button"
+        variant="ghost"
+        className="min-h-[48px]"
+        onClick={() => {
+          setReason('')
+          setError(null)
+          setOpen(false)
+        }}
+      >
         Cancel
       </Button>
       {error && <span className="type-body-sm text-error">{error}</span>}
