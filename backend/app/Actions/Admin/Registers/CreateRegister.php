@@ -10,9 +10,8 @@ use App\Models\Register;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Creates a register row with no device token. This is the admin-UI path; the register
- * only becomes usable once it is enrolled (POST /registers/enroll, which mints the first
- * token) or its activation code is issued via IssueActivationCode. Both are legal.
+ * Creates a register row with no device token. The register only becomes usable once
+ * its activation code is issued via IssueActivationCode.
  */
 final class CreateRegister
 {

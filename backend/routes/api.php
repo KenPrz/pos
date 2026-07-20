@@ -39,7 +39,6 @@ use App\Http\Controllers\Admin\Reports\StockReportController;
 use App\Http\Controllers\Admin\Users\CreateUserController;
 use App\Http\Controllers\Admin\Users\ListUsersController;
 use App\Http\Controllers\Admin\Users\UpdateUserController;
-use App\Http\Controllers\Auth\EnrollRegisterController;
 use App\Http\Controllers\Auth\StaffLoginController;
 use App\Http\Controllers\Auth\StaffLogoutController;
 use App\Http\Controllers\Catalog\GetCatalogController;
@@ -90,12 +89,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', HealthController::class)->name('health');
-
-    // Enrolment is bootstrapped by a back-office admin, so it authenticates with a user
-    // session rather than a device token — the device has no identity yet.
-    Route::post('/registers/enroll', EnrollRegisterController::class)
-        ->middleware('auth:sanctum')
-        ->name('registers.enroll');
 
     // Back office: email+password, no device or location context. Every later admin
     // task (M6 tasks 2-7) adds routes inside the group below.
