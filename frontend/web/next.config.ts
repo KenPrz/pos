@@ -1,7 +1,10 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  // Two shapes from one source: the deployed app is a standalone Node server; the Tauri
+  // shell bundles a static export (it has no Node runtime and no rewrite). CI builds
+  // both so neither can rot.
+  output: process.env.POS_STATIC_EXPORT ? 'export' : 'standalone',
   // Type-checking is deliberately not Next's job here: the gate is `npm run
   // typecheck` (tsgo --noEmit, the native TS7 compiler), run locally and in CI.
   // The stable `typescript` devDep exists so Next's build-time TS detection is

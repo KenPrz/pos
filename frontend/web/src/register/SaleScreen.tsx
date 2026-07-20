@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError, api, tokens, type CatalogProduct, type CatalogVariant, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
 import { cents, formatMoney, parseCentsOrNull, subtract } from '../lib/money'
+import { hasHardware, printReceipt } from '../lib/shell'
 import { ActionZone } from '@/components/ActionZone'
 import { CartLine } from '@/components/CartLine'
 import { MoneyText } from '@/components/MoneyText'
@@ -43,6 +44,23 @@ type Phase =
     Deliberately still on the legacy `.receipt` classes: the printable receipt and its
     @media print CSS survived the Task 9 cutover as src/styles/print.css, preserved
     as-is (plain, functional) — do not restyle. */
+/**
+ * In the shell, print to the thermal printer; in a browser, the print dialog exactly as
+ * before. Printing never blocks a sale — the order is already closed server-side, so a
+ * jammed printer is a notice, not a rollback.
+ */
+async function printNow(receipt: Receipt | null, currency: string): Promise<void> {
+  if (!hasHardware() || receipt === null) {
+    window.print()
+    return
+  }
+  try {
+    await printReceipt(receipt, currency)
+  } catch {
+    window.print()
+  }
+}
+
 function ReceiptCard({ receipt }: { receipt: Receipt }) {
   return (
     <div className="receipt">
@@ -465,7 +483,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
           <div className="flex flex-col gap-sm border-b border-hairline pb-lg print:border-0" key={outcome.order.id}>
             <header className="flex items-center justify-between gap-md">
               <h3 className="type-card-title">Check {ix + 1} — order {outcome.order.number}</h3>
-              {receipt && <Button type="button" variant="ghost" className="min-h-[48px]" onClick={() => window.print()}>Print</Button>}
+              {receipt && <Button type="button" variant="ghost" className="min-h-[48px]" onClick={() => void printNow(receipt, CURRENCY)}>Print</Button>}
             </header>
             <p className="type-body-sm text-ink-muted">
               {outcome.payment.driver === 'cash'
@@ -634,7 +652,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
   // the viewport minus the 48px top bar, the shell's p-lg, and the 64px action-zone
   // band (reserved even when no primary action is showing, so nothing ever jumps).
   return (
-    <section className="flex h-[calc(100dvh-160px)] min-h-[360px] flex-col gap-md print:block print:h-auto">
+    <section className="flex h-[calc(var(--app-vh,100dvh)-160px)] min-h-[360px] flex-col gap-md print:block print:h-auto">
       <header className="flex shrink-0 items-center justify-between gap-md print:hidden">
         <h2 className="type-headline">{order ? `Order ${order.number}` : 'New sale'}</h2>
         {/* Present through scanning and tender exactly as before; the done plates never
@@ -769,7 +787,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
       )}
       {phase.name === 'done' && (
         <ActionZone>
-          <Button size="xl" type="button" variant="ghost" onClick={() => window.print()}>Print</Button>
+          <Button size="xl" type="button" variant="ghost" onClick={() => void printNow(phase.receipt, CURRENCY)}>Print</Button>
           <Button size="xl" onClick={newSale}>New sale</Button>
         </ActionZone>
       )}

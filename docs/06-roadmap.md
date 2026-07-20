@@ -495,7 +495,7 @@ Not "maybe someday" — each has a specific condition that should promote it.
 
 | Deferred | Revive when |
 | --- | --- |
-| Desktop shell (`frontend/native/`) | A pilot store needs a real cash drawer and thermal printer. Until then: browser print dialog, drawer opened by hand. The seam is in `01-architecture.md` — server decides what, shell does how. |
+| Real printer drivers (network / USB / serial) | A printer physically exists. The shell, the `Printer` trait, and the ESC/POS encoder shipped; a driver is the small remaining part. |
 | Offline-tolerant writes | The first outage costs a real shift's revenue. The idempotency table is already the replay mechanism, and the desktop shell would be its host. |
 | Stripe Terminal | Someone wants card money to flow through our reports instead of a separate reader. |
 | Kitchen display | A kitchen asks. `order_lines.prep_state` is already there. |

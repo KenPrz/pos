@@ -591,6 +591,17 @@ paginates at 50 rows. `entity_type`/`entity_id`, `user_id`, and `action` are eac
 by a dedicated index on `audit_log`; only a bare date range with none of those three set
 falls back to a sequential scan, an accepted cost for a back-office read at this scale.
 
+## Drawer
+
+```
+POST /api/v1/drawer/no-sale              # open the drawer with no sale attached
+```
+
+Requires `drawer.no_sale` (supervisor). `reason` is mandatory and the opening is bound to
+the register's open shift — no open shift is `409 no_open_shift`. Moves no money, so
+there is no table: the audit row is the record, and the back office's audit viewer reads
+it. Only the desktop shell can act on the response; a browser has no drawer to open.
+
 ## Receipts
 
 ```

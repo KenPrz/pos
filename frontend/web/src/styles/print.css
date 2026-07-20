@@ -45,6 +45,45 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * Register viewport (Register.tsx <main>, ServerSetupScreen.tsx <main>).
+ *
+ * `.app-viewport-min` gives the register's root a minimum height of one viewport without
+ * ever constraining it: `100vh` as the base declaration, `100dvh` inside `@supports`
+ * overriding it wherever the engine actually supports `dvh` (a plain fallback PAIR of two
+ * `min-height` declarations on one rule reads identically to a human, but Next's CSS
+ * minifier treats the first as a dead duplicate and strips it — verified against the
+ * built output — so the fallback has to live in a separate `@supports` block to survive).
+ * This is a MIN-height, so content taller than the viewport simply grows the document —
+ * window.print() paginates it normally, in browser and shell alike.
+ *
+ * `.app-viewport-shell-fixed` is the WebKitGTK workaround: `100dvh`/`100vh` mismeasure in
+ * some WebKitGTK builds (resolving against the display's pixel height, not the window's),
+ * so the shell instead pins the root to the window with `position: fixed` and scrolls its
+ * content internally. That same trick is exactly what silently truncated printed
+ * receipts/Z-reports to one page (a fixed, viewport-clipped, overflow:auto box cannot be
+ * fragmented across print pages) — so this is wrapped in `@media screen`, never applied
+ * for print regardless of environment, and callers additionally gate it to the shell
+ * (`inShell()`) since browsers never have the bug this works around.
+ */
+.app-viewport-min {
+  min-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  .app-viewport-min {
+    min-height: 100dvh;
+  }
+}
+
+@media screen {
+  .app-viewport-shell-fixed {
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+  }
+}
+
 @media print {
   button,
   form {

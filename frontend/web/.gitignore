@@ -26,3 +26,6 @@ dist-ssr
 # next
 .next/
 next-env.d.ts
+
+# static export (shell build)
+/out/

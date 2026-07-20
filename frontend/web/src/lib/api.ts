@@ -2,6 +2,7 @@
  * The API client. One place that knows the envelope from docs/03-api.md, so no component
  * ever unwraps `data` or branches on an HTTP status by hand.
  */
+import { send } from './transport'
 
 /** Success is always `{ data: ... }`; errors are always `{ error: ... }`. Never both. */
 export type ApiSuccess<T> = { data: T }
@@ -108,21 +109,29 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (device) headers.Authorization = `Bearer ${device}`
   if (staff) headers['X-Staff-Token'] = staff
 
-  let response: Response
+  let response: { status: number; body: string }
 
   try {
-    response = await fetch(`/api/v1${path}`, { ...init, headers })
+    response = await send(path, { ...init, headers })
   } catch (cause) {
     // The network never reached us. v1 is online-only (docs/00-overview.md), so this is
-    // a real, expected state the UI has to show rather than swallow.
+    // a real, expected state the UI has to show rather than swallow. The shell's Rust
+    // transport maps its own failures here too, so offline screens work identically.
     throw new ApiError('network_unreachable', 'Cannot reach the server.', 0, {
       cause: String(cause),
     })
   }
 
-  const body: unknown = await response.json().catch(() => null)
+  const ok = response.status >= 200 && response.status < 300
 
-  if (!response.ok) {
+  let body: unknown = null
+  try {
+    body = JSON.parse(response.body)
+  } catch {
+    body = null
+  }
+
+  if (!ok) {
     // 503 from /health is a normal, well-formed response carrying `data`, not an error
     // envelope. Anything else that fails must be one.
     if (isErrorBody(body)) {
@@ -541,6 +550,9 @@ export const api = {
     ),
 
   receipt: (orderId: string) => request<Receipt>(`/orders/${orderId}/receipt`),
+
+  drawerNoSale: (reason: string) =>
+    post<{ authorized: boolean; shift_id: string }>('/drawer/no-sale', { reason }),
 
   // original_order_id + lines derive the amount server-side from the original lines'
   // frozen price/tax snapshot (RefundOrder.php) — the client only chooses qty/restock.
