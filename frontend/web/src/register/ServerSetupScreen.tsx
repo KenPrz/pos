@@ -24,7 +24,7 @@ export function ServerSetupScreen({
   const [error, setError] = useState<string | null>(null)
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-canvas p-lg text-ink">
+    <main className="fixed inset-0 flex items-center justify-center overflow-auto bg-canvas p-lg text-ink">
       <Card className="w-full max-w-[28rem] p-lg">
         <CardTitle>Connect this terminal</CardTitle>
         <p className="type-body-sm mt-sm text-ink-muted">

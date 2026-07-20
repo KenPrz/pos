@@ -652,7 +652,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
   // the viewport minus the 48px top bar, the shell's p-lg, and the 64px action-zone
   // band (reserved even when no primary action is showing, so nothing ever jumps).
   return (
-    <section className="flex h-[calc(100dvh-160px)] min-h-[360px] flex-col gap-md print:block print:h-auto">
+    <section className="flex h-[calc(var(--app-vh,100dvh)-160px)] min-h-[360px] flex-col gap-md print:block print:h-auto">
       <header className="flex shrink-0 items-center justify-between gap-md print:hidden">
         <h2 className="type-headline">{order ? `Order ${order.number}` : 'New sale'}</h2>
         {/* Present through scanning and tender exactly as before; the done plates never

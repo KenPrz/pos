@@ -39,7 +39,7 @@ export function NoSaleButton({
 
   return (
     <form
-      className="flex items-center gap-sm"
+      className="flex min-w-0 flex-1 items-center gap-sm px-sm"
       onSubmit={async (e) => {
         e.preventDefault()
         if (busy || reason.trim() === '') return
@@ -68,7 +68,7 @@ export function NoSaleButton({
     >
       <Input
         autoFocus
-        className="min-h-[48px]"
+        className="min-h-[48px] min-w-0 flex-1"
         placeholder="Reason for opening the drawer…"
         value={reason}
         onChange={(e) => setReason(e.target.value)}

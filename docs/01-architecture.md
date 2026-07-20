@@ -64,8 +64,8 @@ password-authenticated, location-less back office are different enough sessions 
 sharing a build bought nothing and cost a permission check on every route to keep the two
 audiences apart.
 
-`frontend/native/` is reserved for a **desktop shell** (Electron or Tauri) and is empty in
-v1. It is not a second frontend: the plan is that it hosts the same SPA and adds the two
+`frontend/native/` is reserved for a **desktop shell** (Electron or Tauri) and now exists.
+It is not a second frontend: the plan is that it hosts the same SPA and adds the two
 things a browser cannot do.
 
 **1. Hardware.** This is the real reason it exists. A browser tab cannot kick a cash
@@ -80,6 +80,13 @@ So the design keeps a seam:
   the API.
 - The **shell** does *how* (bytes to a printer, a pulse to a drawer) — device-specific,
   untestable in CI, and deliberately dumb.
+
+Built as of the shell milestone: the SPA is bundled as a static export, API traffic
+detours through a Rust `api_request` command (no CORS, and the server address lives in
+Rust so the webview never names a host), and receipt JSON becomes ESC/POS bytes in a pure
+Rust function. `POST /api/v1/drawer/no-sale` finally gives `drawer.no_sale` a door: the
+server authorizes and audits, the shell only pulses. Only the mock driver ships — it
+writes the exact bytes to disk — because no printer has been bought yet.
 
 The rule is that no money decision ever lives in the shell. A shell that decided when a
 drawer may open would put the fraud boundary on the terminal, where it can't be audited.

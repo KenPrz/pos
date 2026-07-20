@@ -17,8 +17,8 @@ Laravel 13.20 (PHP 8.5) · PostgreSQL 18 · React 19 + TypeScript 7 on Next.js 1
 backend/              Laravel API. Action-class architecture — see docs/04-backend-conventions.md
 frontend/web/         Next.js register app
 frontend/back-office/ Next.js back-office app (M6) — catalog/user/location CRUD, reports, audit
-frontend/native/      Reserved for a desktop shell (Electron/Tauri) — hosts the register
-                      app and adds cash drawer + receipt printer access. Empty in v1.
+frontend/native/      Tauri v2 desktop shell — hosts the register SPA and adds thermal
+                      printer + cash drawer. Mock driver only; see its README.
 Makefile               Runner surface for the containerized stack — `make help` lists everything.
 compose.dev.yml        Full dev stack: db + api + web + back-office, hot reload. `make dev`.
 compose.prod.yml       Single-host production: one FrankenPHP edge, TLS, host routing. `make prod-up`.

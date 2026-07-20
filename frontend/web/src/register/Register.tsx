@@ -75,6 +75,20 @@ export function Register() {
     setStage(!tokens.device() ? { name: 'setup' } : !tokens.staff() ? { name: 'pin' } : { name: 'loading-shift' })
   }, [])
 
+  // `100dvh`/`100vh` misreport in some WebKitGTK builds (observed: resolving against the
+  // display's pixel height rather than the actual window's), which silently pushes
+  // viewport-sized layout (and anything an autofocused field scrolls into view against)
+  // off the bottom of the shell's window. `window.innerHeight` measures the real thing in
+  // every engine tested, so screens that need "the viewport, minus some fixed chrome"
+  // (SaleScreen's cart/context pane) read `--app-vh` instead of `dvh`. Harmless in the
+  // browser too — it's just a more reliable version of the same number.
+  useEffect(() => {
+    const setVh = () => document.documentElement.style.setProperty('--app-vh', `${window.innerHeight}px`)
+    setVh()
+    window.addEventListener('resize', setVh)
+    return () => window.removeEventListener('resize', setVh)
+  }, [])
+
   // A cached shift outliving the session that fetched it would let the next login
   // skip straight to selling on a closed drawer — evict it whenever a session ends.
   //
@@ -135,7 +149,7 @@ export function Register() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col bg-canvas text-ink">
+    <main className="fixed inset-0 flex flex-col overflow-y-auto bg-canvas text-ink">
       {/* Slim Carbon top bar (DESIGN.md top-nav: 48px, canvas, 1px bottom hairline) —
           brand block, section word, stage toggles, staff name + Clock out. Hidden in
           print so a Z-report/receipt page prints without chrome. */}
@@ -174,7 +188,7 @@ export function Register() {
           <NoSaleButton authorize={(reason) => api.drawerNoSale(reason).then(() => undefined)} pulse={openDrawer} />
         )}
         {user && onShift && (
-          <span className="ml-auto flex items-center gap-md">
+          <span className="ml-auto flex shrink-0 items-center gap-md whitespace-nowrap px-md">
             <span className="type-body-sm text-ink-muted">{user.name}</span>
             <Button type="button" variant="ghost" className="self-stretch" onClick={clockOut}>
               Clock out
