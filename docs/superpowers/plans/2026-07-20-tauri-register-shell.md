@@ -32,7 +32,7 @@
 | `frontend/web/src/lib/transport.ts` | Browser-vs-shell transport seam |
 | `frontend/web/src/lib/shell.ts` | Shell detection + hardware/config command wrappers |
 | `frontend/web/src/register/ServerSetupScreen.tsx` | First-run "Connect this terminal" |
-| `frontend/native/src-tauri/src/main.rs` | Window + command registration |
+| `frontend/native/src-tauri/src/lib.rs` | Builder chain, module declarations, command registration (`main.rs` stays a one-line shim) |
 | `frontend/native/src-tauri/src/config.rs` | Server URL persistence + URL normalization |
 | `frontend/native/src-tauri/src/api.rs` | `api_request` — the HTTP detour |
 | `frontend/native/src-tauri/src/hardware/escpos.rs` | Receipt JSON → ESC/POS bytes (pure) |
@@ -645,7 +645,7 @@ git commit -m "Shell: Tauri v2 scaffold hosting the register SPA"
 
 **Files:**
 - Create: `frontend/native/src-tauri/src/config.rs`, `frontend/native/src-tauri/src/api.rs`
-- Modify: `frontend/native/src-tauri/src/main.rs`, `frontend/native/src-tauri/Cargo.toml`
+- Modify: `frontend/native/src-tauri/src/lib.rs`, `frontend/native/src-tauri/Cargo.toml`
 
 **Interfaces:**
 - Produces four Tauri commands consumed by Task 5:
@@ -1215,7 +1215,7 @@ git commit -m "Register: first-run server-address setup in the shell"
 
 **Files:**
 - Create: `frontend/native/src-tauri/src/hardware/mod.rs`, `frontend/native/src-tauri/src/hardware/escpos.rs`
-- Modify: `frontend/native/src-tauri/src/main.rs`
+- Modify: `frontend/native/src-tauri/src/lib.rs`
 
 **Interfaces:**
 - Produces: `escpos::encode(receipt: &Receipt, currency: &str) -> Vec<u8>`, `escpos::money(cents: i64) -> String`, `escpos::DRAWER_KICK: [u8; 5]`, and the `Receipt` deserialization types. Task 7 consumes all of these.
@@ -1521,7 +1521,7 @@ git commit -m "Shell: ESC/POS encoder — server JSON to printer bytes"
 
 **Files:**
 - Create: `frontend/native/src-tauri/src/hardware/driver.rs`, `frontend/native/src-tauri/src/hardware/mock.rs`
-- Modify: `frontend/native/src-tauri/src/hardware/mod.rs`, `frontend/native/src-tauri/src/main.rs`, `frontend/native/src-tauri/src/config.rs`
+- Modify: `frontend/native/src-tauri/src/hardware/mod.rs`, `frontend/native/src-tauri/src/lib.rs`, `frontend/native/src-tauri/src/config.rs`
 
 **Interfaces:**
 - Consumes: `escpos::{encode, Receipt, DRAWER_KICK}` from Task 6.
