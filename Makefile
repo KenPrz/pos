@@ -9,7 +9,7 @@ COMPOSE_PROD := docker compose -f compose.prod.yml
 COMPOSE_VAR := $(if $(filter prod,$(COMPOSE)),$(COMPOSE_PROD),$(COMPOSE_DEV))
 
 .DEFAULT_GOAL := help
-.PHONY: help dev dev-down logs ps seed migrate dev-key test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs backup restore restore-drill e2e
+.PHONY: help dev dev-down logs ps seed migrate dev-key wait-api test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs backup restore restore-drill e2e
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -19,9 +19,10 @@ help: ## List available targets
 # not in make's recipe shell (nothing here `include`s .env), so hardcoding the
 # defaults here would lie the moment someone actually overrides a port. `make
 # ps` asks Docker, which knows the truth.
-dev: ## Bring up the full dev stack (db, api, register, back office)
-	$(COMPOSE_DEV) up -d --build
-	@echo "stack is up — see 'make ps' for the actual host ports (defaults: api 8000, register 5174, back office 5175, overridable via POS_DEV_*_PORT in .env)"
+dev: ## Bring up the full dev stack and wait until it's actually READY (first boot installs vendor — takes minutes)
+	@echo "bringing the stack up — first boot installs composer/npm dependencies into fresh volumes, which takes a few minutes; --wait blocks until the api answers"
+	$(COMPOSE_DEV) up -d --build --wait --wait-timeout 900
+	@echo "stack is READY — see 'make ps' for the actual host ports (defaults: api 8000, register 5174, back office 5175, overridable via POS_DEV_*_PORT in .env)"
 
 dev-down: ## Stop the dev stack (volumes survive)
 	$(COMPOSE_DEV) down
@@ -50,10 +51,21 @@ dev-key: ## Mint an APP_KEY for the root .env — no vendor, no compose, no exis
 # for api, node for web/back-office (see compose.dev.yml comments). `exec`
 # without --user reconnects as root, so every target below that writes to a
 # bind-mounted directory names the user explicitly.
-seed: ## Fresh migrate + seed (prints dev PINs and device tokens)
+# Guard for every target that execs artisan: the api container is "up" the
+# moment its process starts, but on a FIRST boot `composer install` runs for
+# minutes before vendor/ exists — exec'ing artisan in that window dies with
+# "Failed opening required '/app/vendor/autoload.php'". `make dev` already
+# --waits; this covers running seed/migrate/tests directly after a manual
+# `docker compose up -d` that didn't.
+wait-api:
+	@$(COMPOSE_DEV) exec api curl -fsS http://localhost:8000/api/v1/health >/dev/null 2>&1 || echo "waiting for the api (first boot installs dependencies — up to ~10 min; watch 'make logs')..."
+	@tries=0; until $(COMPOSE_DEV) exec api curl -fsS http://localhost:8000/api/v1/health >/dev/null 2>&1; do \
+	  tries=$$((tries+1)); [ "$$tries" -lt 120 ] || { echo "api never became ready — check 'make logs'"; exit 1; }; sleep 5; done
+
+seed: wait-api ## Fresh migrate + seed (prints dev PINs and device tokens)
 	$(COMPOSE_DEV) exec --user pos api php artisan migrate:fresh --seed
 
-migrate: ## Run pending migrations
+migrate: wait-api ## Run pending migrations
 	$(COMPOSE_DEV) exec --user pos api php artisan migrate
 
 # Credential extraction is pinned to the seeder's ACTUAL printed table
@@ -129,7 +141,7 @@ test: test-backend test-web test-bo ## All suites, in containers
 
 # -e overrides beat phpunit.xml <env> values by design (real env wins — the
 # same mechanism as the local DB_PORT=5433 habit). Never edit phpunit.xml.
-test-backend: ## Pest against the compose db (creates pos_test if missing)
+test-backend: wait-api ## Pest against the compose db (creates pos_test if missing)
 	$(COMPOSE_DEV) exec db psql -U pos -d pos -tc "SELECT 1 FROM pg_database WHERE datname='pos_test'" | grep -q 1 || $(COMPOSE_DEV) exec db createdb -U pos pos_test
 	$(COMPOSE_DEV) exec --user pos -e DB_HOST=db -e DB_PORT=5432 -e DB_DATABASE=pos_test api php -d memory_limit=512M ./vendor/bin/pest
 
