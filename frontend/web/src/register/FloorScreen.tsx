@@ -47,7 +47,7 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
   activeOrderId: string | null
   onResume: (order: Order) => void
   onNewTab: (order: Order) => void
-  onSessionExpired: () => void
+  onSessionExpired: (err?: unknown) => void
 }) {
   const [error, setError] = useState<string | null>(null)
   const [newTabOpen, setNewTabOpen] = useState(false)
@@ -61,7 +61,7 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
   const newTabKeyRef = useRef<string | null>(null)
 
   const fail = (err: unknown, fallback: string) => {
-    if (err instanceof ApiError && err.status === 401) return onSessionExpired()
+    if (err instanceof ApiError && err.status === 401) return onSessionExpired(err)
     setError(err instanceof ApiError ? err.message : fallback)
   }
 
@@ -85,10 +85,10 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
   // useQuery (react-query v5) dropped the onError callback — watch the settled error the
   // same way Register.tsx's own shift-load effect does.
   useEffect(() => {
-    if (openOrders.error instanceof ApiError && openOrders.error.status === 401) onSessionExpired()
+    if (openOrders.error instanceof ApiError && openOrders.error.status === 401) onSessionExpired(openOrders.error)
   }, [openOrders.error, onSessionExpired])
   useEffect(() => {
-    if (openShiftRegisters.error instanceof ApiError && openShiftRegisters.error.status === 401) onSessionExpired()
+    if (openShiftRegisters.error instanceof ApiError && openShiftRegisters.error.status === 401) onSessionExpired(openShiftRegisters.error)
   }, [openShiftRegisters.error, onSessionExpired])
 
   const newTab = useMutation({

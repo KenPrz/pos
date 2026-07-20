@@ -9,11 +9,13 @@
  * pins down only the effect, via `../lib/shell` and `../lib/transport` mocks that let
  * Register mount without a device, a staff session, or a real Tauri bridge.
  */
+import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Register } from './Register'
 import { inShell } from '../lib/transport'
+import { ApiError, api } from '../lib/api'
 
 // @testing-library/react's auto-cleanup never registers itself in this suite (see
 // ShiftScreens.test.tsx et al.) — do it by hand or DOM from one test leaks into the next.
@@ -43,8 +45,13 @@ vi.mock('../lib/shell', () => ({
   openDrawer: vi.fn(async () => {}),
 }))
 
+vi.mock('../lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/api')>()
+  return { ...actual, api: { ...actual.api, currentShift: vi.fn() } }
+})
+
 function renderRegister() {
-  const client = new QueryClient()
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
       <Register />
@@ -84,5 +91,36 @@ describe('Register --app-vh effect', () => {
     // proving anything.
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(appVh()).toBe('')
+  })
+})
+
+describe('device revocation routing', () => {
+  it('lands on the disabled screen when a mid-session 401 carries invalid_device_token', async () => {
+    localStorage.setItem('pos.device_token', 'dead-token')
+    localStorage.setItem('pos.staff_token', 'live-staff-token')
+    vi.mocked(api.currentShift).mockRejectedValue(
+      new ApiError('invalid_device_token', 'This device is not enrolled.', 401),
+    )
+
+    renderRegister()
+
+    expect(
+      await screen.findByText('Your activation code has been disabled. Please contact an admin and request a new activation code.'),
+    ).toBeInTheDocument()
+    expect(localStorage.getItem('pos.device_token')).toBeNull()
+    expect(localStorage.getItem('pos.staff_token')).toBeNull()
+  })
+
+  it('goes back to the PIN screen when the 401 is a plain staff-session expiry', async () => {
+    localStorage.setItem('pos.device_token', 'live-token')
+    localStorage.setItem('pos.staff_token', 'dead-staff-token')
+    vi.mocked(api.currentShift).mockRejectedValue(
+      new ApiError('staff_session_expired', 'No staff session.', 401),
+    )
+
+    renderRegister()
+
+    expect(await screen.findByText('Enter PIN')).toBeInTheDocument()
+    expect(localStorage.getItem('pos.device_token')).toBe('live-token')
   })
 })

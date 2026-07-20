@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { inShell } from '../lib/transport'
 import { checkServer, getConfig, hasHardware, openDrawer, setServerUrl } from '../lib/shell'
-import { PinScreen, SetupScreen } from './SessionScreens'
+import { PinScreen } from './SessionScreens'
+import { ActivationScreen } from './ActivationScreen'
 import { ServerSetupScreen } from './ServerSetupScreen'
 import { CloseShiftScreen, OpenShiftScreen } from './ShiftScreens'
 import { SaleScreen } from './SaleScreen'
@@ -20,6 +21,7 @@ type StaffUser = StaffSession['user']
 type Stage =
   | { name: 'booting' }
   | { name: 'setup' }
+  | { name: 'disabled' }
   | { name: 'pin' }
   | { name: 'loading-shift' }
   | { name: 'open-shift' }
@@ -31,7 +33,8 @@ type Stage =
 // Section word on the top bar — pure wayfinding, no behavior attached.
 const SECTION_LABEL: Record<Stage['name'], string> = {
   booting: 'Loading',
-  setup: 'Enroll Terminal',
+  setup: 'Activate Terminal',
+  disabled: 'Terminal Disabled',
   pin: 'Sign In',
   'loading-shift': 'Loading',
   'open-shift': 'Open Shift',
@@ -120,7 +123,28 @@ export function Register() {
     setStage({ name: 'pin' })
   }
 
-  const sessionExpired = endSession
+  // The terminal's token was revoked server-side (activation code reissued). Everything
+  // cached belongs to the old identity; drop all of it and show the lockout screen.
+  const deviceDisabled = () => {
+    queryClient.clear()
+    tokens.clearDevice()
+    tokens.clearStaff()
+    setUser(null)
+    setResumeOrder(null)
+    setActiveOrder(null)
+    setStage({ name: 'disabled' })
+  }
+
+  // 401s fork on `code`, not just status: a dead STAFF session goes back to the PIN
+  // screen, but a dead DEVICE token means this terminal was disabled — mid-session
+  // revocation must not be misread as staff-session expiry.
+  const sessionExpired = (err?: unknown) => {
+    if (err instanceof ApiError && err.code === 'invalid_device_token') {
+      deviceDisabled()
+      return
+    }
+    endSession()
+  }
 
   // Resolving "is a shift open on this register?" — a real server-state read, so it goes
   // through React Query; the stage machine just reacts to the answer.
@@ -140,7 +164,7 @@ export function Register() {
     }
     const err = shiftQuery.error
     if (err instanceof ApiError && err.status === 404) setStage({ name: 'open-shift' })
-    else if (err instanceof ApiError && err.status === 401) sessionExpired()
+    else if (err instanceof ApiError && err.status === 401) sessionExpired(err)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- endSession is identity-stable in behavior; listing it would re-run on every render
   }, [stage.name, shiftQuery.data, shiftQuery.error, foodMode])
 
@@ -225,7 +249,12 @@ export function Register() {
         {(stage.name === 'booting' || stage.name === 'loading-shift') && (
           <p className="type-body-sm text-ink-muted">Loading…</p>
         )}
-        {stage.name === 'setup' && <SetupScreen onDone={() => setStage({ name: 'pin' })} />}
+        {stage.name === 'setup' && (
+          <ActivationScreen activate={(code) => api.activateRegister(code)} onActivated={() => setStage({ name: 'pin' })} />
+        )}
+        {stage.name === 'disabled' && (
+          <ActivationScreen disabled activate={(code) => api.activateRegister(code)} onActivated={() => setStage({ name: 'pin' })} />
+        )}
         {stage.name === 'pin' && (
           <PinScreen
             onLoggedIn={(session) => {
@@ -233,7 +262,7 @@ export function Register() {
               setFoodMode(session.register.mode === 'food')
               setStage({ name: 'loading-shift' })
             }}
-            onDeviceInvalid={() => setStage({ name: 'setup' })}
+            onDeviceInvalid={deviceDisabled}
           />
         )}
         {stage.name === 'open-shift' && (
