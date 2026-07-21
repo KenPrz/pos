@@ -22,6 +22,11 @@ return [
     // ISO-4217. Fixed at setup — changing it is a data migration, not a setting.
     'currency' => env('POS_CURRENCY'),
 
+    // Which demo catalogs `php artisan migrate:fresh --seed` builds, comma-separated:
+    // any of grocery, restaurant, cafe. Dev-only — the seeder is never run anywhere
+    // real. Each enabled catalog brings its own Manila location, registers, and stock.
+    'seed_catalogs' => env('POS_SEED_CATALOGS', 'grocery'),
+
     'business' => [
         'name'    => env('POS_BUSINESS_NAME'),
         'address' => env('POS_BUSINESS_ADDRESS'),
