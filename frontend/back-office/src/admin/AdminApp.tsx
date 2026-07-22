@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, adminToken, api, type AdminSession, type AdminUser } from '../lib/api'
 import { initCurrencyFromStorage } from '../lib/currency'
 import { LoginScreen } from './LoginScreen'
@@ -20,6 +20,12 @@ export function AdminApp() {
   // tree — so the machine boots neutral and resolves its real stage after mount.
   const [stage, setStage] = useState<Stage>({ name: 'booting' })
   const [user, setUser] = useState<AdminUser | null>(null)
+  // Which back-office sections this session may see (RBAC v2 Task 11) — threaded into
+  // Shell, which gates its nav against it. `reportLocationIds` is `null` for an admin
+  // (every location) or the union of locations a report permission is held at otherwise;
+  // it narrows the location switcher below, same restore-from-storage story as `user`.
+  const [sections, setSections] = useState<string[]>([])
+  const [reportLocationIds, setReportLocationIds] = useState<string[] | null>(null)
   // The sidebar's location switcher lives here — the ONE place that owns "which
   // location" for the whole shell. Today and Reports/Stock all read it as a prop (the
   // per-screen pickers are gone — the frozen contract's named switcher-relocation
@@ -35,6 +41,8 @@ export function AdminApp() {
     initCurrencyFromStorage()
     if (adminToken.get()) {
       setUser(adminToken.user())
+      setSections(adminToken.sections())
+      setReportLocationIds(adminToken.reportLocationIds())
       setStage({ name: 'shell' })
     } else {
       setStage({ name: 'login' })
@@ -44,6 +52,8 @@ export function AdminApp() {
   const logout = async () => {
     await api.logout()
     setUser(null)
+    setSections([])
+    setReportLocationIds(null)
     setStage({ name: 'login' })
   }
 
@@ -54,6 +64,8 @@ export function AdminApp() {
     adminToken.clear()
     adminToken.clearUser()
     setUser(null)
+    setSections([])
+    setReportLocationIds(null)
     setStage({ name: 'login' })
   }, [])
 
@@ -69,13 +81,23 @@ export function AdminApp() {
     if (locations.error instanceof ApiError && locations.error.status === 401) handleUnauthorized()
   }, [locations.error, handleUnauthorized])
 
-  // Default to the first location once the list arrives — the switcher never sits
-  // empty when there is anything to pick.
+  // `reportLocationIds === null` means admin (every location); otherwise the switcher
+  // (which feeds Today and Reports) narrows down to only what this session holds a
+  // report permission at — a report-scoped user should never be able to pick a
+  // location they can't run a report for in the first place.
+  const visibleLocations = useMemo(() => {
+    const all = locations.data ?? []
+    if (reportLocationIds === null) return all
+    return all.filter((l) => reportLocationIds.includes(l.id))
+  }, [locations.data, reportLocationIds])
+
+  // Default to the first (visible) location once the list arrives — the switcher never
+  // sits empty when there is anything to pick.
   useEffect(() => {
-    if (!locationId && locations.data && locations.data.length > 0) {
-      setLocationId(locations.data[0].id)
+    if (!locationId && visibleLocations.length > 0) {
+      setLocationId(visibleLocations[0].id)
     }
-  }, [locations.data, locationId])
+  }, [visibleLocations, locationId])
 
   // Booting and login are chrome-less relative to the shell: Shell is the one that
   // owns the full chassis (the AppSidebar + section body) — nesting a second <main>
@@ -96,6 +118,8 @@ export function AdminApp() {
           <LoginScreen
             onLoggedIn={(session: AdminSession) => {
               setUser(session.user)
+              setSections(session.sections)
+              setReportLocationIds(session.report_location_ids)
               setStage({ name: 'shell' })
             }}
           />
@@ -104,15 +128,16 @@ export function AdminApp() {
     )
   }
 
-  const selectedLocation = locations.data?.find((l) => l.id === locationId) ?? null
+  const selectedLocation = visibleLocations.find((l) => l.id === locationId) ?? null
 
   return (
     <Shell
       user={user}
+      sections={sections}
       onLogout={logout}
       onUnauthorized={handleUnauthorized}
       location={selectedLocation}
-      locations={locations.data ?? []}
+      locations={visibleLocations}
       onLocationChange={setLocationId}
     />
   )

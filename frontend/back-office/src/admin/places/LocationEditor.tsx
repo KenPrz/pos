@@ -3,12 +3,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Location } from '../../lib/api'
+import { parseCentsOrNull } from '../../lib/money'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { FieldRow } from '../../components/FieldRow'
 import { Button } from '../../components/ui/button'
 import { Card, CardTitle } from '../../components/ui/card'
 import { Checkbox } from '../../components/ui/checkbox'
 import { Input } from '../../components/ui/input'
+import { MoneyField } from '../catalog/MoneyField'
+
+// A stock-quantity threshold, same numeric family `lib/money.ts`'s `quantity()` accepts
+// (up to 3 decimal places) but non-negative only — a "below this, it's low" line never
+// makes sense as a negative amount, unlike a signed money delta elsewhere in this app.
+const QUANTITY_RE = /^\d+(\.\d{1,3})?$/
 
 // Intl.supportedValuesOf('timeZone') is the canonical IANA zone list the runtime knows
 // about — computed once at module load (it never changes mid-session) rather than per
@@ -39,6 +46,15 @@ export function LocationEditor({
   const [pricesIncludeTax, setPricesIncludeTax] = useState(location?.prices_include_tax ?? false)
   const [receiptHeader, setReceiptHeader] = useState(location?.receipt_header ?? '')
   const [receiptFooter, setReceiptFooter] = useState(location?.receipt_footer ?? '')
+  // Per-location threshold overrides (Task 8/11): raw string state, same optional-numeric
+  // pattern as VariantEditor's cost field — empty is a real, valid "use the config
+  // default" choice, distinct from an invalid non-empty value.
+  const [varianceThresholdInput, setVarianceThresholdInput] = useState(
+    location?.variance_approval_threshold_cents != null
+      ? (location.variance_approval_threshold_cents / 100).toFixed(2)
+      : '',
+  )
+  const [lowStockThresholdInput, setLowStockThresholdInput] = useState(location?.low_stock_threshold ?? '')
   const [isActive, setIsActive] = useState(location?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
   // Archive-style confirm (brief's global constraint) — set only when Save would
@@ -58,12 +74,23 @@ export function LocationEditor({
     },
   })
 
+  // Blank means "use the config default" (null on the wire); a non-empty value that
+  // doesn't parse must block save rather than silently drop the threshold.
+  const varianceThresholdCents = varianceThresholdInput === '' ? null : parseCentsOrNull(varianceThresholdInput)
+  const varianceThresholdInvalid = varianceThresholdInput !== '' && varianceThresholdCents === null
+  const lowStockThresholdInvalid = lowStockThresholdInput !== '' && !QUANTITY_RE.test(lowStockThresholdInput)
+
   const submit = (e: FormEvent) => {
     e.preventDefault()
     setError(null)
 
     if (timezone.trim() === '' || !TIMEZONES.includes(timezone)) {
       setError('Pick a timezone from the list.')
+      return
+    }
+
+    if (varianceThresholdInvalid || lowStockThresholdInvalid) {
+      setError('Enter a valid threshold (e.g. 25.00 or 5.000), or leave it blank for the default.')
       return
     }
 
@@ -77,6 +104,12 @@ export function LocationEditor({
     put('prices_include_tax', pricesIncludeTax, location?.prices_include_tax)
     put('receipt_header', receiptHeader || null, location?.receipt_header)
     put('receipt_footer', receiptFooter || null, location?.receipt_footer)
+    put('variance_approval_threshold_cents', varianceThresholdCents, location?.variance_approval_threshold_cents ?? null)
+    put(
+      'low_stock_threshold',
+      lowStockThresholdInput === '' ? null : lowStockThresholdInput,
+      location?.low_stock_threshold ?? null,
+    )
     if (location) put('is_active', isActive, location.is_active)
 
     // Deactivation behind a confirm (brief's global constraint) — same as every other
@@ -131,6 +164,24 @@ export function LocationEditor({
         </FieldRow>
         <FieldRow label="Receipt footer">
           <Input id="location-receipt-footer" value={receiptFooter} onChange={(e) => setReceiptFooter(e.target.value)} />
+        </FieldRow>
+        <MoneyField
+          id="location-variance-threshold"
+          label="Variance approval threshold (optional)"
+          value={varianceThresholdInput}
+          onChange={setVarianceThresholdInput}
+          invalid={varianceThresholdInvalid}
+        />
+        <FieldRow label="Low stock threshold (optional)">
+          <Input
+            id="location-low-stock-threshold"
+            type="text"
+            inputMode="decimal"
+            placeholder="0.000"
+            value={lowStockThresholdInput}
+            aria-invalid={lowStockThresholdInvalid || undefined}
+            onChange={(e) => setLowStockThresholdInput(e.target.value)}
+          />
         </FieldRow>
         {location && (
           <FieldRow label="Active">

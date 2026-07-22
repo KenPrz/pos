@@ -23,25 +23,39 @@ function useAdminList<T>(key: string, queryFn: () => Promise<T[]>, onUnauthorize
 /**
  * Users & Roles (Task 10, RBAC v2): the `PlacesSection` two-tab shape — the Users body
  * is unchanged from before this task, just moved into its own tab panel; Roles is the
- * new `RolesPanel` (role template CRUD + grouped permission checkboxes).
+ * new `RolesPanel` (role template CRUD + grouped permission checkboxes). Task 11 gates
+ * each tab on its own permission (`user.manage` / `role.manage`) — Shell only mounts
+ * this section when at least one is held, so at least one tab is always present.
  */
-export function UsersSection({ onUnauthorized }: { onUnauthorized: () => void }) {
-  const [tab, setTab] = useState<Tab>('users')
+export function UsersSection({
+  onUnauthorized,
+  canManageUsers,
+  canManageRoles,
+}: {
+  onUnauthorized: () => void
+  canManageUsers: boolean
+  canManageRoles: boolean
+}) {
+  const [tab, setTab] = useState<Tab>(canManageUsers ? 'users' : 'roles')
 
   return (
     <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
       <TabsList aria-label="Users tabs">
-        <TabsTrigger value="users">Users</TabsTrigger>
-        <TabsTrigger value="roles">Roles</TabsTrigger>
+        {canManageUsers && <TabsTrigger value="users">Users</TabsTrigger>}
+        {canManageRoles && <TabsTrigger value="roles">Roles</TabsTrigger>}
       </TabsList>
 
       <div className="pt-lg">
-        <TabsContent value="users">
-          <UsersPanel onUnauthorized={onUnauthorized} />
-        </TabsContent>
-        <TabsContent value="roles">
-          <RolesPanel onUnauthorized={onUnauthorized} />
-        </TabsContent>
+        {canManageUsers && (
+          <TabsContent value="users">
+            <UsersPanel onUnauthorized={onUnauthorized} />
+          </TabsContent>
+        )}
+        {canManageRoles && (
+          <TabsContent value="roles">
+            <RolesPanel onUnauthorized={onUnauthorized} />
+          </TabsContent>
+        )}
       </div>
     </Tabs>
   )

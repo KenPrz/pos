@@ -32,6 +32,8 @@ describe('LoginScreen', () => {
     vi.mocked(api.login).mockResolvedValue({
       token: 'admin-token-abc',
       user: { id: 'user-1', name: 'Alex Admin', email: 'alex@example.com', is_admin: true },
+      sections: [],
+      report_location_ids: null,
       currency: 'USD',
     })
     render(<LoginScreen onLoggedIn={vi.fn()} />)
@@ -58,6 +60,8 @@ describe('LoginScreen', () => {
     const session = {
       token: 'admin-token-abc',
       user: { id: 'user-1', name: 'Alex Admin', email: 'alex@example.com', is_admin: true },
+      sections: [],
+      report_location_ids: null,
       currency: 'USD',
     }
     vi.mocked(api.login).mockResolvedValue(session)

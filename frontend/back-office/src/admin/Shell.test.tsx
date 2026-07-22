@@ -19,6 +19,7 @@ vi.mock('./users/UsersSection', () => ({ UsersSection: () => <div>Users stub</di
 vi.mock('./places/PlacesSection', () => ({ PlacesSection: () => <div>Places stub</div> }))
 vi.mock('./reports/ReportsSection', () => ({ ReportsSection: () => <div>Reports stub</div> }))
 vi.mock('./audit/AuditSection', () => ({ AuditSection: () => <div>Audit stub</div> }))
+vi.mock('./settings/SettingsSection', () => ({ SettingsSection: () => <div>Settings stub</div> }))
 
 vi.mock('../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/api')>()
@@ -37,6 +38,8 @@ const LOCATION = {
   receipt_header: null,
   receipt_footer: null,
   is_active: true,
+  variance_approval_threshold_cents: null,
+  low_stock_threshold: null,
 }
 
 const NO_ATTENTION: TodayOverview = {
@@ -56,13 +59,29 @@ const LOW_STOCK: TodayOverview = {
   },
 }
 
-function renderShell(overview: TodayOverview, onLogout = vi.fn()) {
+// The canonical, ordered admin-tier section list (RBAC v2 Task 6/11 brief) — the
+// default for every test that isn't specifically exercising gating, so the pre-Task-11
+// tests below keep seeing every nav item without having to name each permission.
+const ALL_SECTIONS = [
+  'catalog.manage',
+  'user.manage',
+  'location.manage',
+  'register.enroll',
+  'audit.view',
+  'report.sales.view',
+  'report.stock.view',
+  'settings.manage',
+  'role.manage',
+]
+
+function renderShell(overview: TodayOverview, onLogout = vi.fn(), sections: string[] = ALL_SECTIONS) {
   vi.mocked(api.today.overview).mockResolvedValue(overview)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
       <Shell
         user={{ id: 'u-1', name: 'Alex Admin', email: 'alex@pos.test', is_admin: true }}
+        sections={sections}
         onLogout={onLogout}
         onUnauthorized={vi.fn()}
         location={LOCATION}
@@ -126,5 +145,36 @@ describe('Shell', () => {
 
     const todayItem = screen.getByRole('button', { name: 'Today' }).closest('li') as HTMLElement
     expect(await within(todayItem).findByText('2')).toBeInTheDocument()
+  })
+
+  // Section gating (RBAC v2 Task 11) — the exact section-permission → sidebar mapping
+  // from the brief: a session scoped to only `report.sales.view` should see Today (always
+  // visible) plus Reports, and nothing else.
+  it('shows only Today and Reports for a session scoped to report.sales.view', () => {
+    renderShell(NO_ATTENTION, vi.fn(), ['report.sales.view'])
+
+    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reports' })).toBeInTheDocument()
+
+    for (const label of ['Catalog', 'Users', 'Locations & Registers', 'Audit', 'Settings']) {
+      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
+    }
+  })
+
+  it('shows all seven nav items, including Settings, for the full admin section list', () => {
+    renderShell(NO_ATTENTION, vi.fn(), ALL_SECTIONS)
+
+    for (const label of ['Today', 'Catalog', 'Users', 'Locations & Registers', 'Reports', 'Audit', 'Settings']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    }
+  })
+
+  // A hidden section has no nav item at all — there is nothing to click, so it cannot be
+  // navigated to, rather than being reachable-but-rejected.
+  it('renders no nav item for a section whose permission is not held, so it cannot be clicked', () => {
+    renderShell(NO_ATTENTION, vi.fn(), ['report.sales.view'])
+
+    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Settings stub')).not.toBeInTheDocument()
   })
 })

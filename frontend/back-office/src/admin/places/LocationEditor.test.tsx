@@ -30,6 +30,8 @@ const LOCATION: Location = {
   receipt_header: null,
   receipt_footer: null,
   is_active: true,
+  variance_approval_threshold_cents: null,
+  low_stock_threshold: null,
 }
 
 function renderEditor(props: Partial<ComponentProps<typeof LocationEditor>> = {}) {
@@ -99,5 +101,73 @@ describe('LocationEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }))
 
     await waitFor(() => expect(api.locations.update).toHaveBeenCalledWith('loc-1', { is_active: false }))
+  })
+
+  // Per-location threshold overrides (RBAC v2 Task 11) — the VariantEditor cost-field
+  // optional-numeric pattern: empty is a real "use the config default" choice (null on
+  // the wire), a well-formed number saves, and a non-numeric value blocks save entirely
+  // rather than silently dropping the override.
+  it('saves an empty variance threshold as null', async () => {
+    vi.mocked(api.locations.update).mockResolvedValue({ ...LOCATION, variance_approval_threshold_cents: null })
+    renderEditor({ location: { ...LOCATION, variance_approval_threshold_cents: 2500 } })
+
+    fireEvent.change(screen.getByLabelText(/variance approval threshold/i), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() =>
+      expect(api.locations.update).toHaveBeenCalledWith('loc-1', { variance_approval_threshold_cents: null }),
+    )
+  })
+
+  it('saves a well-formed variance threshold as integer cents', async () => {
+    vi.mocked(api.locations.update).mockResolvedValue({ ...LOCATION, variance_approval_threshold_cents: 5000 })
+    renderEditor()
+
+    fireEvent.change(screen.getByLabelText(/variance approval threshold/i), { target: { value: '50.00' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() =>
+      expect(api.locations.update).toHaveBeenCalledWith('loc-1', { variance_approval_threshold_cents: 5000 }),
+    )
+  })
+
+  it('blocks save on a non-numeric variance threshold', () => {
+    renderEditor()
+
+    fireEvent.change(screen.getByLabelText(/variance approval threshold/i), { target: { value: 'abc' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(api.locations.update).not.toHaveBeenCalled()
+    expect(screen.getByText(/enter a valid threshold/i)).toBeInTheDocument()
+  })
+
+  it('saves an empty low-stock threshold as null', async () => {
+    vi.mocked(api.locations.update).mockResolvedValue({ ...LOCATION, low_stock_threshold: null })
+    renderEditor({ location: { ...LOCATION, low_stock_threshold: '5.000' } })
+
+    fireEvent.change(screen.getByLabelText(/low stock threshold/i), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => expect(api.locations.update).toHaveBeenCalledWith('loc-1', { low_stock_threshold: null }))
+  })
+
+  it('saves a well-formed low-stock threshold as a decimal string, unparsed', async () => {
+    vi.mocked(api.locations.update).mockResolvedValue({ ...LOCATION, low_stock_threshold: '5.000' })
+    renderEditor()
+
+    fireEvent.change(screen.getByLabelText(/low stock threshold/i), { target: { value: '5.000' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => expect(api.locations.update).toHaveBeenCalledWith('loc-1', { low_stock_threshold: '5.000' }))
+  })
+
+  it('blocks save on a non-numeric low-stock threshold', () => {
+    renderEditor()
+
+    fireEvent.change(screen.getByLabelText(/low stock threshold/i), { target: { value: 'low' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(api.locations.update).not.toHaveBeenCalled()
+    expect(screen.getByText(/enter a valid threshold/i)).toBeInTheDocument()
   })
 })
