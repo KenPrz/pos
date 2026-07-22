@@ -69,17 +69,19 @@ export function Shell({
   const canViewAudit = hasAny(sections, SECTION_RULES.audit)
   const canManageSettings = hasAny(sections, SECTION_RULES.settings)
 
-  // Same data Today's own screen fetches (`api.today.overview`) — sharing the queryKey
-  // means React Query dedupes this against TodaySection's request rather than firing a
-  // second one, so the nav's low-stock count costs nothing extra over rendering Today
-  // itself. Runs regardless of which section is active, so the badge stays honest even
-  // while parked on Catalog or Reports.
-  const todayQuery = useQuery({
-    queryKey: ['admin', 'today', location?.id ?? null],
-    queryFn: () => api.today.overview(location!.id),
-    enabled: location !== null,
+  // Same query, same key, `TodaySection` itself uses for its low-stock KPI — React
+  // Query dedupes this against TodaySection's request rather than firing a second one,
+  // so the nav's low-stock count costs nothing extra over rendering Today itself. Runs
+  // regardless of which section is active, so the badge stays honest even while parked
+  // on Catalog or Reports. Gated on `report.stock.view` the same way TodaySection gates
+  // its own stock widget — a session without it never fires this request either, so the
+  // badge is silently absent rather than 403ing in the background.
+  const stockQuery = useQuery({
+    queryKey: ['admin', 'today', 'stock', location?.id ?? null],
+    queryFn: () => api.reports.stock({ location_id: location!.id, low_only: true }),
+    enabled: location !== null && canViewStockReport,
   })
-  const lowStockCount = todayQuery.data?.stock.rows.length ?? 0
+  const lowStockCount = stockQuery.data?.rows.length ?? 0
 
   // Today is unconditional; everything else is filtered against `sections` per
   // `SECTION_RULES` — an item simply never renders when its permission isn't held, which
@@ -119,7 +121,7 @@ export function Shell({
 
       <div className="flex-1 overflow-y-auto p-xl">
         {section === 'today' && (
-          <TodaySection locationId={location?.id ?? null} onUnauthorized={onUnauthorized} />
+          <TodaySection locationId={location?.id ?? null} sections={sections} onUnauthorized={onUnauthorized} />
         )}
         {section === 'catalog' && <CatalogSection onUnauthorized={onUnauthorized} />}
         {section === 'users' && (

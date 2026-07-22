@@ -6,7 +6,6 @@
  * surfaces should never accidentally share credentials.
  */
 
-import { isoDate } from './date'
 import { setCurrency } from './currency'
 
 /** Success is always `{ data: ... }`; errors are always `{ error: ... }`. Never both. */
@@ -420,24 +419,6 @@ export type AuditPage = { rows: AuditLogEntry[]; page: number; has_more: boolean
 
 export type Setting = { key: string; value: string | null; source: 'db' | 'config' }
 
-// ---------------------------------------------------------------------------
-// Today landing (Task 2, back-office UI rework) — zero new backend. The server has no
-// single "today" endpoint and none is being added: this composes four EXISTING calls
-// client-side (the design spec's frozen contract lists the Today landing's LABELS as
-// one of exactly three permitted exceptions, never a new route).
-// ---------------------------------------------------------------------------
-
-export type TodayOverview = {
-  /** `group_by: 'day'`, today..today, at the given location — ledger basis. */
-  sales: SalesReport
-  /** `low_only: true` at the given location. */
-  stock: StockReport
-  /** Every register (all locations) — callers filter to their own location's rows. */
-  registers: Register[]
-  /** First page only, unfiltered — the shell's "recent activity" glance, not a report. */
-  audit: AuditPage
-}
-
 /**
  * Build a query string from a flat params object, dropping `undefined`/empty values —
  * every report/audit filter is optional-by-omission, never sent as the literal string
@@ -550,17 +531,11 @@ export const api = {
       patch<{ settings: Setting[] }>('/admin/settings', { settings }).then((r) => r.settings),
   },
 
-  today: {
-    // Same `isoDate` SalesReportView's `defaultRange` uses — one shared helper
-    // (`lib/date.ts`) rather than two copies of `toISOString().slice(0, 10)`.
-    overview: (locationId: string): Promise<TodayOverview> => {
-      const date = isoDate(new Date())
-      return Promise.all([
-        api.reports.sales({ location_id: locationId, from: date, to: date, group_by: 'day' }),
-        api.reports.stock({ location_id: locationId, low_only: true }),
-        api.registers.list(),
-        api.audit.list({ page: 1 }),
-      ]).then(([sales, stock, registers, audit]) => ({ sales, stock, registers, audit }))
-    },
-  },
+  // The Today landing (Task 2) used to compose these four calls into one `today.overview`
+  // Promise.all. RBAC v2 Task 11 split it back apart: a session missing one of the
+  // underlying permissions (`report.sales.view`/`report.stock.view`/`register.enroll`/
+  // `audit.view`) must never have that ONE call's 403 take down the whole page —
+  // `TodaySection` now calls `reports.sales`/`reports.stock`/`registers.list`/
+  // `audit.list` above directly, one `useQuery` per widget, each `enabled` only when its
+  // permission is held, so an unpermitted widget never fires a request at all.
 }
