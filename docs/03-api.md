@@ -606,9 +606,10 @@ GET  /api/v1/admin/permissions
   → { groups: [ { label, permissions[] } ] }           # the catalog, grouped for the UI
 ```
 
-All gated `role.manage`, except `GET /admin/permissions`, which also accepts
-`user.manage` — the user editor's role and direct-grant pickers need the same catalog
-without needing role-editing rights. `role_templates.name` is unique; `cashier` and
+All gated `role.manage`, except the two read endpoints — `GET /admin/roles` and
+`GET /admin/permissions` — which also accept `user.manage` — the user editor's role
+and direct-grant pickers need the same lists without needing role-editing rights.
+`role_templates.name` is unique; `cashier` and
 `supervisor` are `is_system` (permissions editable, name and existence pinned — every
 seed and doc assumes they exist under those names). A `PATCH` or delete on a system
 template's name/existence is `422 role_template_is_system`; deleting a custom template
@@ -632,7 +633,10 @@ GET|POST /api/v1/admin/registers        PATCH /api/v1/admin/registers/{id}
 POST /api/v1/admin/registers/{id}/activation-code
   → { activation_code, expires_at }        # shown exactly once
 ```
-Gated `location.manage`.
+Gated `location.manage`, except `GET /admin/locations`, which accepts any admin-tier
+section — location names are low-sensitivity reference data every permitted section
+(the location switcher, the user editor, reports) composes from, not something worth
+gating behind `location.manage` specifically.
 
 **Per-location thresholds (RBAC v2).** `variance_approval_threshold_cents` (integer,
 `>= 0`) and `low_stock_threshold` (decimal string, `>= 0`) override the deployed config

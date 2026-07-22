@@ -651,7 +651,9 @@ while fixing all three findings along the way.
   inside the lock and re-checks `order.discount.apply` when the flag is true —
   `403 discount_needs_supervisor` — while the route itself only enforces the floor
   (`order.line.add`). A discount flipped to `requires_supervisor: false` is a real
-  cashier-safe discount for the first time.
+  cashier-safe discount for the first time. Note the shipped register UI still shows
+  the **Discount** panel only to a supervisor's PIN session, so a cashier-safe discount
+  is reachable at the API today but not yet from the till screen itself.
 - **Settings**, database-backed with a config fallback: a new `settings` table
   (`key`/`value` jsonb/timestamps) holds `business.name`, `business.address`,
   `business.tax_id` — receipts and the boot-time required-config check both read
@@ -669,7 +671,7 @@ while fixing all three findings along the way.
   `.env.example`s' and the seeder's default catalog, `capture_screenshots.mjs`'s admin
   password constant) that had drifted out of sync with each other.
 
-**Status: complete.** 525 backend tests, 113 register-app tests, 166 back-office-app
+**Status: complete.** 527 backend tests, 113 register-app tests, 166 back-office-app
 tests. All three e2e scripts green via `make e2e` — `e2e-admin-day.sh`'s activation-code
 proof and `e2e-lunch-service.sh`'s supervisor-approval flow are both unchanged and still
 pass, confirming templates materialize the identical `cashier`/`supervisor` permission

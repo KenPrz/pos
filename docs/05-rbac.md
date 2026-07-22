@@ -402,6 +402,21 @@ still why `user.manage` guards `self_lockout` (`03-api.md`): with `is_admin` rem
 the only *unconditional* tier and no guaranteed second admin online, an admin who could
 revoke their own access would have no one else able to undo it.
 
+**Escalation posture: `user.manage` and `role.manage` are effectively root-equivalent
+grants, not ordinary admin-tier permissions.** A `user.manage` holder can set any other
+user's `is_admin` flag or hand them any permission grant directly; a `role.manage`
+holder can widen the permission set of any role template they themselves already hold,
+which reaches every user assigned that template. Neither needs `is_admin` to escalate to
+full admin in practice — grant them with the same care as `is_admin` itself, not as a
+routine admin-tier permission like `report.sales.view`.
+
+**Archived locations still confer back-office access.** A role or direct grant recorded
+at a location that has since been archived is never deleted (archive-never-delete, this
+repo-wide), so `AdminAccess::holdsAnywhere`/`allHeld` still see it — a user whose only
+admin-tier grant sits at an archived location still logs into the back office and still
+sees that section, consistent with every other archived-but-not-deleted row in this
+system.
+
 ## The `requires_supervisor` discount rule (RBAC v2: enforced, not just stored)
 
 `discounts.requires_supervisor` (`02-data-model.md`) existed since M2 as a column with

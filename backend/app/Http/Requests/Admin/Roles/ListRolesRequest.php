@@ -12,9 +12,10 @@ final class ListRolesRequest extends FormRequest
 {
     use AuthorizesBackOffice;
 
+    /** UserEditor's role picker runs under user.manage, so either manager can read the list. */
     public function authorize(): bool
     {
-        return $this->allowsBackOffice(Permissions::ROLE_MANAGE);
+        return $this->allowsBackOffice(Permissions::ROLE_MANAGE) || $this->allowsBackOffice(Permissions::USER_MANAGE);
     }
 
     public function rules(): array

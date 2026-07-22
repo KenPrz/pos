@@ -300,7 +300,10 @@ To remove one, tap the **✕** next to it in the cart. Like voiding,
 **Discount** only appears for a supervisor. The back office's Discounts tab
 (Chapter 9) carries its own **Requires supervisor** flag per discount, but
 every discount already needs one today regardless of that flag, since only
-the supervisor role holds the permission to open the panel at all.
+the supervisor role holds the permission to open the panel at all. A
+discount with that flag turned off is enforced as cashier-safe by the API,
+but the till screen has no way to reach it yet — the **Discount** button
+itself still renders for a supervisor's PIN session only.
 
 ## Pay, tender, and print
 

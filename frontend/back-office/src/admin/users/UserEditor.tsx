@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { ApiError, api, type Location, type ManagedUser } from '../../lib/api'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { DataTable } from '../../components/DataTable'
@@ -59,6 +59,18 @@ const NONE_PERMISSION = '__none__'
 // asynchronously too (api.roles.list()), so it starts unselected rather than
 // defaulting to "cashier".
 const NONE_ROLE = '__none__'
+
+// Same list-query idiom as UsersSection's/PlacesSection's/RolesPanel's useAdminList
+// (Task 9/10): react-query v5 dropped `onError`, so a settled query error is watched
+// via effect instead — the add-row Selects below now reach 401 the same way every
+// other admin list does, rather than silently rendering empty.
+function useAdminList<T>(key: string, queryFn: () => Promise<T[]>, onUnauthorized: () => void) {
+  const query = useQuery({ queryKey: ['admin', key], queryFn })
+  useEffect(() => {
+    if (query.error instanceof ApiError && query.error.status === 401) onUnauthorized()
+  }, [query.error, onUnauthorized])
+  return query
+}
 
 /**
  * Name/email/password/PIN + per-location roles + is_admin/is_active. PIN and password
@@ -127,7 +139,7 @@ export function UserEditor({
   // Role templates for the add-row's role Select — every template (system and custom
   // alike), not a hardcoded cashier/supervisor pair; see RoleAssignment's comment in
   // lib/api.ts. Same list `RolesPanel` uses, so this shares its cache.
-  const roleTemplates = useQuery({ queryKey: ['admin', 'roles'], queryFn: api.roles.list })
+  const roleTemplates = useAdminList('roles', api.roles.list, onUnauthorized)
   const roleNames = roleTemplates.data?.map((r) => r.name) ?? []
 
   const addRole = () => {
@@ -144,7 +156,7 @@ export function UserEditor({
   // Direct permission grants (Task 10, RBAC v2) — independent of the roles block
   // above: a location can appear here more than once (one row per permission), so
   // unlike `availableLocations` there is nothing to filter out of the location picker.
-  const permissionGroups = useQuery({ queryKey: ['admin', 'permission-groups'], queryFn: api.roles.permissionGroups })
+  const permissionGroups = useAdminList('permission-groups', api.roles.permissionGroups, onUnauthorized)
   const flatPermissions = permissionGroups.data?.flatMap((g) => g.permissions) ?? []
 
   const addPermissionGrant = () => {

@@ -36,10 +36,14 @@ final class AdminLogin
         }
 
         return DB::transaction(function () use ($user, $in): AdminSession {
-            // 'admin' here is a label for what this token is, not an enforcement
-            // mechanism: createToken()'s ability list gates nothing on its own (Sanctum
-            // grants any unspecified createToken() the wildcard ['*']), and
-            // EnsureBackOffice deliberately never checks it. See EnsureBackOffice for why.
+            // EnsureBackOffice checks this ability (`currentAccessToken()?->can('admin')`)
+            // as well as the permission check above — a register staff-session token
+            // authenticates as this same User row, so the permission check alone would
+            // let a staff token belonging to a supervisor who already holds
+            // report.sales.view walk straight into the back office. Minting `['admin']`
+            // here, rather than leaving it at Sanctum's unspecified-token wildcard
+            // `['*']`, is what lets that second check actually distinguish an
+            // admin-login token from a device or staff one. See EnsureBackOffice.
             $token = $user->createToken("admin:{$user->id}", ['admin']);
 
             $this->audit->record('admin.login', $user, $user->id, ip: $in->ip);

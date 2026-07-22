@@ -47,6 +47,19 @@ it('lets a report-only user read reports at the granted location and nothing els
     $this->postJson('/api/v1/admin/categories', ['name' => 'X'], $headers)->assertStatus(403);
 });
 
+it('lets a report-only user read location names too, since every section composes from them', function (): void {
+    [, $headers] = boUser([['location_id' => $this->a->id, 'permission' => Permissions::REPORT_SALES_VIEW]]);
+
+    $this->getJson('/api/v1/admin/locations', $headers)->assertOk();
+});
+
+it('lets a user.manage-only user read the roles list and location names, not just users', function (): void {
+    [, $headers] = boUser([['location_id' => $this->a->id, 'permission' => Permissions::USER_MANAGE]]);
+
+    $this->getJson('/api/v1/admin/roles', $headers)->assertOk();
+    $this->getJson('/api/v1/admin/locations', $headers)->assertOk();
+});
+
 it('keeps full access for is_admin', function (): void {
     // UserFactory::admin() only flips is_admin — password_hash still comes from
     // definition() (Hash::make('password')), so login is exercised with that password

@@ -284,7 +284,7 @@ per-location threshold columns (`variance_approval_threshold_cents`,
 `low_stock_threshold`, null = config default) round it out. Bundled along the way: the
 stock report's mis-gate onto `report.sales.view` fixed (own `report.stock.view` now),
 and a confirmed bug where a UI-created location got no roles provisioned at all.
-Suites: 525 backend / 113 register / 166 back-office. Full story in
+Suites: 527 backend / 113 register / 166 back-office. Full story in
 `docs/06-roadmap.md`; rule in `docs/05-rbac.md`.
 
 Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
