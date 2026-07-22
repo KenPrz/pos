@@ -13,15 +13,21 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The back-office gate: a bearer token whose owner is an active user holding at least
- * one admin-tier permission (or `is_admin`, which bypasses entirely). Registers also
- * hold sanctum tokens (device tokens), so the instanceof check is load-bearing.
+ * one admin-tier permission (or `is_admin`, which bypasses entirely), presented on a
+ * token that was actually issued by `POST /admin/login`. Registers also hold sanctum
+ * tokens (device tokens), so the instanceof check is load-bearing.
  *
- * Deliberately gates on the user's attributes and permission grants, never on the
- * token's abilities. A token ability check would be trivially satisfied here: any
- * `createToken()` call that doesn't pass an ability list defaults to the wildcard
- * `['*']`, so an ability check is not a real second factor — it would only add the
- * appearance of one. Attributes (and `AdminAccess`'s direct-join resolution) are the
- * enforcement; abilities are just a label.
+ * Both halves matter now, for different reasons. Now that ordinary role permissions
+ * (e.g. a supervisor's default `report.sales.view`/`report.stock.view`) can open
+ * admin-tier sections, the attribute/permission check alone is not sufficient: a
+ * register staff-session token (`StaffLogin`'s `register:{id}` ability) authenticates
+ * as that same user and would otherwise pass straight through. The ability check pins
+ * access to tokens actually minted by admin login — staff tokens carry `register:{id}`,
+ * device tokens carry `['device']`, neither satisfies `can('admin')`. `AdminLogin`
+ * issues `['admin']`, and test helpers' bare `createToken('t')` default to the
+ * wildcard `['*']`, which still passes. The attribute/permission check still matters
+ * too: it is what scopes an admin-login token to the sections its holder actually
+ * holds, not just proof of where the token came from.
  */
 final class EnsureBackOffice
 {
@@ -31,7 +37,11 @@ final class EnsureBackOffice
     {
         $user = $request->user();
 
-        if (! $user instanceof User || ! $user->is_active || ! $this->access->holdsAnyAdminSection($user)) {
+        if (! $user instanceof User
+            || ! $user->is_active
+            || ! $this->access->holdsAnyAdminSection($user)
+            || ! $user->currentAccessToken()?->can('admin')
+        ) {
             throw new AdminAccessRequired;
         }
 

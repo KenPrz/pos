@@ -7,7 +7,7 @@ namespace App\Exceptions\Domain;
 /**
  * The presented bearer token does not belong to an active admin user.
  *
- * Thrown by EnsureAdmin rather than the middleware building JSON inline, mirroring
+ * Thrown by EnsureBackOffice rather than the middleware building JSON inline, mirroring
  * EnsureDeviceToken/InvalidDeviceToken and EnsureStaffSession/StaffSessionExpired: every
  * refusal in the auth-gate middlewares is a DomainException, rendered once by
  * ApiErrorEnvelope.
