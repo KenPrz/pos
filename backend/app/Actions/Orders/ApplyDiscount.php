@@ -7,10 +7,13 @@ namespace App\Actions\Orders;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Orders\OpenOrderLock;
 use App\Domain\Pricing\OrderTotals;
+use App\Domain\Rbac\Permissions;
+use App\Exceptions\Domain\DiscountNeedsSupervisor;
 use App\Exceptions\Domain\DiscountScopeMismatch;
 use App\Exceptions\Domain\LineAlreadyVoided;
 use App\Models\Discount;
 use App\Models\Order;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -36,6 +39,17 @@ final class ApplyDiscount
             $order = $this->lock->acquire($in->orderId, $in->registerId, $in->expectedVersion);
 
             $discount = Discount::where('is_active', true)->findOrFail($in->discountId);
+
+            // The FormRequest only enforces the floor (order.line.add) — whether *this*
+            // discount needs a supervisor depends on its own requires_supervisor flag,
+            // which isn't known until the row is loaded. Mirrors SetLinePrepState's
+            // in-action escalation; team context is already set by EnsureStaffSession.
+            if ($discount->requires_supervisor) {
+                $actor = User::query()->findOrFail($in->actorId);
+                if (! $actor->can(Permissions::ORDER_DISCOUNT_APPLY)) {
+                    throw new DiscountNeedsSupervisor($discount->id);
+                }
+            }
 
             if ($discount->scope === 'line') {
                 // Must belong to this order — a stray or foreign line id is a 404, same

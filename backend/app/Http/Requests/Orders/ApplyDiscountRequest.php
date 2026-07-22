@@ -13,7 +13,11 @@ final class ApplyDiscountRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::ORDER_DISCOUNT_APPLY);
+        // The floor only: any staffer who can add a line can attempt a discount. Whether
+        // *this* discount needs a supervisor depends on its `requires_supervisor` flag,
+        // which isn't known until the row is loaded — that escalation happens inside
+        // ApplyDiscount::execute, mirroring SetLinePrepState's in-action permission check.
+        return $this->user()->can(Permissions::ORDER_LINE_ADD);
     }
 
     protected function prepareForValidation(): void

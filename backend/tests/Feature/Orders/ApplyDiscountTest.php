@@ -131,7 +131,9 @@ it('404s a line-scoped discount with no matching line on this order', function (
 });
 
 it('is denied to a cashier and allowed to a supervisor over HTTP', function (): void {
-    $discount = Discount::factory()->percent(100_000)->create(['name' => '10% off']);
+    // requires_supervisor: true — the flag=false (cashier-safe) path is covered by
+    // DiscountSupervisorFlagTest.php (Task 9).
+    $discount = Discount::factory()->percent(100_000)->create(['name' => '10% off', 'requires_supervisor' => true]);
     $url = "/api/v1/orders/{$this->order->id}/discounts";
     $body = ['discount_id' => $discount->id, 'order_line_id' => null, 'reason' => 'Manager comp'];
 
