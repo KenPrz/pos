@@ -540,7 +540,9 @@ gone. Seeding now builds a believable Manila business instead.
   three catalogs, each with its own location, all `Asia/Manila`,
   `prices_include_tax=true`, 12% VAT with fresh produce VAT-exempt:
   - **grocery** (`GRC`) — 200 real Philippine retail items sourced from Open Food
-    Facts, genuine EAN-13 barcodes and brands.
+    Facts, real brands; sourced items carry their own real-world EAN-13 barcodes and
+    the 11 curated items with no sourceable barcode carry a generated, checksum-valid
+    EAN-13 instead.
   - **restaurant** (`RST`) — 30 dishes off a researched Filipino menu, with
     rice/size/spice/add-on modifiers exercising the same modifier machinery M5 built.
   - **cafe** (`CAF`) — 20 drinks and pastries.

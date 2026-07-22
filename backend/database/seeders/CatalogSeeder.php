@@ -17,7 +17,6 @@ use App\Models\Register;
 use App\Models\TaxRate;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use JsonException;
 
 /**
  * One business-type catalog from one committed JSON file: its Manila location, its
@@ -161,7 +160,7 @@ abstract class CatalogSeeder extends Seeder
         $path = database_path('seeders/data/'.$this->dataFile());
         $raw = file_get_contents($path);
         if ($raw === false) {
-            throw new JsonException("Seed data file missing: {$path}");
+            throw new \RuntimeException("Seed data file missing: {$path}");
         }
 
         return json_decode($raw, true, flags: JSON_THROW_ON_ERROR);

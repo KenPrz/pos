@@ -67,7 +67,7 @@ paid with — a card sale can't be refunded to the card, since that money never 
 through this till in the first place.
 
 > Note: only a **closed** order can be refunded. Looking up one that isn't answers with
-> something like "Order *DT-20260716-0001* is open — only closed orders can be
+> something like "Order *GRC-20260716-0001* is open — only closed orders can be
 > refunded." — find the right receipt number, or let the order close first.
 
 ## Transfer a tab to another register

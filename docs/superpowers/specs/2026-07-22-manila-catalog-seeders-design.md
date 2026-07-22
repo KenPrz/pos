@@ -34,8 +34,10 @@ pesos. The e2e scripts move onto the new seed data and stay green.
 
 - **grocery.json — 200 items.** Researched from Open Food Facts' Philippine catalog and
   Manila supermarket listings: real brands (Lucky Me!, Century Tuna, Argentina, San
-  Miguel, Nescafé, Bear Brand, …) with real `480`-prefix EAN-13 barcodes where
-  sourceable; otherwise a checksum-valid generated `480` EAN-13. Fields: product name,
+  Miguel, Nescafé, Bear Brand, …). As shipped: fetched items carry their own real-world
+  EAN-13s (mostly the PH `480` prefix, plus a scatter of legitimate import prefixes from
+  other GS1 country codes); the 11 curated anchor items that had no sourceable barcode
+  instead carry a generated, checksum-valid `4809990*` EAN-13. Fields: product name,
   category, variant name, sku, barcode, `price_cents`, `cost_cents`,
   `track_inventory`. Includes a handful of per-kg items (rice, bangus, pork) sold by
   fractional quantity, and a few multi-variant products (e.g. soft drink sizes) so the
@@ -87,8 +89,8 @@ Each catalog seeder (`GrocerySeeder`, `RestaurantSeeder`, `CafeSeeder`):
 
 Staff (same PINs as today) map onto whatever exists:
 
-- Alice — cashier at the first enabled location.
-- Bob — supervisor at the first enabled location.
+- Alice — cashier at **every** enabled location (lunch-service needs her at RST too).
+- Bob — supervisor at **every** enabled location (same reason).
 - Maria — cashier at the first enabled location, supervisor at the second **if** a
   second exists (the two-location RBAC story degrades gracefully to one role).
 - Priya — global admin, unchanged (PIN + back-office password).
@@ -101,10 +103,11 @@ All three scripts re-anchor on the new seed; the flows they prove are unchanged.
   T-shirt trio; expected totals recomputed for VAT-inclusive pricing (total = shelf
   price sum − discount; tax is derived, not added).
 - **`e2e-lunch-service.sh`** → Restaurant location. A dish with a required modifier
-  group plus a repeat-legal add-on replaces the Latte/Oat/Extra-shot anchors; a per-kg
-  grocery item (catalog is global, so it is visible from any register) keeps the
-  fractional-quantity split proof. Register-mode assertions updated to the restaurant's
-  tills.
+  group plus a repeat-legal add-on replaces the Latte/Oat/Extra-shot anchors; the
+  fractional-quantity split proof shipped as a 3-way adobo split, checked against a
+  hand-computed allocation (the same earliest-absorbs-the-remainder math
+  `SplitOrder::allocateMilli()` uses, applied independently in the script) rather than
+  a per-kg grocery item. Register-mode assertions updated to the restaurant's tills.
 - **`e2e-admin-day.sh`** → Grocery location (`GRC` replaces `DT`); drawer/report
   expectations recomputed for VAT-inclusive pricing; the activation-code and hiring
   flows are untouched.
