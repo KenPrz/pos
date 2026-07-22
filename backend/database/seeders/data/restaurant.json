@@ -1,0 +1,337 @@
+{
+  "categories": [
+    {
+      "name": "Appetizers",
+      "sort_order": 1
+    },
+    {
+      "name": "Mains",
+      "sort_order": 2
+    },
+    {
+      "name": "Noodles & Rice",
+      "sort_order": 3
+    },
+    {
+      "name": "Desserts",
+      "sort_order": 4
+    },
+    {
+      "name": "Beverages",
+      "sort_order": 5
+    }
+  ],
+  "modifier_groups": [
+    {
+      "name": "Rice",
+      "min_select": 1,
+      "max_select": 1,
+      "modifiers": [
+        {"name": "Plain Rice", "price_delta_cents": 0},
+        {"name": "Garlic Rice", "price_delta_cents": 2000},
+        {"name": "No Rice", "price_delta_cents": -1500}
+      ]
+    },
+    {
+      "name": "Add-ons",
+      "min_select": 0,
+      "max_select": 3,
+      "modifiers": [
+        {"name": "Extra Egg", "price_delta_cents": 2500},
+        {"name": "Chicharon Bits", "price_delta_cents": 3000},
+        {"name": "Extra Sauce", "price_delta_cents": 1500}
+      ]
+    },
+    {
+      "name": "Serving Size",
+      "min_select": 1,
+      "max_select": 1,
+      "modifiers": [
+        {"name": "Solo", "price_delta_cents": 0},
+        {"name": "Family", "price_delta_cents": 15000}
+      ]
+    },
+    {
+      "name": "Spice Level",
+      "min_select": 1,
+      "max_select": 1,
+      "modifiers": [
+        {"name": "Mild", "price_delta_cents": 0},
+        {"name": "Regular", "price_delta_cents": 0},
+        {"name": "Extra Spicy", "price_delta_cents": 0}
+      ]
+    }
+  ],
+  "products": [
+    {
+      "name": "Lumpiang Shanghai",
+      "description": "Bite-sized pork and vegetable spring rolls, fried crisp and served with a sweet-and-sour dip.",
+      "category": "Appetizers",
+      "modifier_groups": ["Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-LUMPIA-SH", "barcode": null, "price_cents": 18000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Calamares",
+      "description": "Breaded squid rings fried golden and served with a garlic-vinegar dip.",
+      "category": "Appetizers",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-CALAMARES", "barcode": null, "price_cents": 22000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Tokwa't Baboy",
+      "description": "Fried tofu and boiled pork ear and belly tossed in a soy-vinegar dressing with onions and chili.",
+      "category": "Appetizers",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-TOKWAT", "barcode": null, "price_cents": 16000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Chicharon Bulaklak",
+      "description": "Deep-fried pork ruffle fat, crackling-crisp outside and tender inside, served with spiced vinegar.",
+      "category": "Appetizers",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-CHICHARON", "barcode": null, "price_cents": 24000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Cheese Sticks",
+      "description": "Spring roll wrappers filled with melting cheese, rolled thin and fried until crackling.",
+      "category": "Appetizers",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-CHEESESTIX", "barcode": null, "price_cents": 12000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Chicken Adobo",
+      "description": "Chicken braised in soy sauce, vinegar, garlic, and bay leaves — the house classic.",
+      "category": "Mains",
+      "modifier_groups": ["Rice", "Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-ADOBO-CHK", "barcode": null, "price_cents": 22000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Pork Sinigang",
+      "description": "Pork simmered in a sour tamarind broth with kangkong, radish, and green beans.",
+      "category": "Mains",
+      "modifier_groups": ["Rice", "Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-SINIGANG-PRK", "barcode": null, "price_cents": 28000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Kare-Kare",
+      "description": "Oxtail and vegetables stewed in a rich peanut sauce, served with bagoong on the side.",
+      "category": "Mains",
+      "modifier_groups": ["Rice", "Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-KAREKARE", "barcode": null, "price_cents": 32000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Lechon Kawali",
+      "description": "Pork belly boiled until tender then deep-fried to a crackling crust, chopped and served with liver sauce.",
+      "category": "Mains",
+      "modifier_groups": ["Rice", "Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-LECHON-KAW", "barcode": null, "price_cents": 28000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Sizzling Sisig",
+      "description": "Chopped pork face and liver, seasoned with calamansi and chili, served sizzling on a hot plate with a raw egg on top.",
+      "category": "Mains",
+      "modifier_groups": ["Rice", "Add-ons", "Spice Level"],
+      "variants": [
+        {"name": "Default", "sku": "RST-SISIG", "barcode": null, "price_cents": 26000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Grilled Liempo",
+      "description": "Marinated pork belly grilled over charcoal until charred and juicy.",
+      "category": "Mains",
+      "modifier_groups": ["Rice", "Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-LIEMPO", "barcode": null, "price_cents": 26000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Chicken Inasal",
+      "description": "Chicken marinated in calamansi, lemongrass, and annatto oil, grilled and basted until smoky.",
+      "category": "Mains",
+      "modifier_groups": ["Rice", "Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-INASAL", "barcode": null, "price_cents": 21000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Beef Caldereta",
+      "description": "Beef chunks stewed in tomato sauce with liver spread, potatoes, carrots, and bell peppers.",
+      "category": "Mains",
+      "modifier_groups": ["Rice", "Add-ons", "Spice Level"],
+      "variants": [
+        {"name": "Default", "sku": "RST-CALDERETA", "barcode": null, "price_cents": 30000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Crispy Pata",
+      "description": "Whole pork leg boiled then deep-fried until the skin shatters, served with a soy-vinegar dip.",
+      "category": "Mains",
+      "modifier_groups": ["Rice", "Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-CRISPYPATA", "barcode": null, "price_cents": 55000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Bicol Express",
+      "description": "Pork simmered in coconut milk, shrimp paste, and chili for a rich, spicy stew from the Bicol region.",
+      "category": "Mains",
+      "modifier_groups": ["Rice", "Add-ons", "Spice Level"],
+      "variants": [
+        {"name": "Default", "sku": "RST-BICOLEXP", "barcode": null, "price_cents": 24000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Pancit Canton",
+      "description": "Stir-fried egg noodles with pork, shrimp, and vegetables in a soy-based sauce.",
+      "category": "Noodles & Rice",
+      "modifier_groups": ["Serving Size", "Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-PANCIT-CTN", "barcode": null, "price_cents": 18000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Pancit Bihon",
+      "description": "Thin rice noodles stir-fried with vegetables, pork, and chicken in a light soy broth.",
+      "category": "Noodles & Rice",
+      "modifier_groups": ["Serving Size", "Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-PANCIT-BHN", "barcode": null, "price_cents": 17000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Garlic Fried Rice",
+      "description": "Day-old rice fried with toasted garlic until every grain is golden and fragrant.",
+      "category": "Noodles & Rice",
+      "modifier_groups": ["Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-GARLIC-RICE", "barcode": null, "price_cents": 6000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Plain Rice",
+      "description": "A steaming cup of plain steamed white rice.",
+      "category": "Noodles & Rice",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-PLAIN-RICE", "barcode": null, "price_cents": 3000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Arroz Caldo",
+      "description": "Ginger rice porridge with chicken, topped with toasted garlic, scallions, and a boiled egg.",
+      "category": "Noodles & Rice",
+      "modifier_groups": ["Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-ARROZCALDO", "barcode": null, "price_cents": 15000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Bagoong Fried Rice",
+      "description": "Fried rice cooked with sautéed shrimp paste for a salty, savory kick.",
+      "category": "Noodles & Rice",
+      "modifier_groups": ["Add-ons"],
+      "variants": [
+        {"name": "Default", "sku": "RST-BAGOONG-RICE", "barcode": null, "price_cents": 12000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Halo-Halo",
+      "description": "Shaved ice layered with sweet beans, jellies, and fruit, topped with leche flan and ube ice cream.",
+      "category": "Desserts",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-HALOHALO", "barcode": null, "price_cents": 15000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Leche Flan",
+      "description": "Steamed egg custard topped with a layer of soft caramel.",
+      "category": "Desserts",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-LECHEFLAN", "barcode": null, "price_cents": 9000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Turon",
+      "description": "Saba banana and jackfruit rolled in a spring roll wrapper, fried until crisp and caramelized in sugar.",
+      "category": "Desserts",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-TURON", "barcode": null, "price_cents": 8000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Buko Pandan",
+      "description": "Young coconut strips and pandan-flavored gelatin in sweetened cream.",
+      "category": "Desserts",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-BUKOPANDAN", "barcode": null, "price_cents": 9000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Sago't Gulaman",
+      "description": "Iced brown-sugar drink with chewy sago pearls and gulaman jelly cubes.",
+      "category": "Beverages",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-SAGO", "barcode": null, "price_cents": 7000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Calamansi Juice",
+      "description": "Freshly squeezed calamansi juice served over ice, sweet and tart.",
+      "category": "Beverages",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-CALAMANSI", "barcode": null, "price_cents": 8000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Buko Juice",
+      "description": "Fresh young coconut water served chilled with strips of coconut meat.",
+      "category": "Beverages",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-BUKO", "barcode": null, "price_cents": 9000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Canned Soda",
+      "description": "A chilled 330ml can of soft drink.",
+      "category": "Beverages",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-SODA", "barcode": null, "price_cents": 6000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Bottled Water",
+      "description": "A 500ml bottle of purified drinking water.",
+      "category": "Beverages",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "RST-WATER", "barcode": null, "price_cents": 3000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    }
+  ]
+}
