@@ -1,0 +1,3229 @@
+{
+  "categories": [
+    {
+      "name": "Fresh Market",
+      "sort_order": 1
+    },
+    {
+      "name": "Instant Noodles",
+      "sort_order": 2
+    },
+    {
+      "name": "Canned Goods",
+      "sort_order": 3
+    },
+    {
+      "name": "Beverages",
+      "sort_order": 4
+    },
+    {
+      "name": "Snacks",
+      "sort_order": 5
+    },
+    {
+      "name": "Condiments & Sauces",
+      "sort_order": 6
+    },
+    {
+      "name": "Dairy & Frozen",
+      "sort_order": 7
+    },
+    {
+      "name": "Coffee & Breakfast",
+      "sort_order": 8
+    },
+    {
+      "name": "Pantry Staples",
+      "sort_order": 9
+    }
+  ],
+  "modifier_groups": [],
+  "products": [
+    {
+      "name": "Nescafé Classic 100g",
+      "description": null,
+      "category": "Coffee & Breakfast",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-NESCAFE-100",
+          "barcode": "4809990000016",
+          "price_cents": 18500,
+          "cost_cents": 14000,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lucky Me! Pancit Canton Original 60g",
+      "description": null,
+      "category": "Instant Noodles",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-LUCKYME-60",
+          "barcode": "4809990000023",
+          "price_cents": 1500,
+          "cost_cents": 1100,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Century Tuna Flakes in Oil 420g",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-TUNA-420",
+          "barcode": "4809990000030",
+          "price_cents": 25000,
+          "cost_cents": 19000,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Bangus (per kg)",
+      "description": null,
+      "category": "Fresh Market",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-BANGUS-KG",
+          "barcode": "4809990000047",
+          "price_cents": 22000,
+          "cost_cents": 16500,
+          "track_inventory": true,
+          "tax_exempt": true
+        }
+      ]
+    },
+    {
+      "name": "Dinorado Rice (per kg)",
+      "description": null,
+      "category": "Fresh Market",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-RICE-KG",
+          "barcode": "4809990000054",
+          "price_cents": 6500,
+          "cost_cents": 5200,
+          "track_inventory": true,
+          "tax_exempt": true
+        }
+      ]
+    },
+    {
+      "name": "Pork Liempo (per kg)",
+      "description": null,
+      "category": "Fresh Market",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-LIEMPO-KG",
+          "barcode": "4809990000061",
+          "price_cents": 38000,
+          "cost_cents": 30000,
+          "track_inventory": true,
+          "tax_exempt": true
+        }
+      ]
+    },
+    {
+      "name": "Whole Chicken (per kg)",
+      "description": null,
+      "category": "Fresh Market",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-CHICKEN-KG",
+          "barcode": "4809990000078",
+          "price_cents": 21000,
+          "cost_cents": 16000,
+          "track_inventory": true,
+          "tax_exempt": true
+        }
+      ]
+    },
+    {
+      "name": "Tilapia (per kg)",
+      "description": null,
+      "category": "Fresh Market",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-TILAPIA-KG",
+          "barcode": "4809990000085",
+          "price_cents": 16000,
+          "cost_cents": 12000,
+          "track_inventory": true,
+          "tax_exempt": true
+        }
+      ]
+    },
+    {
+      "name": "Coca-Cola",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Mismo 300ml",
+          "sku": "GRC-COKE-300",
+          "barcode": "4809990000092",
+          "price_cents": 2000,
+          "cost_cents": 1500,
+          "track_inventory": true,
+          "tax_exempt": false
+        },
+        {
+          "name": "1L",
+          "sku": "GRC-COKE-1L",
+          "barcode": "4809990000108",
+          "price_cents": 5500,
+          "cost_cents": 4200,
+          "track_inventory": true,
+          "tax_exempt": false
+        },
+        {
+          "name": "1.5L",
+          "sku": "GRC-COKE-1_5L",
+          "barcode": "4809990000115",
+          "price_cents": 7500,
+          "cost_cents": 5600,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "555 Spanish Style Sardines",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485200040",
+          "barcode": "0748485200040",
+          "price_cents": 10025,
+          "cost_cents": 7518,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "555 tuna adobo 155g",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485700014",
+          "barcode": "0748485700014",
+          "price_cents": 6500,
+          "cost_cents": 4875,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "555 tuna afritada 155g",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485700021",
+          "barcode": "0748485700021",
+          "price_cents": 6500,
+          "cost_cents": 4875,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "ACT II Microwave Popcorn",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0076150982312",
+          "barcode": "0076150982312",
+          "price_cents": 8300,
+          "cost_cents": 6225,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Afritada",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485900056",
+          "barcode": "0748485900056",
+          "price_cents": 7050,
+          "cost_cents": 5287,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Aice Chocolate Crispy",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8885013130058",
+          "barcode": "8885013130058",
+          "price_cents": 10050,
+          "cost_cents": 7537,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Ajinomoto crispiy fry (r) original 62g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4801958390108",
+          "barcode": "4801958390108",
+          "price_cents": 15100,
+          "cost_cents": 11325,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "alaska evaporada (y) 140ml",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800575140158",
+          "barcode": "4800575140158",
+          "price_cents": 12150,
+          "cost_cents": 9112,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "alibaba (y) sweet corn 30g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4809013041354",
+          "barcode": "4809013041354",
+          "price_cents": 14350,
+          "cost_cents": 10762,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Aloe",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8801056022150",
+          "barcode": "8801056022150",
+          "price_cents": 17150,
+          "cost_cents": 12862,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Amos Peelerz Gummy Peach",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0810051805321",
+          "barcode": "0810051805321",
+          "price_cents": 11800,
+          "cost_cents": 8850,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Anchor protein",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806501599687",
+          "barcode": "4806501599687",
+          "price_cents": 5675,
+          "cost_cents": 4256,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "angel kremdensada 410ml",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485401225",
+          "barcode": "0748485401225",
+          "price_cents": 14225,
+          "cost_cents": 10668,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Apple green tea",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016052040",
+          "barcode": "4800016052040",
+          "price_cents": 2025,
+          "cost_cents": 1518,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "argentina beef loaf 150g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485800738",
+          "barcode": "0748485800738",
+          "price_cents": 22725,
+          "cost_cents": 17043,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Argentina Canned Meat Loaf",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485800233",
+          "barcode": "0748485800233",
+          "price_cents": 11725,
+          "cost_cents": 8793,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Argentina Corned Beef",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485800011",
+          "barcode": "0748485800011",
+          "price_cents": 11500,
+          "cost_cents": 8625,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "argentina corned beef 150g",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485800431",
+          "barcode": "0748485800431",
+          "price_cents": 11925,
+          "cost_cents": 8943,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "argentina meat loaf 150g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485801490",
+          "barcode": "0748485801490",
+          "price_cents": 23475,
+          "cost_cents": 17606,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Arla Natural Light Cream Cheese",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-5711953017353",
+          "barcode": "5711953017353",
+          "price_cents": 10350,
+          "cost_cents": 7762,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Arla Original Sandwich Slices",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-5711953023262",
+          "barcode": "5711953023262",
+          "price_cents": 16250,
+          "cost_cents": 12187,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Asia Brewery Natural Drinking Water",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800014148080",
+          "barcode": "4800014148080",
+          "price_cents": 9075,
+          "cost_cents": 6806,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Athlene Creatine Monohydrate",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0745125547008",
+          "barcode": "0745125547008",
+          "price_cents": 23000,
+          "cost_cents": 17250,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Australia's own Skim Milk",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-9315090206968",
+          "barcode": "9315090206968",
+          "price_cents": 11950,
+          "cost_cents": 8962,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Bahag Hari Banana Chips",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4809016216032",
+          "barcode": "4809016216032",
+          "price_cents": 6025,
+          "cost_cents": 4518,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Balconi Blueberry Muffin",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8001585010776",
+          "barcode": "8001585010776",
+          "price_cents": 4775,
+          "cost_cents": 3581,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "bear brand (w) 33g",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800361410816",
+          "barcode": "4800361410816",
+          "price_cents": 15800,
+          "cost_cents": 11850,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Best Foods Mayonnaise",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4808680652757",
+          "barcode": "4808680652757",
+          "price_cents": 21750,
+          "cost_cents": 16312,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "birch tree (bwn) 29g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485401621",
+          "barcode": "0748485401621",
+          "price_cents": 3600,
+          "cost_cents": 2700,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Birch Tree Fortified Milk",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485401492",
+          "barcode": "0748485401492",
+          "price_cents": 6475,
+          "cost_cents": 4856,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "birch tree twin (w) milk 64g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485915036",
+          "barcode": "0748485915036",
+          "price_cents": 22025,
+          "cost_cents": 16518,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "blue lychee 350ml",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016073588",
+          "barcode": "4800016073588",
+          "price_cents": 2575,
+          "cost_cents": 1931,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "bread pan (g) cheese & onion 24g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800194153225",
+          "barcode": "4800194153225",
+          "price_cents": 3225,
+          "cost_cents": 2418,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Buenas Shredded Coconut",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806514650405",
+          "barcode": "4806514650405",
+          "price_cents": 4400,
+          "cost_cents": 3300,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "c2 apple 230ml",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016068010",
+          "barcode": "4800016068010",
+          "price_cents": 5000,
+          "cost_cents": 3750,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "C2 APPLE 455ML",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016052132",
+          "barcode": "4800016052132",
+          "price_cents": 2125,
+          "cost_cents": 1593,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Cadbury Dairy milk",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-7622210335630",
+          "barcode": "7622210335630",
+          "price_cents": 10625,
+          "cost_cents": 7968,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Cadbury Dairy Milk Shots 18g",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8901233028637",
+          "barcode": "8901233028637",
+          "price_cents": 11125,
+          "cost_cents": 8343,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Cadbury Milk Lickables 20g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8901233026497",
+          "barcode": "8901233026497",
+          "price_cents": 15475,
+          "cost_cents": 11606,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Cailer Chocolat Au Lait Aux Noisettes Entieres",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8445290537164",
+          "barcode": "8445290537164",
+          "price_cents": 6650,
+          "cost_cents": 4987,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Calbee Honey Butter Potato Chips",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016680540",
+          "barcode": "4800016680540",
+          "price_cents": 11525,
+          "cost_cents": 8643,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Calcium Vitamine D3",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0625273038743",
+          "barcode": "0625273038743",
+          "price_cents": 8725,
+          "cost_cents": 6543,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Capri diced tomatoes",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800593120316",
+          "barcode": "4800593120316",
+          "price_cents": 13300,
+          "cost_cents": 9975,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Centennial Food Corporation Popsnaks Crunchy Popnik",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806505854874",
+          "barcode": "4806505854874",
+          "price_cents": 5350,
+          "cost_cents": 4012,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "century chunky chili corned tuna",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485102573",
+          "barcode": "0748485102573",
+          "price_cents": 14550,
+          "cost_cents": 10912,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Century iron65",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0740985226704",
+          "barcode": "0740985226704",
+          "price_cents": 24700,
+          "cost_cents": 18525,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Century Pacific Angel Coffee Creamer",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485400846",
+          "barcode": "0748485400846",
+          "price_cents": 5825,
+          "cost_cents": 4368,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Cheeson Cream Cheese Original",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8420640612838",
+          "barcode": "8420640612838",
+          "price_cents": 7825,
+          "cost_cents": 5868,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Cheez Whiz Pimiento",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-7622210075017",
+          "barcode": "7622210075017",
+          "price_cents": 5000,
+          "cost_cents": 3750,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Chips Delight Assorted Cookies",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800552888127",
+          "barcode": "4800552888127",
+          "price_cents": 20125,
+          "cost_cents": 15093,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Choco Mucho Caramel",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800092660634",
+          "barcode": "4800092660634",
+          "price_cents": 11625,
+          "cost_cents": 8718,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Chocolate",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0204400910000",
+          "barcode": "0204400910000",
+          "price_cents": 4000,
+          "cost_cents": 3000,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Clara Ole CHEDDAR CHEESE",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806026205797",
+          "barcode": "4806026205797",
+          "price_cents": 4775,
+          "cost_cents": 3581,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Clear (SPORTS) (SHAMPOO) (blue) 12ml",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800888151704",
+          "barcode": "4800888151704",
+          "price_cents": 12700,
+          "cost_cents": 9525,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Coca Cola Coke Mismo 290mL",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4801981118502",
+          "barcode": "4801981118502",
+          "price_cents": 14500,
+          "cost_cents": 10875,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Coca-Cola Zero Sugar",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4801981120642",
+          "barcode": "4801981120642",
+          "price_cents": 3625,
+          "cost_cents": 2718,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Coco Oat Choco Original Flavor",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806526075135",
+          "barcode": "4806526075135",
+          "price_cents": 2125,
+          "cost_cents": 1593,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Colgate",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-6920354811852",
+          "barcode": "6920354811852",
+          "price_cents": 20850,
+          "cost_cents": 15637,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Columbia's Frutos",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800818808302",
+          "barcode": "4800818808302",
+          "price_cents": 10800,
+          "cost_cents": 8100,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Conaprole Leche UAT entera",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-7730105021381",
+          "barcode": "7730105021381",
+          "price_cents": 26375,
+          "cost_cents": 19781,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Cowhead Pure milk",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8888440000048",
+          "barcode": "8888440000048",
+          "price_cents": 5025,
+          "cost_cents": 3768,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Creamy & Cheesy taste eden original 45g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-7622210892126",
+          "barcode": "7622210892126",
+          "price_cents": 15125,
+          "cost_cents": 11343,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Datu Puti Patis",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4801668505038",
+          "barcode": "4801668505038",
+          "price_cents": 22025,
+          "cost_cents": 16518,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Datu Puti Patis 1L",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4801668505045",
+          "barcode": "4801668505045",
+          "price_cents": 22025,
+          "cost_cents": 16518,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Datu Puti Soy sauce",
+      "description": null,
+      "category": "Condiments & Sauces",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4801668500286",
+          "barcode": "4801668500286",
+          "price_cents": 4275,
+          "cost_cents": 3206,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "datu puti soy sauce 200ml",
+      "description": null,
+      "category": "Condiments & Sauces",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4801668602034",
+          "barcode": "4801668602034",
+          "price_cents": 16025,
+          "cost_cents": 12018,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "De carolis Condi",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8056249411413",
+          "barcode": "8056249411413",
+          "price_cents": 14400,
+          "cost_cents": 10800,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Del Monte dm ketchup original 320g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800024577122",
+          "barcode": "4800024577122",
+          "price_cents": 12100,
+          "cost_cents": 9075,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Del Monte dm ketchup sweet 320g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800024577139",
+          "barcode": "4800024577139",
+          "price_cents": 19125,
+          "cost_cents": 14343,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Del Monte dm pj ace 220ml",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800024562692",
+          "barcode": "4800024562692",
+          "price_cents": 10675,
+          "cost_cents": 8006,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Del Monte Fiesta Fruit Cocktail in Extra Light Syrup",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800024037480",
+          "barcode": "4800024037480",
+          "price_cents": 5475,
+          "cost_cents": 4106,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Del Monte Four Season",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800024558305",
+          "barcode": "4800024558305",
+          "price_cents": 6300,
+          "cost_cents": 4725,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Del Monte Mango Can",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800024550194",
+          "barcode": "4800024550194",
+          "price_cents": 15175,
+          "cost_cents": 11381,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Del Monte Mixed Veggie & Mixed Fruit Juice",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8851013740498",
+          "barcode": "8851013740498",
+          "price_cents": 12475,
+          "cost_cents": 9356,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Del Monte Sweet Chili Sauce",
+      "description": null,
+      "category": "Condiments & Sauces",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800024582461",
+          "barcode": "4800024582461",
+          "price_cents": 8450,
+          "cost_cents": 6337,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "del monte tomato paste 150g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800024556899",
+          "barcode": "4800024556899",
+          "price_cents": 4875,
+          "cost_cents": 3656,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Delfi Twister",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8991001780898",
+          "barcode": "8991001780898",
+          "price_cents": 10875,
+          "cost_cents": 8156,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Delfi Twister Minis",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8991001780225",
+          "barcode": "8991001780225",
+          "price_cents": 10225,
+          "cost_cents": 7668,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "dewberry (b) bluebeeries 33g",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016113055",
+          "barcode": "4800016113055",
+          "price_cents": 9050,
+          "cost_cents": 6787,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Dona Elena Diced Tomatoes",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806014098721",
+          "barcode": "4806014098721",
+          "price_cents": 4700,
+          "cost_cents": 3525,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "doowee donut (b) 42g",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800092552779",
+          "barcode": "4800092552779",
+          "price_cents": 8775,
+          "cost_cents": 6581,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "doowee donut (p) 42g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800092553011",
+          "barcode": "4800092553011",
+          "price_cents": 7000,
+          "cost_cents": 5250,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "doowee donut (r) 42g",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800092551604",
+          "barcode": "4800092551604",
+          "price_cents": 7600,
+          "cost_cents": 5700,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Doowee Donut Dowee Donut Strawberry",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800092553028",
+          "barcode": "4800092553028",
+          "price_cents": 7025,
+          "cost_cents": 5268,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Doreen DAIRY MILK CORPORATION",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-9557727929202",
+          "barcode": "9557727929202",
+          "price_cents": 7200,
+          "cost_cents": 5400,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Doretos",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-6924743926561",
+          "barcode": "6924743926561",
+          "price_cents": 22550,
+          "cost_cents": 16912,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Dutch Mill Delight Plus Probiotic Fiber",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8851717905407",
+          "barcode": "8851717905407",
+          "price_cents": 10400,
+          "cost_cents": 7800,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Eden Cheese",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4808647020094",
+          "barcode": "4808647020094",
+          "price_cents": 25075,
+          "cost_cents": 18806,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Eden Original",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4808647020100",
+          "barcode": "4808647020100",
+          "price_cents": 25100,
+          "cost_cents": 18825,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Emborg Mozzarella Cheese",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-5701215042780",
+          "barcode": "5701215042780",
+          "price_cents": 22775,
+          "cost_cents": 17081,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Emborg Parmesan Shredded",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-5704025026841",
+          "barcode": "5704025026841",
+          "price_cents": 4825,
+          "cost_cents": 3618,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Emborg Unsalted Butter",
+      "description": null,
+      "category": "Dairy & Frozen",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-5701215045767",
+          "barcode": "5701215045767",
+          "price_cents": 25750,
+          "cost_cents": 19312,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Emco Crunchy Muesli With Nuts & Raisins",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8594017140597",
+          "barcode": "8594017140597",
+          "price_cents": 9575,
+          "cost_cents": 7181,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "energen champion twin 64g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8996001603444",
+          "barcode": "8996001603444",
+          "price_cents": 6425,
+          "cost_cents": 4818,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "ENERGEN COKLAT 34g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8996001440049",
+          "barcode": "8996001440049",
+          "price_cents": 12025,
+          "cost_cents": 9018,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Energen Minuman Serbuk Sereal Susu Vanilla 34g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8996001440124",
+          "barcode": "8996001440124",
+          "price_cents": 12100,
+          "cost_cents": 9075,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "eng bee tin Hopia Ube",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4804889008012",
+          "barcode": "4804889008012",
+          "price_cents": 19000,
+          "cost_cents": 14250,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Evian",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-3068320126807",
+          "barcode": "3068320126807",
+          "price_cents": 3800,
+          "cost_cents": 2850,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Fairy",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4084500805163",
+          "barcode": "4084500805163",
+          "price_cents": 14150,
+          "cost_cents": 10612,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Fibisco Chocolate Chip Cookies",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800040314213",
+          "barcode": "4800040314213",
+          "price_cents": 24200,
+          "cost_cents": 18150,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Fit & Flex Crunchy Granola Happy Berries",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8908013252077",
+          "barcode": "8908013252077",
+          "price_cents": 10075,
+          "cost_cents": 7556,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Fita Crackers",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4170573077252",
+          "barcode": "4170573077252",
+          "price_cents": 11250,
+          "cost_cents": 8437,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Folgers Classic Decaf",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0025500000886",
+          "barcode": "0025500000886",
+          "price_cents": 8875,
+          "cost_cents": 6656,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "FOUNDERS Luncheon Meat",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8120001415893",
+          "barcode": "8120001415893",
+          "price_cents": 3875,
+          "cost_cents": 2906,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "FRESCA TUNA CALDERETA 175G",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0748485900032",
+          "barcode": "0748485900032",
+          "price_cents": 7025,
+          "cost_cents": 5268,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Frootees Strawberry Cookie Sandwich",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800092113352",
+          "barcode": "4800092113352",
+          "price_cents": 10350,
+          "cost_cents": 7762,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Fudgee Barr Fudgee bar",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800092550904",
+          "barcode": "4800092550904",
+          "price_cents": 6900,
+          "cost_cents": 5175,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Gardenia Chocolate Chip Loaf",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806502721476",
+          "barcode": "4806502721476",
+          "price_cents": 9475,
+          "cost_cents": 7106,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Gardenia Classic Enriched White Bread",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806502720417",
+          "barcode": "4806502720417",
+          "price_cents": 5400,
+          "cost_cents": 4050,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Gardenia High FIBER WHEAT BREAD",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806502725900",
+          "barcode": "4806502725900",
+          "price_cents": 5400,
+          "cost_cents": 4050,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Gardenia High Fiber Whole Wheat Bread",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806502720301",
+          "barcode": "4806502720301",
+          "price_cents": 8300,
+          "cost_cents": 6225,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Gardenia Neu Bake Wheaten bread",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806502727423",
+          "barcode": "4806502727423",
+          "price_cents": 2400,
+          "cost_cents": 1800,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Gardenia Neu Bake White Bread",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806502726822",
+          "barcode": "4806502726822",
+          "price_cents": 14800,
+          "cost_cents": 11100,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Gardenia White Bread Classic 600G",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806502720615",
+          "barcode": "4806502720615",
+          "price_cents": 8600,
+          "cost_cents": 6450,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Gatorade",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4803925061110",
+          "barcode": "4803925061110",
+          "price_cents": 2100,
+          "cost_cents": 1575,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Gatorade blue bolt flavor",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4803925061141",
+          "barcode": "4803925061141",
+          "price_cents": 2125,
+          "cost_cents": 1593,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "General Nutrifoods Yellowfin Tuna Chunks in Olive Oil",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806530070010",
+          "barcode": "4806530070010",
+          "price_cents": 9000,
+          "cost_cents": 6750,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Glico Pocky Durian Flavour",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8851019001784",
+          "barcode": "8851019001784",
+          "price_cents": 8275,
+          "cost_cents": 6206,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Goldilocks Fluffy Mamon",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800111000649",
+          "barcode": "4800111000649",
+          "price_cents": 8125,
+          "cost_cents": 6093,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Goldilocks Marble Cake Slice",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800111000748",
+          "barcode": "4800111000748",
+          "price_cents": 8225,
+          "cost_cents": 6168,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Goya Ceres Choco Hazelnut Choco Spread",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4002309006567",
+          "barcode": "4002309006567",
+          "price_cents": 5050,
+          "cost_cents": 3787,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "GPR Classics Butter Cookies",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-9555701501772",
+          "barcode": "9555701501772",
+          "price_cents": 17750,
+          "cost_cents": 13312,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Granules Strong",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800010012033",
+          "barcode": "4800010012033",
+          "price_cents": 13025,
+          "cost_cents": 9768,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Great Taste Premium Coffee Classic 100g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016012280",
+          "barcode": "4800016012280",
+          "price_cents": 10275,
+          "cost_cents": 7706,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "great taste twin (w) white 40g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016022265",
+          "barcode": "4800016022265",
+          "price_cents": 20250,
+          "cost_cents": 15187,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Green Tea Essence Mask Sheet",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8809386880440",
+          "barcode": "8809386880440",
+          "price_cents": 22425,
+          "cost_cents": 16818,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "GreenCross Isopropyl alcohol",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800047820014",
+          "barcode": "4800047820014",
+          "price_cents": 9000,
+          "cost_cents": 6750,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Growers NutriBar Apple Cinnamon",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800054210327",
+          "barcode": "4800054210327",
+          "price_cents": 1825,
+          "cost_cents": 1368,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Gullón Chocolate chip cookies",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0795130022564",
+          "barcode": "0795130022564",
+          "price_cents": 3550,
+          "cost_cents": 2662,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "GX International Green Stevia",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800289821787",
+          "barcode": "4800289821787",
+          "price_cents": 4775,
+          "cost_cents": 3581,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "GX International TrueTea",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800289822081",
+          "barcode": "4800289822081",
+          "price_cents": 5075,
+          "cost_cents": 3806,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Hansel Choco",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800092110528",
+          "barcode": "4800092110528",
+          "price_cents": 7525,
+          "cost_cents": 5643,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Heineken 0.0 Non alco beer",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8888017300571",
+          "barcode": "8888017300571",
+          "price_cents": 8550,
+          "cost_cents": 6412,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Heinz [Seriously] Good Mayonnaise",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8850343011322",
+          "barcode": "8850343011322",
+          "price_cents": 7300,
+          "cost_cents": 5475,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Heinz Tomato Ketchup",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8994907002279",
+          "barcode": "8994907002279",
+          "price_cents": 5275,
+          "cost_cents": 3956,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Hello Chocolate Wafer sandwich",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016079559",
+          "barcode": "4800016079559",
+          "price_cents": 8550,
+          "cost_cents": 6412,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Hi-Ho hiho (o) 70g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800092331626",
+          "barcode": "4800092331626",
+          "price_cents": 15625,
+          "cost_cents": 11718,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Hormel SPAM",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0037600130783",
+          "barcode": "0037600130783",
+          "price_cents": 7275,
+          "cost_cents": 5456,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Ito En Uji Matcha Latte",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4901085644898",
+          "barcode": "4901085644898",
+          "price_cents": 6875,
+          "cost_cents": 5156,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack 'n Jill Chippy Flavored Chili & Cheese Corn Chips",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016641503",
+          "barcode": "4800016641503",
+          "price_cents": 2000,
+          "cost_cents": 1500,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack 'n Jill Cloud 9 Overload",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016963827",
+          "barcode": "4800016963827",
+          "price_cents": 9325,
+          "cost_cents": 6993,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack 'n Jill Kack n jill Chiz Curls",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016105098",
+          "barcode": "4800016105098",
+          "price_cents": 11075,
+          "cost_cents": 8306,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack 'n Jill Mr. chips",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016653094",
+          "barcode": "4800016653094",
+          "price_cents": 5075,
+          "cost_cents": 3806,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack 'n Jill nova (r) cheddar 38g",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016663802",
+          "barcode": "4800016663802",
+          "price_cents": 3300,
+          "cost_cents": 2475,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack 'N Jill presto (y) 30g",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800010075878",
+          "barcode": "4800010075878",
+          "price_cents": 9375,
+          "cost_cents": 7031,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack 'n Jill vcut (o) spicy barbeque 25g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016622533",
+          "barcode": "4800016622533",
+          "price_cents": 13525,
+          "cost_cents": 10143,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack n Jill maxx cherry flavor 4gx50",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016304019",
+          "barcode": "4800016304019",
+          "price_cents": 11000,
+          "cost_cents": 8250,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "jack n jill Nova Homestyle BBQ",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016604232",
+          "barcode": "4800016604232",
+          "price_cents": 4225,
+          "cost_cents": 3168,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack N Jill Piattos Sour Cream and Onion",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016671500",
+          "barcode": "4800016671500",
+          "price_cents": 10500,
+          "cost_cents": 7875,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack n' Jill berry knots (p) strawberry 25g",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016627279",
+          "barcode": "4800016627279",
+          "price_cents": 4275,
+          "cost_cents": 3206,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack n' Jill cream o (b) vanilla 30g",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800010075069",
+          "barcode": "4800010075069",
+          "price_cents": 8550,
+          "cost_cents": 6412,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack n' Jill cream o (bwn) choco 30g",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800010075243",
+          "barcode": "4800010075243",
+          "price_cents": 8725,
+          "cost_cents": 6543,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack n' Jill Sandwich cookie aux peanut butter",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800010079951",
+          "barcode": "4800010079951",
+          "price_cents": 11950,
+          "cost_cents": 8962,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "JACK'nJILL Magic Flakes Cheese",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016082641",
+          "barcode": "4800016082641",
+          "price_cents": 10125,
+          "cost_cents": 7593,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "JACK'nJILL Piatto",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016671807",
+          "barcode": "4800016671807",
+          "price_cents": 11300,
+          "cost_cents": 8475,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jack-n-Jill piattos (b) cheese 45g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016644801",
+          "barcode": "4800016644801",
+          "price_cents": 9800,
+          "cost_cents": 7350,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "JacknJill Cream-O cake sandwich",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800016112560",
+          "barcode": "4800016112560",
+          "price_cents": 18550,
+          "cost_cents": 13912,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Jele beautie jele L-glutathione",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8850157100533",
+          "barcode": "8850157100533",
+          "price_cents": 5525,
+          "cost_cents": 4143,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "jolly whole kernels 425g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806014000144",
+          "barcode": "4806014000144",
+          "price_cents": 10125,
+          "cost_cents": 7593,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Kellogg's Corn Flakes",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8852756346053",
+          "barcode": "8852756346053",
+          "price_cents": 7050,
+          "cost_cents": 5287,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Kellogg's Froot Loops",
+      "description": null,
+      "category": "Coffee & Breakfast",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8852756707045",
+          "barcode": "8852756707045",
+          "price_cents": 37025,
+          "cost_cents": 27768,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Kellogg's Instant Oats",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-9555805800009",
+          "barcode": "9555805800009",
+          "price_cents": 10000,
+          "cost_cents": 7500,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Kellogg's KRAVE MILK KELLOGS 375G",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-5059319031552",
+          "barcode": "5059319031552",
+          "price_cents": 2550,
+          "cost_cents": 1912,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Kirkland Glucosamine Chindroitin",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0096619883165",
+          "barcode": "0096619883165",
+          "price_cents": 13150,
+          "cost_cents": 9862,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Knorr Cream of Mushroom",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4808680221250",
+          "barcode": "4808680221250",
+          "price_cents": 4250,
+          "cost_cents": 3187,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Knorr Liquid Seasoning Chili",
+      "description": null,
+      "category": "Condiments & Sauces",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800888218889",
+          "barcode": "4800888218889",
+          "price_cents": 4875,
+          "cost_cents": 3656,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Kojie • san Kojic",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4809014128337",
+          "barcode": "4809014128337",
+          "price_cents": 20325,
+          "cost_cents": 15243,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Kopiko Brown Coffee Mix (Creamy Coffee Mix with Brown Sugar",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8996001410547",
+          "barcode": "8996001410547",
+          "price_cents": 8525,
+          "cost_cents": 6393,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Kopiko Double Cups Original",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8998666001467",
+          "barcode": "8998666001467",
+          "price_cents": 2450,
+          "cost_cents": 1837,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "KOPIKO PREMIUM 3IN1",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8996001410226",
+          "barcode": "8996001410226",
+          "price_cents": 8225,
+          "cost_cents": 6168,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "kopiko twin (bwn) brown 40g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8998666001719",
+          "barcode": "8998666001719",
+          "price_cents": 2700,
+          "cost_cents": 2025,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Kraft singles",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-3760315370119",
+          "barcode": "3760315370119",
+          "price_cents": 16100,
+          "cost_cents": 12075,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lady's Choice Ceasar Dressing",
+      "description": null,
+      "category": "Condiments & Sauces",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4808680021997",
+          "barcode": "4808680021997",
+          "price_cents": 3975,
+          "cost_cents": 2981,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lady's Choice ladys choice (b) mayonnaise 80ml",
+      "description": null,
+      "category": "Condiments & Sauces",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4808680021355",
+          "barcode": "4808680021355",
+          "price_cents": 3350,
+          "cost_cents": 2512,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lady's Choice Real Mayonnaise",
+      "description": null,
+      "category": "Condiments & Sauces",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800888602268",
+          "barcode": "4800888602268",
+          "price_cents": 10250,
+          "cost_cents": 7687,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lady's Choice Super Chunky Peanut Spread",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4808680653273",
+          "barcode": "4808680653273",
+          "price_cents": 22250,
+          "cost_cents": 16687,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Ladys Choice Chcken Spread",
+      "description": null,
+      "category": "Pantry Staples",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4808680022031",
+          "barcode": "4808680022031",
+          "price_cents": 12025,
+          "cost_cents": 9018,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lay's Lays Classic",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-1200108000462",
+          "barcode": "1200108000462",
+          "price_cents": 2450,
+          "cost_cents": 1837,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lay's Lays Classic 180g",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-1200108000042",
+          "barcode": "1200108000042",
+          "price_cents": 2025,
+          "cost_cents": 1518,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Le Minerale Mountain Mineral Water",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8996001600269",
+          "barcode": "8996001600269",
+          "price_cents": 3250,
+          "cost_cents": 2437,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lemon Square Cheese Cake",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4809010626011",
+          "barcode": "4809010626011",
+          "price_cents": 1500,
+          "cost_cents": 1125,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lemon Square Choochoo cheesy milk",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806018403873",
+          "barcode": "4806018403873",
+          "price_cents": 6350,
+          "cost_cents": 4762,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lemon Square Lava Cake Chocolate",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4806018405655",
+          "barcode": "4806018405655",
+          "price_cents": 8150,
+          "cost_cents": 6112,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Leslie's Cheezy corn crunch spicy",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800216121911",
+          "barcode": "4800216121911",
+          "price_cents": 3400,
+          "cost_cents": 2550,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Leslie's Chili and Cheese",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800216122215",
+          "barcode": "4800216122215",
+          "price_cents": 3700,
+          "cost_cents": 2775,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Leslies clover (b) cheesier 24g",
+      "description": null,
+      "category": "Snacks",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800216120013",
+          "barcode": "4800216120013",
+          "price_cents": 1500,
+          "cost_cents": 1125,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Libby's Vienna Sausage",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-0039000086639",
+          "barcode": "0039000086639",
+          "price_cents": 5125,
+          "cost_cents": 3843,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Ligo Sardines in Tomato Sauce",
+      "description": null,
+      "category": "Canned Goods",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-4800163443043",
+          "barcode": "4800163443043",
+          "price_cents": 6525,
+          "cost_cents": 4893,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    },
+    {
+      "name": "Lipton GREEN TEA Lively Fresh",
+      "description": null,
+      "category": "Beverages",
+      "variants": [
+        {
+          "name": "Default",
+          "sku": "GRC-8720608618200",
+          "barcode": "8720608618200",
+          "price_cents": 9200,
+          "cost_cents": 6900,
+          "track_inventory": true,
+          "tax_exempt": false
+        }
+      ]
+    }
+  ]
+}
