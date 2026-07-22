@@ -603,6 +603,80 @@ and each frontend reads it at boot instead of closing over a stale constant (com
 
 ---
 
+## RBAC v2 and Settings
+
+A 2026-07-22 audit of every state-changing route confirmed the permission gates
+themselves were sound, but found the *management* of those permissions still baked
+into code, plus two live bugs: `GET /admin/reports/stock` mis-gated on
+`report.sales.view` instead of its own permission, and a UI-created location silently
+provisioned with no roles at all (`CreateLocation` never called
+`RoleProvisioner::provisionForLocation`). This work turns roles into admin-editable
+data, adds per-user direct permission grants, opens the back office to anyone holding
+an admin-tier permission instead of `is_admin` alone, and ships a Settings surface —
+while fixing all three findings along the way.
+
+- **Roles are templates now, not a hardcoded pair.** `role_templates` +
+  `role_template_permissions` (new tables, `02-data-model.md`) hold a name and a
+  permission set; `RoleProvisioner` materializes each template into spatie's
+  per-location `roles` rows and keeps them in sync on every create/edit/rename. Two
+  system templates (`cashier`, `supervisor`) seed once from the same permission sets
+  this repo always specified; an admin can add a `shift-lead` or a `bookkeeper` without
+  a migration, or edit either system template's permissions without renaming it.
+  `GET/POST /admin/roles`, `PATCH /admin/roles/{id}`,
+  `POST /admin/roles/{id}/delete` — a `POST`, keeping the "no `DELETE` verb under
+  `/admin/*`" rule literal even though a role template really is deleted, not archived
+  (it has no `is_active` column, and an unassigned template has nothing left pointing at
+  it). `GET /admin/permissions` backs both the role editor and the user editor's
+  pickers.
+- **Direct per-location permission grants.** `users.permissions[]`
+  (`[{location_id, permission}]`, full-set-replace, mirroring `roles[]`) writes to
+  spatie's own `model_has_permissions` table — present since M2, unused until now.
+  `PermissionAssignments` mirrors `RoleAssignments`'s direct-table-join shape for the
+  same reason: spatie's `permissions()` relation has the identical team-scoping gotcha
+  as `roles()`. Grants union with role permissions at `can()` time under the same team
+  context `EnsureStaffSession` already sets — zero register-tier code changed.
+- **Back-office access is permission-based.** `EnsureBackOffice` (was `EnsureAdmin`)
+  admits any active user holding at least one admin-tier permission *anywhere* — a role
+  or a direct grant — via a new `AdminAccess` domain service
+  (`holdsAnywhere`/`allHeld`/`sectionsFor`/`locationIdsWhere`, all direct joins, same
+  team-scoping reasoning as above). A second check matters just as much: the presented
+  token must carry the `admin` Sanctum ability, or a register staff-session token
+  belonging to a supervisor who already holds `report.sales.view` would pass the
+  permission check alone. `AdminSessionResource` gained `sections[]` (which admin-tier
+  screens this session may open) and `report_location_ids` (which locations its report
+  permissions actually cover) so the sidebar and the location switcher both render only
+  what the API would actually allow.
+- **`requires_supervisor` on discounts is enforced, not just stored.** The column
+  existed since M2 with nothing checking it. `ApplyDiscount` now loads the discount
+  inside the lock and re-checks `order.discount.apply` when the flag is true —
+  `403 discount_needs_supervisor` — while the route itself only enforces the floor
+  (`order.line.add`). A discount flipped to `requires_supervisor: false` is a real
+  cashier-safe discount for the first time.
+- **Settings**, database-backed with a config fallback: a new `settings` table
+  (`key`/`value` jsonb/timestamps) holds `business.name`, `business.address`,
+  `business.tax_id` — receipts and the boot-time required-config check both read
+  through `App\Domain\Settings\Settings`, which resolves database-override-or-config
+  per key. `PATCH` with an explicit `null` clears an override back to config, on
+  purpose — there is no way to store an explicit null, because a stored null would pin
+  the key to the database forever. Plus two nullable columns on `locations`,
+  `variance_approval_threshold_cents` and `low_stock_threshold`: `null` means "use the
+  deployed config default," resolved at read time by `ApproveVariance`,
+  `CloseShiftResource`, and `StockReport` alike.
+- **The three quick fixes landed alongside the feature work**, not as a follow-up: the
+  stock report now gates on its own `report.stock.view`; `CreateLocation` provisions
+  every current role template at a new location (closing the audit's confirmed bug);
+  and a small consistency sweep (`Makefile`'s `make e2e` admin password, both
+  `.env.example`s' and the seeder's default catalog, `capture_screenshots.mjs`'s admin
+  password constant) that had drifted out of sync with each other.
+
+**Status: complete.** 525 backend tests, 113 register-app tests, 166 back-office-app
+tests. All three e2e scripts green via `make e2e` — `e2e-admin-day.sh`'s activation-code
+proof and `e2e-lunch-service.sh`'s supervisor-approval flow are both unchanged and still
+pass, confirming templates materialize the identical `cashier`/`supervisor` permission
+sets the hardcoded roles used to.
+
+---
+
 ## Sequencing rationale
 
 - **Money before schema** — everything computes on it.

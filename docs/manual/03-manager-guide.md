@@ -6,10 +6,12 @@ separate application from the register (see Getting Started's
 [three surfaces](00-getting-started.md#the-three-surfaces)): a laptop, not a till, and an
 email/password sign-in rather than a device token and a PIN.
 
-> Note: signing in to the back office is **admin-only** in this version — there's no
-> supervisor or bookkeeper tier that can see reports without also being able to change
-> the catalog or deactivate staff. See [Roles](00-getting-started.md#roles) and
-> `05-rbac.md` for why.
+> Note: signing in to the back office no longer requires **Admin** — anyone holding at
+> least one back-office permission, through a role or a direct grant, can sign in and
+> sees only the sections that permission unlocks. A user with just **Sales report**
+> access, say, signs in and sees **Reports** and nothing else. **Admin** is still the
+> one flag that unlocks every section at every location; everything narrower is a role
+> or a grant a manager assigns from **Users**. See `05-rbac.md` for the full rule.
 
 ## Sign in
 
@@ -24,12 +26,15 @@ device token involved.
 > incorrect."** — on purpose. A more specific answer would let someone probe which
 > emails exist in the system.
 
-Once in, six sections sit in a rail down the left, grouped under two headings —
-**Operations**: **Today**, **Catalog**, **Users**, **Locations & Registers**;
-**Insights**: **Reports**, **Audit**. A **location switcher** sits above the rail;
-**Today**, **Reports**, and **Stock** all read whichever location it's set to — there
-are no per-screen location pickers. Tap **Sign out**, at the bottom of the rail, when
-you're done.
+Once in, a rail down the left holds every section you hold a permission for, grouped
+under two headings — **Operations**: **Today**, **Catalog**, **Users**, **Locations &
+Registers**, **Settings**; **Insights**: **Reports**, **Audit**. **Today** always shows;
+every other section only appears if you hold the permission behind it, so two managers
+can see different rails depending on what each one was granted — a full admin sees all
+seven. A **location switcher** sits above the rail; **Today**, **Reports**, and
+**Stock** all read whichever location it's set to — there are no per-screen location
+pickers, and the switcher itself only offers locations your report permissions actually
+cover. Tap **Sign out**, at the bottom of the rail, when you're done.
 
 ## Today
 
@@ -179,21 +184,40 @@ nothing destructive about restoring something).
 2. Fill in **Name**, and either an **Email**, a **PIN**, or both — one of the two is
    required for a new hire ("Enter an email or a PIN.").
 3. Leave **Admin** unchecked for regular staff.
-4. Under **Roles**, pick a location in **Add location**, pick **Cashier** or
-   **Supervisor** in **Add role**, then tap **Add**. Repeat for every location this
-   person works at.
+4. Under **Roles**, pick a location in **Add location**, pick a role in **Add role**,
+   then tap **Add**. Repeat for every location this person works at.
 5. Tap **Save**.
 
-> Note: roles are per location — the same person can be a cashier at one store and a
-> supervisor at another (see Getting Started's [Roles](00-getting-started.md#roles)).
+> Note: roles are per location — the same person can hold one role at one store and a
+> different one at another (see Getting Started's [Roles](00-getting-started.md#roles)).
 > Tap **Remove** next to a row in the Roles table to drop a location assignment.
+
+> Note: **Cashier** and **Supervisor** ship as the two starting roles, but roles are no
+> longer fixed — a manager holding **Manage roles** can add, rename, or reshape one from
+> **Users → Roles** (below), and the **Add role** picker offers whatever roles currently
+> exist, not just those two.
+
+### Manage roles
+
+**Users → Roles** (a manager needs the **Manage roles** permission, or **Admin**, to see
+this tab) lists every role: its **Name**, its permissions, and how many people currently
+hold it. **Cashier** and **Supervisor** are built in — their permissions can be edited,
+but not their name, so nothing that assumes those two roles exist by name ever breaks.
+Tap **New role** to add one of your own (a name plus a checklist of permissions, grouped
+the same way this guide groups them); tap **Edit** on any role to change its permission
+set. A role you added yourself can also be renamed or removed — removal is refused while
+anyone still holds it, so unassign it from every user first.
 
 ### Give someone back-office access
 
-Check **Admin** on their user record and save. There's no in-between tier yet — admin
-is full access to everything under **Catalog**, **Users**, **Locations & Registers**,
-**Reports**, and **Audit**, or nothing. A read-only bookkeeper role is a named gap in
-this version (`05-rbac.md`), waiting on the first person who actually needs it.
+Back-office access is no longer all-or-nothing. Checking **Admin** on a user record
+still gives full access to every section at every location, same as before. Short of
+that, granting **any** back-office permission — through a role, or a one-off direct
+grant added right on the user's own record — is enough by itself: that person signs in
+with their own email and password and sees exactly the sections their permissions
+unlock, nothing more. A user granted only **Sales report** access, for instance, signs
+in to **Reports** and nothing else. There's no longer a gap here waiting on a
+bookkeeper role — grant exactly the one permission a bookkeeper needs.
 
 ### Deactivate a leaver
 
@@ -223,11 +247,20 @@ undo it. Have a second admin make the change if one genuinely needs to leave.
 
 **Locations & Registers** → **Locations** tab. Editing a location: **Name**, **Code**,
 **Timezone** (typed against the IANA list — e.g. `America/Chicago` — and refused if it
-doesn't match one), **Prices include tax**, **Receipt header**, **Receipt footer**.
+doesn't match one), **Prices include tax**, **Receipt header**, **Receipt footer**,
+**Variance approval threshold**, **Low stock threshold**.
 
 > Note: **"Applies to future orders only — orders already open keep the pricing basis
 > they started with."** Flipping **Prices include tax** mid-shift doesn't retroactively
 > change how an order already open is taxed.
+
+> Note: **Variance approval threshold** and **Low stock threshold** are optional —
+> leave either blank and this location uses the store-wide default everyone starts
+> with. Set one to override it just for this location: a busier store might tolerate a
+> larger drawer variance before a shift close needs a supervisor's sign-off, and a
+> store that turns over stock faster might want its low-stock warning to fire earlier.
+> Clearing a field you'd previously set — save it blank again — puts the location back
+> on the store-wide default; it doesn't turn the threshold off.
 
 A location can be deactivated the same way as everything else — uncheck **Active**,
 confirm **"Deactivate *Name*? Its history stays, but staff can no longer sign in
@@ -286,6 +319,24 @@ apply exactly as they do to replacing a lost or stolen terminal's code.
 > Note: an activation code is single-use and expires 7 days after it's issued. A code
 > that expired unused shows **Code expired** on the status pill — issue a fresh one the
 > same way.
+
+## Settings
+
+**Settings** (visible to **Admin** or anyone granted the **Manage settings**
+permission) holds the business identity that prints on every receipt: **Business
+name**, **Business address**, **Business tax ID**. Each field shows whether it's
+currently set here or falling back to the value the system shipped with, and clearing a
+field back to blank and saving returns it to that default — the same "blank means use
+the default" behavior as the per-location thresholds above.
+
+1. **Settings** → edit any field.
+2. Tap **Save**.
+
+> Note: unlike a price or a tax rate, business identity is never snapshotted onto an
+> order — a change here shows up immediately, on a **reprint of an old receipt too**,
+> the same way a letterhead change applies to every letter from then on, old and new
+> alike. That's different from Catalog (Chapter 9), where a repriced product's past
+> receipts deliberately never change.
 
 ## Reports
 
