@@ -9,10 +9,11 @@ import { StatCard } from '../../components/StatCard'
 import { StatusPill, type StatusPillTone } from '../../components/StatusPill'
 import { Card, CardTitle } from '../../components/ui/card'
 import { ApiError, api, type AuditLogEntry, type Register, type StockReportRow } from '../../lib/api'
+import { getCurrency } from '../../lib/currency'
 import { cents, formatMoney } from '../../lib/money'
 
-const CURRENCY = 'USD' // display only; the server owns all arithmetic
-const fm = (n: number) => formatMoney(cents(n), CURRENCY)
+// display only; the server owns all arithmetic
+const fm = (n: number) => formatMoney(cents(n), getCurrency())
 
 /**
  * One row shape for the "Needs attention" `DataTable` — a low-stock variant and an

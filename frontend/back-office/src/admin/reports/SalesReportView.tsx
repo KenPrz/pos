@@ -13,10 +13,11 @@ import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { ApiError, api, type SalesReportRow } from '../../lib/api'
 import { centsToDecimalString, downloadCsv, toCsv } from '../../lib/csv'
 import { isoDate } from '../../lib/date'
+import { getCurrency } from '../../lib/currency'
 import { cents, formatMoney } from '../../lib/money'
 
-const CURRENCY = 'USD' // display only; the server owns all arithmetic
-const fm = (n: number) => formatMoney(cents(n), CURRENCY)
+// display only; the server owns all arithmetic
+const fm = (n: number) => formatMoney(cents(n), getCurrency())
 
 type GroupBy = 'day' | 'category' | 'user'
 

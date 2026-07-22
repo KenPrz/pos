@@ -1,13 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { getCurrency } from '../lib/currency'
 import { cents, formatMoney } from '../lib/money'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 
-const CURRENCY = 'USD'
-const fm = (n: number) => formatMoney(cents(n), CURRENCY)
+const fm = (n: number) => formatMoney(cents(n), getCurrency())
 
 // A thinner shape than the wire ModifierGroup/Modifier types (api.ts) — deliberately:
 // this component only ever needs id/name/group_id/min_select/max_select/price_delta_cents,

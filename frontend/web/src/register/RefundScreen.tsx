@@ -3,14 +3,14 @@
 import { useMutation } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Order, type Refund } from '../lib/api'
+import { getCurrency } from '../lib/currency'
 import { cents, formatMoney } from '../lib/money'
 import { MoneyText } from '@/components/MoneyText'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 
-const CURRENCY = 'USD'
-const fm = (n: number) => formatMoney(cents(n), CURRENCY)
+const fm = (n: number) => formatMoney(cents(n), getCurrency())
 
 type LinePick = { qty: string; restock: boolean }
 
@@ -82,7 +82,7 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
             print parity (print.css pins it to 24px). */}
         <div className="flex flex-col items-center gap-xs border border-hairline bg-surface-1 px-lg py-xl print:border-0 print:bg-transparent">
           <p className="type-caption text-ink-muted">Refund — cash from the drawer</p>
-          <MoneyText cents={result.amount_cents} currency={CURRENCY} size="total" className="hero-amount" />
+          <MoneyText cents={result.amount_cents} currency={getCurrency()} size="total" className="hero-amount" />
         </div>
         <p className="type-body-sm text-ink-muted">Order {order?.number} · {result.lines.length} line{result.lines.length === 1 ? '' : 's'} · {result.reason}</p>
         <div>

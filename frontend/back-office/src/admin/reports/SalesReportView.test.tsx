@@ -5,11 +5,15 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SalesReportView } from './SalesReportView'
 import { api, type SalesReport } from '../../lib/api'
+import { setCurrency } from '../../lib/currency'
 
 afterEach(cleanup)
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Explicit, not relying on lib/currency's pre-load default: this suite never logs in
+  // (the thing that would normally set it for real — see api.ts's login).
+  setCurrency('USD')
 })
 
 vi.mock('../../lib/api', async (importOriginal) => {

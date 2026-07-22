@@ -19,10 +19,14 @@ it('returns one denormalized payload with location-resolved prices', function ()
 
     $response = $this->getJson('/api/v1/catalog', $this->device)->assertOk()->json('data');
 
-    expect($response)->toHaveKeys(['categories', 'products', 'variants', 'modifier_groups', 'modifiers', 'tax_rates']);
+    expect($response)->toHaveKeys(['categories', 'products', 'variants', 'modifier_groups', 'modifiers', 'tax_rates', 'currency']);
 
     $wire = collect($response['variants'])->firstWhere('id', $variant->id);
     expect($wire['price_cents'])->toBe(2499);   // resolved server-side; the register never resolves prices
+
+    // The register renders whatever ISO-4217 code the server is configured with — it
+    // never hardcodes a currency (phpunit.xml pins POS_CURRENCY=USD for the suite).
+    expect($response['currency'])->toBe('USD');
 });
 
 it('hides inactive and soft-deleted variants', function (): void {

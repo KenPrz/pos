@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, adminToken, api } from './api'
+import { getCurrency } from './currency'
 
 // Vitest's default (node) environment has no localStorage — Node itself only gained a
 // global one in recent versions, and we don't rely on it being present. adminToken is the
@@ -46,6 +47,7 @@ describe('api.login', () => {
         data: {
           token: 'admin-token-abc',
           user: { id: 'user-1', name: 'Alex Admin', email: 'alex@example.com', is_admin: true },
+          currency: 'PHP',
         },
       }),
     )
@@ -55,6 +57,10 @@ describe('api.login', () => {
     expect(session.token).toBe('admin-token-abc')
     expect(session.user).toEqual({ id: 'user-1', name: 'Alex Admin', email: 'alex@example.com', is_admin: true })
     expect(adminToken.get()).toBe('admin-token-abc')
+    // Login is the back office's only source for the server's currency (no catalog fetch
+    // here) — it must land in lib/currency's module state, not just ride along unread.
+    expect(getCurrency()).toBe('PHP')
+    expect(localStorage.getItem('pos.currency')).toBe('PHP')
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(String(url)).toContain('/admin/login')

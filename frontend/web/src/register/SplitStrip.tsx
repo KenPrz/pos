@@ -1,13 +1,13 @@
 'use client'
 
 import type { Order } from '../lib/api'
+import { getCurrency } from '../lib/currency'
 import { allocate, cents, formatMoney } from '../lib/money'
 import { ActionZone } from '@/components/ActionZone'
 import { PillStrip, type PillStripItem } from '@/components/PillStrip'
 import { Button } from '@/components/ui/button'
 
-const CURRENCY = 'USD'
-const fm = (n: number) => formatMoney(cents(n), CURRENCY)
+const fm = (n: number) => formatMoney(cents(n), getCurrency())
 
 /**
  * The child-check strip (Task 13): one chip per child once an order has been split,

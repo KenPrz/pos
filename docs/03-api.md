@@ -72,7 +72,7 @@ A third, independent tier (M6) — no device, no location, no PIN:
 ```
 POST /api/v1/admin/login
   { "email": "owner@example.com", "password": "..." }
-  → { token, user: { id, name, email, is_admin } }   # 401 invalid_credentials
+  → { token, user: { id, name, email, is_admin }, currency }   # 401 invalid_credentials
 
 POST /api/v1/admin/logout
 ```
@@ -147,7 +147,7 @@ mutation returns the incremented `version`.
 
 ```
 GET /api/v1/catalog?location_id=&updated_since=
-  → { categories[], products[], variants[], modifier_groups[], modifiers[], tax_rates[], discounts[] }
+  → { categories[], products[], variants[], modifier_groups[], modifiers[], tax_rates[], discounts[], currency }
 ```
 
 **One denormalized payload, not five REST resources.** A register needs the whole menu to
@@ -161,6 +161,10 @@ Pricing logic living in exactly one place is worth the denormalization.
 As of M4, `discounts[]` carries the location's active catalog discounts — what a
 supervisor can apply, not what's already applied. Applied discounts live on the order
 (see Discounts, below).
+
+`currency` is `config('pos.currency')` (`POS_CURRENCY`) — the server's ISO-4217 code, so
+the register formats every amount it renders instead of hardcoding one. It's also on the
+admin login response (above), since the back office has no catalog fetch of its own.
 
 > **v1 notes:** the location is taken from the enrolled register, never from
 > `location_id` — a device that could choose its pricing location would be a tampering

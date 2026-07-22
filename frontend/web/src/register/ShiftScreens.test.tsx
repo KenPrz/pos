@@ -9,12 +9,17 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CloseShiftScreen } from './ShiftScreens'
 import { api, tokens, type Shift, type ShiftCloseResult, type ZReport } from '../lib/api'
+import { setCurrency } from '../lib/currency'
 
 afterEach(cleanup)
 
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  // Explicit, not relying on lib/currency's pre-load default: this suite never fetches
+  // the catalog (the thing that would normally set it), so pin it the way a real till
+  // would have it set by the time it's showing these amounts.
+  setCurrency('USD')
 })
 
 // Same idiom as FloorScreen.test.tsx: keep everything real (ApiError, tokens, etc.)

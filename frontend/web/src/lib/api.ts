@@ -3,6 +3,7 @@
  * ever unwraps `data` or branches on an HTTP status by hand.
  */
 import { send } from './transport'
+import { setCurrency } from './currency'
 
 /** Success is always `{ data: ... }`; errors are always `{ error: ... }`. Never both. */
 export type ApiSuccess<T> = { data: T }
@@ -336,6 +337,7 @@ export type Catalog = {
   modifiers: Modifier[]
   tax_rates: TaxRate[]
   discounts: Discount[]
+  currency: string
 }
 
 // Verified against RefundResource.php.
@@ -432,7 +434,14 @@ export const api = {
     post<{ shift: Shift }>(`/shifts/${shiftId}/approve-variance`, {}).then((r) => r.shift),
 
   lookupBarcode: (barcode: string) => request<LookedUpVariant>(`/catalog/lookup?barcode=${encodeURIComponent(barcode)}`),
-  catalog: () => request<Catalog>('/catalog'),
+  // The register's source for the server's currency (config('pos.currency')) — this
+  // fires at boot (see MenuGrid/SaleScreen), so setCurrency runs well before any screen
+  // that formats money renders for real.
+  catalog: () =>
+    request<Catalog>('/catalog').then((catalog) => {
+      setCurrency(catalog.currency)
+      return catalog
+    }),
 
   // The key matters here too: a lost response on the implicit first-scan open would
   // otherwise mint a second, invisible empty order on rescan — and open orders block

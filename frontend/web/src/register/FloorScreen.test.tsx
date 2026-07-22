@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import { FloorScreen } from './FloorScreen'
 import { api, type Order, type OpenShiftRegister } from '../lib/api'
+import { setCurrency } from '../lib/currency'
 
 // Same idiom as ModifierSheet.test.tsx: vitest doesn't run with `globals: true`, so
 // @testing-library/react's auto-cleanup never registers itself — do it by hand or DOM
@@ -21,6 +22,9 @@ afterEach(cleanup)
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(api.openShiftRegisters).mockResolvedValue([])
+  // Explicit, not relying on lib/currency's pre-load default: this suite never fetches
+  // the catalog (the thing that would normally set it).
+  setCurrency('USD')
 })
 
 // Module mock: keep everything real (ApiError, types, other api.* members) except the

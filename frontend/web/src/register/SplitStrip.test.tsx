@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SplitPrompt, SplitStrip } from './SplitStrip'
 import type { Order } from '../lib/api'
+import { setCurrency } from '../lib/currency'
 
 afterEach(cleanup)
+
+beforeEach(() => {
+  // Explicit, not relying on lib/currency's pre-load default: this suite renders
+  // SplitStrip standalone, with no catalog fetch to set it for real.
+  setCurrency('USD')
+})
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
   return {

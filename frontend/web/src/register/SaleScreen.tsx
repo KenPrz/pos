@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError, api, tokens, type CatalogProduct, type CatalogVariant, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
+import { getCurrency } from '../lib/currency'
 import { cents, formatMoney, parseCentsOrNull, subtract } from '../lib/money'
 import { hasHardware, printReceipt } from '../lib/shell'
 import { ActionZone } from '@/components/ActionZone'
@@ -15,8 +16,9 @@ import { cn } from '@/lib/utils'
 import { MenuGrid } from './MenuGrid'
 import { SplitPrompt, SplitStrip } from './SplitStrip'
 
-const CURRENCY = 'USD'
-const fm = (n: number) => formatMoney(cents(n), CURRENCY)
+// display only; the server owns all arithmetic — getCurrency() is called per-format so
+// this always reflects whatever the catalog fetch most recently set (lib/currency.ts).
+const fm = (n: number) => formatMoney(cents(n), getCurrency())
 
 type Driver = 'cash' | 'external_card'
 
@@ -463,7 +465,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
           <div className="flex flex-col items-center gap-xs border border-hairline bg-surface-1 px-lg py-xl print:border-0 print:bg-transparent">
             <p className="type-caption text-ink-muted">{paidCash ? 'Change' : 'Card'}</p>
             {paidCash ? (
-              <MoneyText cents={payment.change_cents ?? 0} currency={CURRENCY} size="total" className="hero-amount" />
+              <MoneyText cents={payment.change_cents ?? 0} currency={getCurrency()} size="total" className="hero-amount" />
             ) : (
               <p className="type-display-md">No change due</p>
             )}
@@ -483,7 +485,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
           <div className="flex flex-col gap-sm border-b border-hairline pb-lg print:border-0" key={outcome.order.id}>
             <header className="flex items-center justify-between gap-md">
               <h3 className="type-card-title">Check {ix + 1} — order {outcome.order.number}</h3>
-              {receipt && <Button type="button" variant="ghost" className="min-h-[48px]" onClick={() => void printNow(receipt, CURRENCY)}>Print</Button>}
+              {receipt && <Button type="button" variant="ghost" className="min-h-[48px]" onClick={() => void printNow(receipt, getCurrency())}>Print</Button>}
             </header>
             <p className="type-body-sm text-ink-muted">
               {outcome.payment.driver === 'cash'
@@ -719,7 +721,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
                 <div className="flex min-h-[48px] items-center gap-sm" key={d.id}>
                   <span className="type-body-lg min-w-0 flex-1">{d.name}</span>
                   <span className="type-body-lg type-money shrink-0">
-                    −<MoneyText cents={d.amount_cents} currency={CURRENCY} size="line" />
+                    −<MoneyText cents={d.amount_cents} currency={getCurrency()} size="line" />
                   </span>
                   {can('order.discount.apply') && phase.name === 'scanning' && (
                     <Button
@@ -736,21 +738,21 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
                 <dl className="flex flex-col gap-xxs pt-xs">
                   <div className="flex items-baseline justify-between gap-md">
                     <dt className="type-body-sm text-ink-muted">Subtotal</dt>
-                    <dd><MoneyText cents={order.subtotal_cents} currency={CURRENCY} size="line" /></dd>
+                    <dd><MoneyText cents={order.subtotal_cents} currency={getCurrency()} size="line" /></dd>
                   </div>
                   {order.discount_cents > 0 && (
                     <div className="flex items-baseline justify-between gap-md">
                       <dt className="type-body-sm text-ink-muted">Discount</dt>
-                      <dd className="type-body-lg type-money">−<MoneyText cents={order.discount_cents} currency={CURRENCY} size="line" /></dd>
+                      <dd className="type-body-lg type-money">−<MoneyText cents={order.discount_cents} currency={getCurrency()} size="line" /></dd>
                     </div>
                   )}
                   <div className="flex items-baseline justify-between gap-md">
                     <dt className="type-body-sm text-ink-muted">Tax</dt>
-                    <dd><MoneyText cents={order.tax_cents} currency={CURRENCY} size="line" /></dd>
+                    <dd><MoneyText cents={order.tax_cents} currency={getCurrency()} size="line" /></dd>
                   </div>
                   <div className="mt-xs flex items-baseline justify-between gap-md border-t border-hairline pt-xs">
                     <dt className="type-body-sm text-ink-muted">Total</dt>
-                    <dd><MoneyText cents={order.total_cents} currency={CURRENCY} size="total" /></dd>
+                    <dd><MoneyText cents={order.total_cents} currency={getCurrency()} size="total" /></dd>
                   </div>
                 </dl>
               )}
@@ -787,7 +789,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
       )}
       {phase.name === 'done' && (
         <ActionZone>
-          <Button size="xl" type="button" variant="ghost" onClick={() => void printNow(phase.receipt, CURRENCY)}>Print</Button>
+          <Button size="xl" type="button" variant="ghost" onClick={() => void printNow(phase.receipt, getCurrency())}>Print</Button>
           <Button size="xl" onClick={newSale}>New sale</Button>
         </ActionZone>
       )}

@@ -16,6 +16,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SaleScreen } from './SaleScreen'
 import { api, type Order } from '../lib/api'
+import { setCurrency } from '../lib/currency'
 
 afterEach(cleanup)
 
@@ -23,6 +24,10 @@ afterEach(cleanup)
 // history between tests the same way FloorScreen.test.tsx does.
 beforeEach(() => {
   vi.clearAllMocks()
+  // Explicit, not relying on lib/currency's pre-load default: api.catalog isn't mocked
+  // here (foodMode is off, so MenuGrid — the only thing that calls it — never mounts),
+  // so nothing else in this file would set it for real.
+  setCurrency('USD')
 })
 
 // Same idiom as FloorScreen.test.tsx: keep everything real except the endpoints

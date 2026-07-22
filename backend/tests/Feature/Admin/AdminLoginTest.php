@@ -19,7 +19,10 @@ it('logs an admin in and the token works on an admin route', function (): void {
 
     $response = $this->postJson('/api/v1/admin/login', [
         'email' => 'boss@pos.test', 'password' => 'secret-password',
-    ])->assertOk()->assertJsonPath('data.user.is_admin', true);
+    ])->assertOk()->assertJsonPath('data.user.is_admin', true)
+        // The back office's entry point; it has no catalog fetch of its own, so login is
+        // where it learns the server's currency (phpunit.xml pins POS_CURRENCY=USD).
+        ->assertJsonPath('data.currency', 'USD');
 
     $token = $response->json('data.token');
     expect($token)->toBeString()->not->toBeEmpty();
