@@ -33,3 +33,7 @@ node_modules/
 
 # SDD scratch (ledger, briefs, reports)
 .superpowers/
+
+# User manual build pipeline
+docs/user-manual/.venv/
+docs/user-manual/node_modules/

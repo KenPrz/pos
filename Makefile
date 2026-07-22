@@ -9,7 +9,7 @@ COMPOSE_PROD := docker compose -f compose.prod.yml
 COMPOSE_VAR := $(if $(filter prod,$(COMPOSE)),$(COMPOSE_PROD),$(COMPOSE_DEV))
 
 .DEFAULT_GOAL := help
-.PHONY: help dev dev-down logs ps seed migrate dev-key wait-api test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs backup restore restore-drill e2e
+.PHONY: help dev dev-down logs ps seed migrate dev-key wait-api test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs backup restore restore-drill e2e manual manual-shots
 
 # Which demo catalogs `make seed` builds — comma-separated subset of
 # grocery,restaurant,cafe. Mirrors config/pos.php's default.
@@ -142,6 +142,11 @@ e2e: ## Reseed (twice — see comment above), run all three committed e2e proofs
 	@test -s $(E2E_TMP)/pos-e2e-grc1b.txt || { echo "could not extract the GRC / Till 1 device token on the second reseed"; exit 1; }
 	POS_ADMIN_EMAIL=admin@pos.test POS_ADMIN_PASSWORD=admin-dev-password POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-grc1b.txt) POS_E2E_PIN=9876 bash scripts/e2e-admin-day.sh
 	@rm -rf $(E2E_TMP)
+
+manual: ## Build docs/user-manual/user-manual.pdf (host python3; pinned deps into a local venv)
+	@test -d docs/user-manual/.venv || python3 -m venv docs/user-manual/.venv
+	@docs/user-manual/.venv/bin/pip install -q markdown==3.7 pymdown-extensions==10.12 weasyprint==63.1
+	docs/user-manual/.venv/bin/python docs/user-manual/build_pdf.py
 
 test: test-backend test-web test-bo ## All suites, in containers
 
