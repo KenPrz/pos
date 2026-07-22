@@ -28,10 +28,23 @@ final class DeleteRole
                 throw new RoleTemplateIsSystem($template->id);
             }
 
+            // Lock the materialized `roles` rows themselves, not just the template: the
+            // count below and the delete further down must see a consistent world with
+            // RoleAssignments::sync()'s insert into model_has_roles, which only holds a
+            // plain FK reference to roles.id. In Postgres, a concurrent FK-referencing
+            // INSERT takes FOR KEY SHARE on the referenced row, which conflicts with
+            // FOR UPDATE — so whichever of "grant" or "delete" arrives first blocks the
+            // other until it commits, and the count is never stale. Without this lock,
+            // a grant that commits after the count reads 0 but before the delete cascades
+            // would have its fresh model_has_roles row silently destroyed by that cascade.
+            $roleIds = DB::table('roles')
+                ->where('name', $template->name)
+                ->whereNotNull('location_id')
+                ->lockForUpdate()
+                ->pluck('id');
+
             $assignedUsers = DB::table('model_has_roles')
-                ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-                ->where('roles.name', $template->name)
-                ->whereNotNull('roles.location_id')
+                ->whereIn('role_id', $roleIds)
                 ->count();
 
             if ($assignedUsers > 0) {
@@ -41,7 +54,7 @@ final class DeleteRole
             // Deleted, not archived: an unassigned custom template has nothing left
             // pointing at it, and role_templates has no is_active column to archive
             // into. Cascades role_has_permissions and role_template_permissions.
-            Role::query()->where('name', $template->name)->whereNotNull('location_id')->delete();
+            Role::query()->whereIn('id', $roleIds)->delete();
 
             $template->delete();
 
