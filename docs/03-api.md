@@ -633,10 +633,13 @@ GET|POST /api/v1/admin/registers        PATCH /api/v1/admin/registers/{id}
 POST /api/v1/admin/registers/{id}/activation-code
   → { activation_code, expires_at }        # shown exactly once
 ```
-Gated `location.manage`, except `GET /admin/locations`, which accepts any admin-tier
-section — location names are low-sensitivity reference data every permitted section
-(the location switcher, the user editor, reports) composes from, not something worth
-gating behind `location.manage` specifically.
+The location endpoints are gated `location.manage`, except `GET /admin/locations`,
+which accepts any admin-tier section — location names are low-sensitivity reference
+data every permitted section (the location switcher, the user editor, reports)
+composes from, not something worth gating behind `location.manage` specifically. The
+register endpoints — including activation-code issuance — are gated `register.enroll`,
+not `location.manage`: enrolling and re-keying terminals is its own trust decision,
+separate from editing location settings.
 
 **Per-location thresholds (RBAC v2).** `variance_approval_threshold_cents` (integer,
 `>= 0`) and `low_stock_threshold` (decimal string, `>= 0`) override the deployed config
