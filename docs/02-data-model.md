@@ -35,6 +35,13 @@ create table locations (
   receipt_header     text,                          -- admin-editable copy
   receipt_footer     text,
   is_active          boolean not null default true,
+
+  -- RBAC v2 / Settings: per-location overrides, null = deployed config default
+  variance_approval_threshold_cents integer
+    check (variance_approval_threshold_cents is null or variance_approval_threshold_cents >= 0),
+  low_stock_threshold                numeric(12,3)
+    check (low_stock_threshold is null or low_stock_threshold >= 0),
+
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
 );
@@ -50,6 +57,22 @@ UK store. See the tax section in `01-architecture.md`.
 the copy and must not need a deploy to do it — the config-vs-database rule is in
 `04-backend-conventions.md`. The business name and address on the same receipt *are*
 config, because those change roughly never.
+
+**`variance_approval_threshold_cents` and `low_stock_threshold` (RBAC v2) are the same
+config-vs-database story, one level more granular: the *deployed* default
+(`pos.shifts.variance_approval_threshold_cents`, `pos.stock.low_threshold`) is still an
+engineer's knob, but a specific store's tolerance for drawer variance or how early it
+wants a low-stock warning is an admin's call, and differs store to store the same way
+`prices_include_tax` does.** Both are nullable, and **null carries a specific, load-
+bearing meaning: "use the config default," not "zero."** A location that has never had
+either column touched reads exactly like it did before these columns existed. The
+consumers (`ApproveVariance`, `CloseShiftResource`, `StockReport`) all resolve
+`location->column ?? config(...)` at read time — never at write time, and never backfilled
+— so changing the deployed default later takes effect immediately at every location that
+hasn't set its own override, with no migration to re-run. The two `check` constraints
+allow `null` explicitly (rather than the usual bare `>= 0`) for exactly this reason: a
+constraint that forbade null here would make "fall back to config" unrepresentable at
+the schema level.
 
 ```sql
 create table users (
@@ -104,6 +127,13 @@ sorted by creation time — the reasons for uuidv7 don't apply. The rationale an
 required migration edits (the package ships integer team/morph keys that must be changed
 to `uuid`) are in `05-rbac.md`.
 
+**`model_has_permissions` (RBAC v2) carries direct per-location permission grants** —
+the same teams-scoped shape as `model_has_roles`, one permission at a time instead of a
+bundle. It shipped with the package from M2 onward and simply went unused until RBAC v2
+gave it a writer (`App\Domain\Rbac\PermissionAssignments`); no migration was needed to
+add it. "Which permissions does this user hold directly, and where" is the same shape of
+query as the role one above, joined through `permissions` instead of `roles`.
+
 **PIN collisions are an application-level invariant, not a database one.** Bcrypt hashes
 are salted, so two identical PINs produce different hashes and no unique index can catch
 them. But two staff at one location sharing PIN `1234` destroys attribution — the audit
@@ -143,6 +173,78 @@ constraint, no new order-model table. It ships on the login response
 (`03-api.md`) and picks the register's screen (menu grid + tabs vs. barcode scanner);
 the order lifecycle underneath is identical either way. A register can be re-enrolled
 into a different mode without touching a single order row.
+
+---
+
+## RBAC v2 and Settings
+
+```sql
+create table role_templates (
+  id         uuid primary key default uuidv7(),
+  name       text not null unique,
+  is_system  boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table role_template_permissions (
+  role_template_id uuid not null references role_templates(id) on delete cascade,
+  permission_id    bigint not null references permissions(id) on delete cascade,
+  primary key (role_template_id, permission_id)
+);
+```
+
+A **role template** is the runtime, admin-editable definition of a role: a name plus a
+permission set. It is `uuid`-keyed and client-visible, unlike spatie's own `roles` table
+(bigint PK, never exposed — `05-rbac.md`), because a role template is exactly what
+`GET /admin/roles` returns to the UI. `role_template_permissions` is a plain join table
+against spatie's own `permissions.id` (bigint, matching that table's own PK), not a
+second copy of the permission catalog.
+
+**A template is not itself an assignable role — it's the thing `RoleProvisioner`
+materializes into one.** Spatie's teams feature makes its own `roles` table per-team, so
+`Role::create(['name' => 'cashier'])` only ever creates a cashier for the current team.
+A `role_templates` row is global; `RoleProvisioner` keeps a same-named `roles` row in
+sync **at every location**, and `model_has_roles` (the actual assignment table,
+`(user, role, location)`) still points at those per-location `roles` rows exactly as it
+always did — nothing about assignment storage changed, only where a role's *definition*
+lives. Two rows seed once, `cashier` and `supervisor` (`is_system = true`): permissions
+editable, name and existence pinned, because every seed, script, and doc assumes those
+two names exist. A custom template can be renamed or deleted; delete is refused while
+any of its materialized `roles` rows still has an assignment (`role_template_in_use`,
+`05-rbac.md`) — at that point it is a real `delete`, not an archive, because
+`role_templates` deliberately carries no `is_active` column: an unassigned template has
+nothing left pointing at it, unlike every other "archive, never delete" row in this
+schema.
+
+```sql
+create table settings (
+  key        text primary key,
+  value      jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+```
+
+Keyed runtime settings — the database half of "config is what engineers deploy, the
+database is what admins change at runtime" (`04-backend-conventions.md`), for the
+handful of values that earned a promotion: `business.name`, `business.address`,
+`business.tax_id`. One row per registry key (`App\Domain\Settings\Settings::REGISTRY`
+is the code-side list of valid keys), value as `jsonb` so a string, bool, or number all
+fit the same column without a schema change per setting. **A row's absence, not a stored
+null, means "use the config default."** Setting a value writes/upserts the row;
+*clearing* an override **deletes the row** rather than storing a JSON null — a stored
+null would pin the key to "the database says so" forever with no way back to config,
+which is exactly the ambiguity the two location threshold columns above solve by
+allowing an explicit `null` in a nullable integer/numeric column instead. Two different
+shapes for the same "null means fall back to config" contract, because `settings.value`
+is `not null jsonb` (it must hold *some* JSON value whenever a row exists at all) while
+the location columns are nullable scalars — each table uses the representation that's
+actually available to it.
+
+The two per-location threshold columns this task adds — `variance_approval_threshold_cents`
+and `low_stock_threshold` on `locations` — are documented in Organization, above, right
+next to the table they extend, rather than repeated here.
 
 ---
 
@@ -581,7 +683,11 @@ discount on an order that later gains a line does not silently re-scale; it is
 recalculated and rewritten explicitly, by code we can test.
 
 `applied_by` is mandatory and `requires_supervisor` defaults true because discounts are
-how money leaves a till with a smile.
+how money leaves a till with a smile. The flag is enforced, not just recorded (RBAC
+v2): `ApplyDiscount` checks it against the acting user after loading the row, `403
+discount_needs_supervisor` on a `true`-flagged discount attempted below the floor
+permission — see `05-rbac.md`. A discount explicitly flipped to `false` is what makes a
+cashier-safe discount real.
 
 ### Payments
 

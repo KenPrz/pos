@@ -5,6 +5,10 @@ import { useEffect, useState } from 'react'
 import { ApiError, api, type ManagedUser } from '../../lib/api'
 import { EntityTable } from '../catalog/EntityTable'
 import { UserEditor } from './UserEditor'
+import { RolesPanel } from './RolesPanel'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
+
+type Tab = 'users' | 'roles'
 
 // Same list-query idiom as CatalogSection's useCatalogList (Task 9): react-query v5
 // dropped `onError`, so a settled query error is watched via effect instead.
@@ -17,14 +21,54 @@ function useAdminList<T>(key: string, queryFn: () => Promise<T[]>, onUnauthorize
 }
 
 /**
- * The Users screen (Task 10, on the component vocabulary since Task 4): one
- * `EntityTable`-on-`DataTable` of every user, with deactivated accounts dimmed
+ * Users & Roles (Task 10, RBAC v2): the `PlacesSection` two-tab shape — the Users body
+ * is unchanged from before this task, just moved into its own tab panel; Roles is the
+ * new `RolesPanel` (role template CRUD + grouped permission checkboxes). Task 11 gates
+ * each tab on its own permission (`user.manage` / `role.manage`) — Shell only mounts
+ * this section when at least one is held, so at least one tab is always present.
+ */
+export function UsersSection({
+  onUnauthorized,
+  canManageUsers,
+  canManageRoles,
+}: {
+  onUnauthorized: () => void
+  canManageUsers: boolean
+  canManageRoles: boolean
+}) {
+  const [tab, setTab] = useState<Tab>(canManageUsers ? 'users' : 'roles')
+
+  return (
+    <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+      <TabsList aria-label="Users tabs">
+        {canManageUsers && <TabsTrigger value="users">Users</TabsTrigger>}
+        {canManageRoles && <TabsTrigger value="roles">Roles</TabsTrigger>}
+      </TabsList>
+
+      <div className="pt-lg">
+        {canManageUsers && (
+          <TabsContent value="users">
+            <UsersPanel onUnauthorized={onUnauthorized} />
+          </TabsContent>
+        )}
+        {canManageRoles && (
+          <TabsContent value="roles">
+            <RolesPanel onUnauthorized={onUnauthorized} />
+          </TabsContent>
+        )}
+      </div>
+    </Tabs>
+  )
+}
+
+/**
+ * One `EntityTable`-on-`DataTable` of every user, with deactivated accounts dimmed
  * (`DataTable`'s `inactive` prop) and reinstate-able rather than removed (users are
  * never deleted — see the account's roles/audit history, which must survive). Roles
  * need the locations list for its "which location" selects, so this loads both the
  * same way ProductsPanel loads categories/modifier-groups alongside products.
  */
-export function UsersSection({ onUnauthorized }: { onUnauthorized: () => void }) {
+function UsersPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
   const users = useAdminList('users', api.users.list, onUnauthorized)
   const locations = useAdminList('locations', api.locations.list, onUnauthorized)
   const queryClient = useQueryClient()

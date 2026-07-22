@@ -6,13 +6,16 @@ namespace App\Http\Requests\Admin\Locations;
 
 use App\Actions\Admin\Locations\CreateLocationInput;
 use App\Domain\Rbac\Permissions;
+use App\Http\Requests\Concerns\AuthorizesBackOffice;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class CreateLocationRequest extends FormRequest
 {
+    use AuthorizesBackOffice;
+
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::LOCATION_MANAGE);
+        return $this->allowsBackOffice(Permissions::LOCATION_MANAGE);
     }
 
     public function rules(): array
@@ -27,6 +30,8 @@ final class CreateLocationRequest extends FormRequest
             'prices_include_tax' => ['sometimes', 'boolean'],
             'receipt_header' => ['nullable', 'string'],
             'receipt_footer' => ['nullable', 'string'],
+            'variance_approval_threshold_cents' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'low_stock_threshold' => ['sometimes', 'nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -39,6 +44,8 @@ final class CreateLocationRequest extends FormRequest
             pricesIncludeTax: $this->boolean('prices_include_tax', false),
             receiptHeader: $this->input('receipt_header'),
             receiptFooter: $this->input('receipt_footer'),
+            varianceApprovalThresholdCents: $this->input('variance_approval_threshold_cents'),
+            lowStockThreshold: $this->input('low_stock_threshold') === null ? null : (string) $this->input('low_stock_threshold'),
             actorId: $this->user()->id,
         );
     }

@@ -16,7 +16,10 @@ final class CloseShiftResource extends JsonResource
             'shift' => new ShiftResource($this->resource),
             'expected_cash_cents' => $this->expected_cash_cents,
             'variance_cents' => $this->variance_cents,
-            'requires_approval' => abs($this->variance_cents) > config('pos.shifts.variance_approval_threshold_cents'),
+            'requires_approval' => abs($this->variance_cents) > (
+                $this->register->location->variance_approval_threshold_cents
+                    ?? config('pos.shifts.variance_approval_threshold_cents')
+            ),
         ];
     }
 }

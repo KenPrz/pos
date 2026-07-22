@@ -13,7 +13,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * `roles` comes from the `role_assignments` attribute the action attaches before
  * wrapping — a direct `model_has_roles` join, never spatie's `roles()` relation. See
- * `App\Domain\Rbac\RoleAssignments`.
+ * `App\Domain\Rbac\RoleAssignments`. `permissions` is the same story for
+ * `permission_assignments` / `model_has_permissions` — see
+ * `App\Domain\Rbac\PermissionAssignments`.
  */
 final class AdminUserResource extends JsonResource
 {
@@ -27,6 +29,7 @@ final class AdminUserResource extends JsonResource
             'is_admin' => (bool) $this->is_admin,
             'is_active' => (bool) $this->is_active,
             'roles' => $this->role_assignments ?? [],
+            'permissions' => $this->permission_assignments ?? [],
         ];
     }
 }

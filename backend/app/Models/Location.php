@@ -28,6 +28,8 @@ class Location extends Model
         'receipt_header',
         'receipt_footer',
         'is_active',
+        'variance_approval_threshold_cents',
+        'low_stock_threshold',
     ];
 
     /** @return array<string, string> */
@@ -37,6 +39,8 @@ class Location extends Model
             'prices_include_tax' => 'boolean',
             'is_active' => 'boolean',
             'address' => 'array',
+            'variance_approval_threshold_cents' => 'integer',
+            'low_stock_threshold' => 'string', // numeric(12,3) -> string; never float
         ];
     }
 

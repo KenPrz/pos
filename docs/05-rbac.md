@@ -88,9 +88,11 @@ short-circuits the gate. The one capability that is genuinely global is the one 
 cannot be modelled per-location — which is a coherent line, not an exception.
 
 Consequence worth knowing: `catalog.manage`, `user.manage`, `location.manage`,
-`register.enroll` and `audit.view` are granted by **no role**. That is correct — only
-admins do those things, and admins bypass. The permission names still exist because the
-endpoints still name what they require.
+`register.enroll`, `audit.view`, `settings.manage`, and `role.manage` are granted by
+**no role**. That is correct — only admins do those things by default, and admins
+bypass. The permission names still exist because the endpoints still name what they
+require, and (RBAC v2, below) an admin can hand any one of them out as a direct
+per-location grant without inventing a role for it.
 
 ## Verified integration notes
 
@@ -200,6 +202,8 @@ resolved in the action rather than a policy class.
 | `user.manage` | Staff and their roles |
 | `location.manage` | Locations, settings |
 | `register.enroll` | Enroll a terminal |
+| `settings.manage` | Business identity + per-location thresholds (RBAC v2) |
+| `role.manage` | Role-template CRUD (RBAC v2) |
 
 **Stock**
 
@@ -221,7 +225,15 @@ invisible if they aren't held to the same standard.
 | --- | --- |
 | `report.z.view` | Z-report for a shift |
 | `report.sales.view` | Sales reports across shifts |
+| `report.stock.view` | The stock/low-stock report |
 | `audit.view` | The audit log |
+
+`report.stock.view` is new in RBAC v2 — a 2026-07-22 audit found `GET
+/admin/reports/stock` mis-gated on `report.sales.view` (a user who can read sales
+figures is not necessarily who should read inventory counts, and vice versa). It's
+its own permission now, granted to `supervisor` alongside `report.sales.view`, and
+the stock-report `FormRequest` checks it explicitly rather than reusing the sales
+one.
 
 Every permission marked **money leaves** is supervisor-or-above. That set is not a
 coincidence or a judgement call — it is the fraud surface from `01-architecture.md`,
@@ -231,50 +243,200 @@ moves cash out of the till, which is why `stock.adjust` carries the label too. W
 a permission, the question that decides its role is "can this be used to take value out of
 the business without a customer noticing?"
 
-## Roles
+## Roles (RBAC v2: admin-editable templates)
 
-Seeded, not user-editable in v1. Two roles, deliberately coarse, plus the `admin` flag
-that sits outside the role system entirely (see the correction above).
+Through M6, roles were seeded and fixed — two names, hardcoded permission sets, no way
+to add a third without a migration. **RBAC v2 turns a role into data**: a
+`role_templates` row (`02-data-model.md`) is a name plus a permission set, editable at
+runtime through `/admin/roles*`. The permission *catalog* stays code (the list above) —
+what changes is which permissions a given role name grants, and how many role names
+exist.
 
-**`cashier`** — the shift they can run alone:
-`order.open`, `order.line.add`, `order.line.update`, `payment.take`, `shift.open`,
-`shift.close`, `catalog.view`, `report.z.view`
+**The materialization problem, and why templates exist at all.** Spatie's teams feature
+makes a `Role` row per-team: `Role::create(['name' => 'cashier'])` creates a cashier for
+*one* location, and a template with no per-location counterpart is a name nobody can
+actually be assigned. So a `RoleTemplate` is the single source of truth, and
+`RoleProvisioner` keeps a materialized spatie `Role` row in sync at every location:
 
-**`supervisor`** — everything a cashier can do, plus the fraud surface:
-`order.line.void`, `order.discount.apply`, `order.void`, `order.reopen`,
-`order.transfer`, `payment.void`, `refund.create`, `shift.cash_movement`,
-`shift.approve_variance`, `drawer.no_sale`, `report.sales.view`, `stock.adjust`,
-`stock.receive`, `stock.count`, `stock.movements.view`
+- `provisionGlobal()` — seeds the permission catalog once, and seeds exactly two
+  **system templates**, `cashier` and `supervisor`, with the same permission sets this
+  document always specified (`Permissions::cashier()`/`supervisor()`, still the seed
+  source — the *template row* is the runtime truth after that first seed; a reseed never
+  clobbers an admin's edit to it).
+- `provisionForLocation($location)` — for every template that exists, materializes its
+  spatie `Role` row at that location. Called from `CreateLocation`, so a store opened at
+  runtime gets every current role, not just the two system ones.
+- `syncTemplate($template)` — after any template create/edit/rename, re-materializes it
+  (permissions synced, or the spatie row renamed) at **every** location in one pass.
 
-**`admin`** — not a role. `users.is_admin` + `Gate::before`, per the correction above.
+**System vs custom.** `is_system` (`cashier`, `supervisor`) may have its **permission
+set** edited but not its name — renaming or deleting either would strand every seed,
+script, and doc that assumes they exist under those exact names
+(`RoleTemplateIsSystem`, 422). A **custom** template (`shift-lead`, `bookkeeper`,
+whatever a business invents) can be renamed or deleted freely, with one guard: delete is
+refused while any materialized `Role` row for it still has an assignment
+(`RoleTemplateInUse`, 422, with the assigned-user count in `details`) — unassign
+everywhere first, the same "no dangling reference" shape as archive-never-delete
+elsewhere in this system, except a role template genuinely has nothing left pointing at
+it once unassigned, so it's a real delete, not an archive (`role_templates` has no
+`is_active` column to archive into).
 
-A cashier can open and close their own drawer without a supervisor, because requiring one
-for a routine open would mean either a manager tied to the terminal all morning or a
-manager's PIN written on a sticky note — and the second is what actually happens.
-Variance *approval* is where the supervisor belongs; that's the moment worth their time.
+`admin` is still **not a template at all** — `users.is_admin` + `Gate::before`, per the
+correction above. Templates are how a business shapes *its own* roles; the one
+capability that is genuinely global still can't be modelled per-location, so it stays
+outside the system entirely.
 
-## Back-office access
+Endpoints (`03-api.md`): `GET/POST /admin/roles`, `PATCH /admin/roles/{id}`,
+`POST /admin/roles/{id}/delete` (a `POST`, not a `DELETE` verb — the repo's "no `DELETE`
+route anywhere under `/admin/*`" rule is about the HTTP verb, and a role-template row
+really is deleted, so the URL still can't use it), and `GET /admin/permissions` (the
+catalog above, grouped for the role editor and the user-management role picker). All
+four gated `role.manage`; `GET /admin/permissions` also accepts `user.manage`, since the
+user editor's role/grant pickers need the same catalog and shouldn't require
+role-editing rights just to read it.
 
-`POST /api/v1/admin/login` (`03-api.md`) is **admin-only** in v1 — there is no
-supervisor or bookkeeper tier that can reach `/admin/*` while stopping short of full
-admin. That is a scope decision, not an oversight, and it follows directly from how
-team context works everywhere else in this system: `EnsureStaffSession` reads the
-location off the *register* the request came from, so a role check never has to ask
-the client which location it means. The back office has no register. A supervisor- or
-bookkeeper-scoped back-office login would need to ask the client which location's roles
-to check, which is exactly the client-supplied-scope hole per-location teams exist to
-close (see "Wiring", above). Solving that properly — not bolting a location parameter
-onto `AdminLogin` — is real design work, so it waits.
+A cashier can still open and close their own drawer without a supervisor, because
+requiring one for a routine open would mean either a manager tied to the terminal all
+morning or a manager's PIN written on a sticky note — and the second is what actually
+happens. Variance *approval* is where the supervisor belongs; that's the moment worth
+their time. Nothing about that changed — it's still true of the `cashier`/`supervisor`
+templates' default permission sets, just expressed as editable data now instead of a
+hardcoded pair.
 
-The deferral has a name and a trigger, from the M6 design spec's deferred table:
-**supervisor/bookkeeper back-office access, revived by the first accountant** who needs
-sales and audit visibility without order-void or user-management power. Until then,
-`admin` is the only way into `/admin/*`, and `AdminLogin` refuses wrong email, wrong
-password, deactivated, and non-admin identically (`401 invalid_credentials`) — the same
-enumeration-safe shape as `StaffLogin`'s PIN refusal, extended to the back office. It's
-also why `user.manage` guards `self_lockout` (`03-api.md`): with exactly one admin tier
-and no location-scoped fallback, an admin who could revoke their own access would have
-no one else able to undo it.
+## Direct per-location permission grants (RBAC v2)
+
+A role assigns a *bundle*; sometimes what's needed is one permission for one person at
+one location — "Maria can pull the sales report at Airport" without inventing a
+`report-only` role for a bundle of one. `users.permissions[]` (`03-api.md`) is exactly
+that: `[{location_id, permission}]` rows in spatie's own `model_has_permissions` table,
+which teams already gave us and RBAC v1 simply never wrote to.
+
+**Same gotcha as roles, same fix.** `PermissionAssignments` reads and writes
+`model_has_permissions` with direct table joins, never spatie's `permissions()`
+relation — that relation applies `wherePivot(location_id, currentTeam)` exactly the way
+`roles()` does, so it can only ever answer "direct grants at the location I'm already
+standing at." The CLAUDE.md gotcha about `roles()` was written for that relation, but
+`permissions()` is generated by the same package the same way, and it bit the same way
+during this work.
+
+**Full-set replace**, mirroring `roles[]`: sending `permissions` on a user create/update
+replaces every existing direct grant for that user; omitting the key leaves them
+untouched; sending `[]` clears them all. Validated against the same permission catalog
+as templates.
+
+**Union at `can()` time, no register-tier change.** A direct grant and a role-derived
+permission both land in `model_has_roles`/`model_has_permissions` under the same team
+context `EnsureStaffSession` already sets, and spatie's own `can()` unions both sources
+when teams are enabled — so a cashier granted `order.discount.apply` directly at one
+location can apply discounts there, and nowhere else, without `EnsureStaffSession`,
+`ApplyDiscount`, or any other register-tier code changing at all. The register was
+already asking the right question (`can('order.discount.apply')`); RBAC v2 just adds a
+second way to answer yes.
+
+## Back-office access (RBAC v2: permission-based, not admin-only)
+
+Through M6, `POST /api/v1/admin/login` was **admin-only** — there was no tier that
+could reach `/admin/*` while stopping short of full admin, and the deferred table named
+the trigger: "the first accountant who needs sales and audit visibility without
+order-void or user-management power." RBAC v2 is that trigger being pulled.
+
+**The rule is "holds it anywhere."** Admin-tier surfaces are global — there is no
+register to read a location off, unlike every other tier in this system — so access is
+granted the moment a user holds at least one **admin-tier permission** at *any*
+location, via a role or a direct grant. `App\Domain\Rbac\AdminAccess::SECTIONS` is the
+admin-tier set: `catalog.manage`, `user.manage`, `location.manage`, `register.enroll`,
+`audit.view`, `report.sales.view`, `report.stock.view`, `settings.manage`,
+`role.manage`. `holdsAnywhere($user, $permission)` is `is_admin || in_array($permission,
+$this->allHeld($user))`, where `allHeld()` is the union of every role-derived and direct
+permission across every location — direct table joins on `model_has_roles` and
+`model_has_permissions`, for the same reason `PermissionAssignments` and
+`RoleAssignments` are direct joins: spatie's relations answer "at the team I'm
+standing at," and there is no team to stand at here.
+
+**Every admin `FormRequest::authorize()` calls `AdminAccess::holdsAnywhere()` (via the
+`AuthorizesBackOffice` trait's `allowsBackOffice()`), never a bare `can()`.** A bare
+`can()` reads the *current* permission team context, and an admin request has none set
+— `EnsureStaffSession` is what sets it, and admin requests never run through that
+middleware. Calling `can()` in an admin `FormRequest` doesn't error; it silently checks
+against whatever team context (usually none) happens to be set, which is the same
+failure shape the `roles()`/`permissions()` gotcha is, one layer up. This is now a
+CLAUDE.md gotcha in its own right.
+
+**The back-office gate is two checks, not one, and both matter for different reasons.**
+`EnsureBackOffice` (the `admin` route middleware, replacing the old `EnsureAdmin`)
+requires the bearer token's owner to be `is_active` **and** hold at least one admin-tier
+permission (`holdsAnyAdminSection`) **and** for the token itself to carry the `admin`
+Sanctum ability. That third check earns its place now, not before: a register staff
+session token (`StaffLogin`'s `register:{id}` ability) authenticates as the same
+underlying `User` row, and once ordinary role permissions like a supervisor's default
+`report.sales.view`/`report.stock.view` can open admin-tier sections, the
+permission check alone would let a staff token that happens to belong to a supervisor
+walk straight into the back office. `AdminLogin` mints tokens with the `admin` ability;
+device tokens carry `['device']` and staff tokens carry `register:{id}` — neither
+satisfies `can('admin')`. The permission check still matters on its own: it's what scopes
+an admin-login token to the sections its holder actually holds, not just proof of where
+the token came from.
+
+**Session shape.** `AdminSessionResource` (`03-api.md`) carries `sections` — the
+admin-tier permissions this user holds, in canonical order, `is_admin` ⇒ every section —
+so the back-office sidebar renders only what its holder may open; the API refuses the
+rest regardless of what the client tries to render. It also carries
+`report_location_ids`: `null` for an admin (every location), otherwise the union of
+every location where `report.sales.view` or `report.stock.view` is held — the location
+switcher filters down to that set, since a stock-only grant at one store must not leak
+a picker option for a store its holder can't actually query.
+
+**Reports stay location-scoped even though back-office login is "anywhere."** Holding
+`report.stock.view` *somewhere* is what gets you in the door; it is not a blank check to
+read *every* location's stock. `StockReportRequest`/the sales-report request each
+additionally validate the requested `location_id` against
+`AdminAccess::locationIdsWhere($user, $permission)` (admin: `null`, meaning all) and
+throw an `AuthorizationException` if the requested location isn't in that set. This is
+the same shape as the ordinary Permissions-vs-Policies split below, just applied to a
+permission that happens to be global-*access* but location-*scoped-data*.
+
+`AdminLogin` still refuses wrong email, wrong password, deactivated, and
+now-zero-admin-tier-permissions identically (`401 invalid_credentials`) — the same
+enumeration-safe shape as before, just with a wider set of users who can pass. It's also
+still why `user.manage` guards `self_lockout` (`03-api.md`): with `is_admin` remaining
+the only *unconditional* tier and no guaranteed second admin online, an admin who could
+revoke their own access would have no one else able to undo it.
+
+**Escalation posture: `user.manage` and `role.manage` are effectively root-equivalent
+grants, not ordinary admin-tier permissions.** A `user.manage` holder can set any other
+user's `is_admin` flag or hand them any permission grant directly; a `role.manage`
+holder can widen the permission set of any role template they themselves already hold,
+which reaches every user assigned that template. Neither needs `is_admin` to escalate to
+full admin in practice — grant them with the same care as `is_admin` itself, not as a
+routine admin-tier permission like `report.sales.view`.
+
+**Archived locations still confer back-office access.** A role or direct grant recorded
+at a location that has since been archived is never deleted (archive-never-delete, this
+repo-wide), so `AdminAccess::holdsAnywhere`/`allHeld` still see it — a user whose only
+admin-tier grant sits at an archived location still logs into the back office and still
+sees that section, consistent with every other archived-but-not-deleted row in this
+system.
+
+## The `requires_supervisor` discount rule (RBAC v2: enforced, not just stored)
+
+`discounts.requires_supervisor` (`02-data-model.md`) existed since M2 as a column with
+no enforcement behind it — any discount could be applied by anyone who could add a line.
+RBAC v2 closes that gap, and does it **inside the action**, not the route, for the same
+reason `order.line.update`'s fired-line escalation (Permission catalog, above) and
+`SetLinePrepState` both live in the action: whether *this* discount needs a supervisor
+depends on data (the row's own flag) that isn't known until it's loaded, and a flat
+route-level `can()` can't express "only when this particular row says so."
+
+`ApplyDiscountRequest::authorize()` checks only the **floor**: `order.line.add` — any
+staffer who can ring up a sale can *attempt* a discount. `ApplyDiscount::execute()`
+loads the discount row inside the lock and, if `requires_supervisor` is true, re-checks
+`order.discount.apply` against the acting user; failing that check is
+`403 discount_needs_supervisor` (`DiscountNeedsSupervisor`), not the generic `forbidden`.
+When the flag is false, the floor permission is sufficient — this is what makes a
+**cashier-safe discount** a real thing rather than a database column nobody reads:
+a "loyalty $1 off" a business marks cashier-safe can now actually be applied by a
+cashier, and a discount left at the column's default (`true`) behaves exactly as it
+always has.
 
 ## Permissions vs Policies
 
@@ -356,20 +518,31 @@ Two consequences worth stating:
 
 ## Seeding
 
-Permissions and roles are **seeded from code, never created at runtime**. The seeder is
-the source of truth and is safe to re-run:
+**Permissions are seeded from code, never created at runtime; roles (RBAC v2) are
+seeded once, then admin-editable data.** `RoleProvisioner` does all of it and is safe
+to re-run:
 
-`RoleProvisioner` does both halves and is safe to re-run:
+- `provisionGlobal()` — every permission in the catalog above, plus exactly two
+  **system role templates** (`cashier`, `supervisor`) seeded `firstOrCreate` from
+  `Permissions::cashier()`/`supervisor()`. `firstOrCreate` is load-bearing: after the
+  first seed, the `role_templates` table is the runtime truth, and a later reseed must
+  never clobber an admin's edit to either template's permission set. It creates no
+  admin role/template (see the correction).
+- `provisionForLocation($location)` — materializes **every current template**, not just
+  the two system ones, into a per-location spatie `Role` row. Called from
+  `CreateLocation`, so a store opened at runtime — and any custom role a business has
+  since added — is provisioned there too.
+- `syncTemplate($template)` — pushes a template's current definition (permission set,
+  and a rename) to its materialized row at every location. Called after every
+  role-template create/edit/rename; a template with no caller to re-sync it would drift
+  from what it was just edited to say.
 
-- `provisionGlobal()` — every permission in the catalog above. Permissions are global;
-  only roles are team-scoped. It creates no admin role (see the correction).
-- `provisionForLocation($location)` — `cashier` and `supervisor`, **once per location**,
-  because with teams enabled a role row is per-team.
-
-That last point is the one that surprises people: `Role::create(['name' => 'cashier'])`
-creates a cashier for the *current* team only. Opening a new store means provisioning its
-roles, so `CreateLocation` must call `provisionForLocation` inside the same action — a
-location without roles is a store nobody can be assigned to.
+The point that still surprises people: `Role::create(['name' => 'cashier'])` creates a
+cashier for the *current* team only — a role row is per-team with teams enabled,
+regardless of whether its definition comes from a seeded template or an admin-created
+one. Opening a new store without provisioning it is a store nobody can be assigned
+to, and this was a real, confirmed bug before RBAC v2: `CreateLocation` wasn't calling
+`provisionForLocation` at all, so a UI-created location silently had no roles.
 
 ## Caching
 
@@ -397,7 +570,22 @@ The tests that must exist, each corresponding to money walking out the door:
 - `admin` resolves at every location while holding no role anywhere.
 - Non-admins are unaffected by the `Gate::before` bypass — it must return `null`, not
   `false`.
-- Roles are provisioned for a location created at runtime.
+- Roles are provisioned for a location created at runtime — the regression test for the
+  bug the paragraph above describes.
+- **RBAC v2 additions:** a custom role template's create/edit/rename/delete, including
+  sync-on-edit reaching every location and delete refused while assigned
+  (`role_template_in_use`) or the template is a system one (`role_template_is_system`); a
+  direct per-location grant unions with role permissions at `can()` time and is scoped to
+  its location (a cashier granted `order.discount.apply` at one location can apply
+  discounts there and nowhere else); the back-office access matrix (a non-admin with one
+  admin-tier permission gets in and sees only that section; zero admin-tier permissions
+  is refused like bad credentials; a staff-session token never passes `EnsureBackOffice`
+  even for a supervisor; `is_admin` is unaffected); sales/stock report location
+  filtering (a location outside `locationIdsWhere()` is refused even though back-office
+  login itself is "anywhere"); `requires_supervisor` enforcement both ways (a
+  cashier-safe discount succeeds for a cashier, a normal one 403s
+  `discount_needs_supervisor`); per-location threshold overrides (variance approval and
+  low-stock) falling back to config when null.
 
 One more, learned the hard way: **`StaffLogin` must set the team context itself.** Login
 runs *before* a staff session exists, so `EnsureStaffSession` hasn't run — and reading the

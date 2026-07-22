@@ -12,12 +12,15 @@ final class UpdateUserInput
      *                                         and roles are handled separately below.
      * @param  list<array{location_id: string, role: string}>|null  $roles  null means "not
      *                                                                      submitted, leave alone"; [] means "clear every assignment".
+     * @param  list<array{location_id: string, permission: string}>|null  $permissions  null
+     *                                                                                  means "not submitted, leave alone"; [] means "clear every grant".
      */
     public function __construct(
         public readonly string $userId,
         public readonly array $changes,
         public readonly ?string $pin,
         public readonly ?array $roles,
+        public readonly ?array $permissions,
         public readonly string $actorId,
     ) {}
 }

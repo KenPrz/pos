@@ -100,20 +100,24 @@ immediately, with nothing to sync or refresh by hand.
 
 ## Roles
 
-Three roles cover everything, and they're deliberately coarse:
+Two roles ship out of the box, deliberately coarse, and a manager can add more
+(Chapter 10):
 
 - **Cashier** — rings up sales, opens and closes their own shift, takes
   payments.
 - **Supervisor** — everything a cashier can do, plus voids, discounts,
   refunds, and approving a variance.
-- **Admin** — full back-office access: catalog, staff, locations, reports,
-  the audit trail.
 
-Cashier and supervisor are assigned **per location** — the same person can be
-a cashier at one store and a supervisor at another, and the two never mix.
-Admin is different: it's a property of the person, not a role tied to a
-location, so an admin is an admin everywhere. There's no in-between tier yet
-— you're an admin with full back-office access, or you have none of it.
+Both are assigned **per location** — the same person can be a cashier at one
+store and a supervisor at another, and the two never mix.
+
+**Admin** sits outside the role system entirely: it's a property of the
+person, not a role tied to a location, so an admin is an admin everywhere,
+with full back-office access — catalog, staff, locations, reports, the
+audit trail. Short of full **Admin**, a manager can also grant someone a
+narrower slice of back-office access — a single permission, at a single
+location, without making them an admin (Chapter 10) — so "admin or nothing"
+is no longer the whole story on the back-office side.
 
 ## Locations and the demo store
 
@@ -296,7 +300,10 @@ To remove one, tap the **✕** next to it in the cart. Like voiding,
 **Discount** only appears for a supervisor. The back office's Discounts tab
 (Chapter 9) carries its own **Requires supervisor** flag per discount, but
 every discount already needs one today regardless of that flag, since only
-the supervisor role holds the permission to open the panel at all.
+the supervisor role holds the permission to open the panel at all. A
+discount with that flag turned off is enforced as cashier-safe by the API,
+but the till screen has no way to reach it yet — the **Discount** button
+itself still renders for a supervisor's PIN session only.
 
 ## Pay, tender, and print
 
@@ -537,10 +544,13 @@ you out of this till completely — you land back at **Enter PIN**.
 ## Layout
 
 Everything in the back office sits behind one sign-in. Once you're in, a
-rail down the left holds six sections under two headings — **Operations**:
-**Today**, **Catalog**, **Users**, **Locations & Registers**; **Insights**:
-**Reports**, **Audit**. A **location switcher** sits above the rail, and your
-name plus a **Sign out** button sit at the bottom.
+rail down the left holds every section your permissions unlock, under two
+headings — **Operations**: **Today**, **Catalog**, **Users**, **Locations &
+Registers**, **Settings**; **Insights**: **Reports**, **Audit**. **Today**
+always shows; every other section only appears if you hold a permission
+that unlocks it — an admin sees all seven, a manager granted only sales
+reporting sees **Today** and **Reports**. A **location switcher** sits above
+the rail, and your name plus a **Sign out** button sit at the bottom.
 
 **Today**, **Reports**, and the **Stock** report all read whichever location
 the switcher is set to — there's no separate location picker on each of
@@ -653,9 +663,9 @@ badge and an **Unarchive** button.
 2. Fill in **Name**, and either an **Email**, a **PIN**, or both — one of
    the two is required for a new hire.
 3. Leave **Admin** unchecked for regular staff.
-4. Under **Roles**, pick a location in **Add location**, pick **Cashier** or
-   **Supervisor** in **Add role**, then tap **Add**. Repeat for every
-   location this person works at.
+4. Under **Roles**, pick a location in **Add location**, pick a role in
+   **Add role**, then tap **Add**. Repeat for every location this person
+   works at.
 5. Tap **Save**.
 
 ![Figure 10.1 — The Users list](assets/screenshots/025-bo-users.png)
@@ -671,11 +681,23 @@ assignments in one action, the same way saving modifier groups does in
 Chapter 9 — tap **Remove** next to a row to drop a single location
 assignment before you save, rather than expecting to edit it after the fact.
 
+**Cashier** and **Supervisor** ship as the two starting roles, but roles are
+no longer fixed. A user with the **Manage roles** permission (or **Admin**)
+sees a **Roles** tab next to **Users**: every role's name, its permission
+checklist, and how many people hold it. The two built-in roles keep their
+name (so nothing that assumes **Cashier**/**Supervisor** exist ever breaks)
+but their permissions can still be edited; a role added from this tab can be
+renamed or removed freely, except removal is refused while anyone still
+holds it.
+
 ## Give someone back-office access
 
-Check **Admin** on their user record and save. There's no in-between tier
-yet: admin is full access to **Catalog**, **Users**, **Locations &
-Registers**, **Reports**, and **Audit**, or nothing.
+Back-office access is no longer all-or-nothing. Checking **Admin** still
+gives full access to every section, at every location. Short of that,
+holding **any** back-office permission — through a role, or a one-off grant
+added directly on the user's own record — is enough on its own: that person
+signs in with their email and password and the sidebar shows exactly the
+sections their permissions unlock, nothing more.
 
 ## Deactivate a leaver
 
@@ -706,9 +728,18 @@ All three of the demo locations shown above — **Manila Cafe**, **Manila
 Grocery**, **Manila Restaurant** — run on the `Asia/Manila` timezone with
 **Prices include tax** set to **Yes**. Editing a location lets you change
 its **Name**, **Code**, **Timezone** (checked against the IANA list),
-**Prices include tax**, **Receipt header**, and **Receipt footer**. Flipping
-**Prices include tax** only applies to future orders — an order already open
-keeps the pricing basis it started with.
+**Prices include tax**, **Receipt header**, **Receipt footer**, **Variance
+approval threshold**, and **Low stock threshold**. Flipping **Prices
+include tax** only applies to future orders — an order already open keeps
+the pricing basis it started with.
+
+The two threshold fields are optional — leave either blank and this
+location follows the store-wide default. Set one to override just this
+location: a busier store might tolerate a larger drawer variance before a
+close needs a supervisor's approval, or want its low-stock warning to fire
+sooner. Blank means "use the default," not zero, so clearing a field you'd
+previously set puts the location back on the default rather than turning
+the check off.
 
 A location can be deactivated the same way as everything else in the back
 office — uncheck **Active**, confirm, and staff can no longer sign in there,

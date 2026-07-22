@@ -6,14 +6,17 @@ namespace App\Http\Requests\Admin\Catalog;
 
 use App\Actions\Admin\Catalog\CreateModifierGroupInput;
 use App\Domain\Rbac\Permissions;
+use App\Http\Requests\Concerns\AuthorizesBackOffice;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class CreateModifierGroupRequest extends FormRequest
 {
+    use AuthorizesBackOffice;
+
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::CATALOG_MANAGE);
+        return $this->allowsBackOffice(Permissions::CATALOG_MANAGE);
     }
 
     public function rules(): array

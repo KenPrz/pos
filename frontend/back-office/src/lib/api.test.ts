@@ -48,6 +48,8 @@ describe('api.login', () => {
           token: 'admin-token-abc',
           user: { id: 'user-1', name: 'Alex Admin', email: 'alex@example.com', is_admin: true },
           currency: 'PHP',
+          sections: ['catalog.manage', 'user.manage'],
+          report_location_ids: null,
         },
       }),
     )
@@ -56,6 +58,8 @@ describe('api.login', () => {
 
     expect(session.token).toBe('admin-token-abc')
     expect(session.user).toEqual({ id: 'user-1', name: 'Alex Admin', email: 'alex@example.com', is_admin: true })
+    expect(session.sections).toEqual(['catalog.manage', 'user.manage'])
+    expect(session.report_location_ids).toBeNull()
     expect(adminToken.get()).toBe('admin-token-abc')
     // Login is the back office's only source for the server's currency (no catalog fetch
     // here) — it must land in lib/currency's module state, not just ride along unread.

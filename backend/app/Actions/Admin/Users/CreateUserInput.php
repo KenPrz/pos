@@ -6,7 +6,10 @@ namespace App\Actions\Admin\Users;
 
 final class CreateUserInput
 {
-    /** @param list<array{location_id: string, role: string}> $roles */
+    /**
+     * @param  list<array{location_id: string, role: string}>  $roles
+     * @param  list<array{location_id: string, permission: string}>  $permissions
+     */
     public function __construct(
         public readonly string $name,
         public readonly ?string $email,
@@ -14,6 +17,7 @@ final class CreateUserInput
         public readonly ?string $pin,
         public readonly bool $isAdmin,
         public readonly array $roles,
+        public readonly array $permissions,
         public readonly string $actorId,
     ) {}
 }

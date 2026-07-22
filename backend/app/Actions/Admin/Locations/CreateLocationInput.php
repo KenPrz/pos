@@ -13,6 +13,8 @@ final readonly class CreateLocationInput
         public bool $pricesIncludeTax,
         public ?string $receiptHeader,
         public ?string $receiptFooter,
+        public ?int $varianceApprovalThresholdCents,
+        public ?string $lowStockThreshold,
         public string $actorId,
     ) {}
 }

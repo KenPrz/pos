@@ -68,7 +68,7 @@ it('throttles the login route', function (): void {
         ->assertStatus(429);
 });
 
-it('EnsureAdmin refuses a non-admin bearer token with 403', function (): void {
+it('EnsureBackOffice refuses a non-admin bearer token with 403', function (): void {
     $staff = User::factory()->create(['email' => 'sup@pos.test', 'password_hash' => 'pw', 'is_admin' => false]);
     $token = $staff->createToken('test')->plainTextToken;
     $this->postJson('/api/v1/admin/logout', [], ['Authorization' => "Bearer {$token}"])

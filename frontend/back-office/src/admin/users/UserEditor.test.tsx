@@ -5,25 +5,68 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import { UserEditor } from './UserEditor'
-import { ApiError, api, type Location, type ManagedUser } from '../../lib/api'
+import { ApiError, api, type Location, type ManagedUser, type PermissionGroup, type Role } from '../../lib/api'
 
 afterEach(cleanup)
 
+const PERMISSION_GROUPS: PermissionGroup[] = [
+  { label: 'Reports', permissions: ['report.sales.view', 'report.stock.view'] },
+  { label: 'Orders', permissions: ['order.void'] },
+]
+
+// Includes a custom template (shift-lead) alongside the two system ones — the add-row
+// Select must offer every role template api.roles.list() returns, not a hardcoded
+// cashier/supervisor pair (RoleAssignment.role is a plain string now — see its comment
+// in lib/api.ts).
+const ROLE_TEMPLATES: Role[] = [
+  { id: 'role-1', name: 'cashier', is_system: true, permissions: [], assigned_users: 1 },
+  { id: 'role-2', name: 'supervisor', is_system: true, permissions: [], assigned_users: 1 },
+  { id: 'role-3', name: 'shift-lead', is_system: false, permissions: [], assigned_users: 0 },
+]
+
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(api.roles.permissionGroups).mockResolvedValue(PERMISSION_GROUPS)
+  vi.mocked(api.roles.list).mockResolvedValue(ROLE_TEMPLATES)
 })
 
 vi.mock('../../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/api')>()
   return {
     ...actual,
-    api: { ...actual.api, users: { ...actual.api.users, update: vi.fn(), create: vi.fn() } },
+    api: {
+      ...actual.api,
+      users: { ...actual.api.users, update: vi.fn(), create: vi.fn() },
+      roles: { ...actual.api.roles, list: vi.fn(), permissionGroups: vi.fn() },
+    },
   }
 })
 
 const LOCATIONS: Location[] = [
-  { id: 'loc-1', code: 'DT', name: 'Downtown', timezone: 'America/Chicago', prices_include_tax: false, receipt_header: null, receipt_footer: null, is_active: true },
-  { id: 'loc-2', code: 'UP', name: 'Uptown', timezone: 'America/Chicago', prices_include_tax: false, receipt_header: null, receipt_footer: null, is_active: true },
+  {
+    id: 'loc-1',
+    code: 'DT',
+    name: 'Downtown',
+    timezone: 'America/Chicago',
+    prices_include_tax: false,
+    receipt_header: null,
+    receipt_footer: null,
+    is_active: true,
+    variance_approval_threshold_cents: null,
+    low_stock_threshold: null,
+  },
+  {
+    id: 'loc-2',
+    code: 'UP',
+    name: 'Uptown',
+    timezone: 'America/Chicago',
+    prices_include_tax: false,
+    receipt_header: null,
+    receipt_footer: null,
+    is_active: true,
+    variance_approval_threshold_cents: null,
+    low_stock_threshold: null,
+  },
 ]
 
 const USER: ManagedUser = {
@@ -33,6 +76,7 @@ const USER: ManagedUser = {
   is_admin: false,
   is_active: true,
   roles: [{ location_id: 'loc-1', location_name: 'Downtown', role: 'cashier' }],
+  permissions: [{ location_id: 'loc-1', location_name: 'Downtown', permission: 'report.sales.view' }],
 }
 
 function renderEditor(props: Partial<ComponentProps<typeof UserEditor>> = {}) {
@@ -81,6 +125,10 @@ describe('UserEditor', () => {
   // and choosing an option replaces the old `fireEvent.change` with the
   // open-trigger/click-option interaction Radix Select needs. Behavior/label assertions
   // are unchanged: same full replacement role set, same "Add" button.
+  //
+  // Follow-up (spec-gap fix): the role option now renders the template's raw name
+  // (`api.roles.list()`, not a hardcoded Cashier/Supervisor label pair) — 'supervisor'
+  // lowercase, matching ROLE_TEMPLATES, is the option text now.
   it('sends the full replacement role set when a role row is added', async () => {
     vi.mocked(api.users.update).mockResolvedValue(USER)
     renderEditor()
@@ -88,7 +136,7 @@ describe('UserEditor', () => {
     fireEvent.click(screen.getByLabelText(/add location/i))
     fireEvent.click(await screen.findByRole('option', { name: 'Uptown' }))
     fireEvent.click(screen.getByLabelText(/add role/i))
-    fireEvent.click(await screen.findByRole('option', { name: 'Supervisor' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'supervisor' }))
     fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
@@ -97,6 +145,30 @@ describe('UserEditor', () => {
         roles: [
           { location_id: 'loc-1', role: 'cashier' },
           { location_id: 'loc-2', role: 'supervisor' },
+        ],
+      }),
+    )
+  })
+
+  // Follow-up (spec-gap fix): the design's success criteria require assigning a custom
+  // role template ("shift-lead") end-to-end through this screen — this was impossible
+  // before the fix (the Select only ever offered the hardcoded cashier/supervisor pair).
+  it('offers a custom role template and assigns it like any other', async () => {
+    vi.mocked(api.users.update).mockResolvedValue(USER)
+    renderEditor()
+
+    fireEvent.click(screen.getByLabelText(/add location/i))
+    fireEvent.click(await screen.findByRole('option', { name: 'Uptown' }))
+    fireEvent.click(screen.getByLabelText(/add role/i))
+    fireEvent.click(await screen.findByRole('option', { name: 'shift-lead' }))
+    fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() =>
+      expect(api.users.update).toHaveBeenCalledWith('user-1', {
+        roles: [
+          { location_id: 'loc-1', role: 'cashier' },
+          { location_id: 'loc-2', role: 'shift-lead' },
         ],
       }),
     )
@@ -139,5 +211,63 @@ describe('UserEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }))
 
     await waitFor(() => expect(api.users.update).toHaveBeenCalledWith('user-1', { is_active: false }))
+  })
+
+  // Task 10 (RBAC v2): direct, per-location permission grants alongside roles — a
+  // second full-set-replace block, same add/remove/diff discipline as the roles table
+  // above, just fed by api.roles.permissionGroups() instead of a fixed enum.
+  describe('direct permission grants', () => {
+    it('renders the existing grants (location_name + permission)', () => {
+      renderEditor()
+
+      expect(screen.getByText('report.sales.view')).toBeInTheDocument()
+      // "Downtown" appears once for the role row and once for the permission row.
+      expect(screen.getAllByText('Downtown')).toHaveLength(2)
+    })
+
+    it('sends the full replacement permission set when a grant is added', async () => {
+      vi.mocked(api.users.update).mockResolvedValue(USER)
+      renderEditor()
+
+      fireEvent.click(screen.getByLabelText(/grant location/i))
+      fireEvent.click(await screen.findByRole('option', { name: 'Uptown' }))
+      fireEvent.click(screen.getByLabelText(/grant permission/i))
+      fireEvent.click(await screen.findByRole('option', { name: 'report.stock.view' }))
+      fireEvent.click(screen.getByRole('button', { name: /^grant$/i }))
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+      await waitFor(() =>
+        expect(api.users.update).toHaveBeenCalledWith('user-1', {
+          permissions: [
+            { location_id: 'loc-1', permission: 'report.sales.view' },
+            { location_id: 'loc-2', permission: 'report.stock.view' },
+          ],
+        }),
+      )
+    })
+
+    it('leaves permissions out of the PATCH body when the grant set is unchanged', async () => {
+      vi.mocked(api.users.update).mockResolvedValue({ ...USER, name: 'Alexandra Cashier' })
+      renderEditor()
+
+      fireEvent.change(screen.getByLabelText(/^name$/i), { target: { value: 'Alexandra Cashier' } })
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+      await waitFor(() =>
+        expect(api.users.update).toHaveBeenCalledWith('user-1', { name: 'Alexandra Cashier' }),
+      )
+    })
+
+    it('removes a grant locally and sends the reduced set', async () => {
+      vi.mocked(api.users.update).mockResolvedValue(USER)
+      renderEditor()
+
+      // Index 1: the roles DataTable's own "Remove" (loc-1/cashier) renders first in DOM
+      // order, the permission grant's "Remove" (loc-1/report.sales.view) second.
+      fireEvent.click(screen.getAllByRole('button', { name: /^remove$/i })[1])
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+      await waitFor(() => expect(api.users.update).toHaveBeenCalledWith('user-1', { permissions: [] }))
+    })
   })
 })

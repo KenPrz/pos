@@ -23,17 +23,17 @@ final class ApproveVariance
     public function execute(ApproveVarianceInput $in): Shift
     {
         return DB::transaction(function () use ($in): Shift {
-            $locationId = Register::findOrFail($in->registerId)->location_id;
+            $location = Register::findOrFail($in->registerId)->location;
 
             $shift = Shift::whereKey($in->shiftId)
-                ->whereHas('register', fn ($q) => $q->where('location_id', $locationId))
+                ->whereHas('register', fn ($q) => $q->where('location_id', $location->id))
                 ->lockForUpdate()
                 ->firstOrFail();
 
             if ($shift->closed_at === null) {
                 throw new VarianceApprovalNotRequired($shift->id, 'shift_open');
             }
-            $threshold = (int) config('pos.shifts.variance_approval_threshold_cents');
+            $threshold = (int) ($location->variance_approval_threshold_cents ?? config('pos.shifts.variance_approval_threshold_cents'));
             if (abs((int) $shift->variance_cents) <= $threshold) {
                 throw new VarianceApprovalNotRequired($shift->id, 'under_threshold');
             }

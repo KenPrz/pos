@@ -45,10 +45,13 @@ final class Permissions
     public const string USER_MANAGE = 'user.manage';
     public const string LOCATION_MANAGE = 'location.manage';
     public const string REGISTER_ENROLL = 'register.enroll';
+    public const string SETTINGS_MANAGE = 'settings.manage';
+    public const string ROLE_MANAGE = 'role.manage';
 
     // Reports
     public const string REPORT_Z_VIEW = 'report.z.view';
     public const string REPORT_SALES_VIEW = 'report.sales.view';
+    public const string REPORT_STOCK_VIEW = 'report.stock.view';
     public const string AUDIT_VIEW = 'audit.view';
 
     // Stock
@@ -107,8 +110,11 @@ final class Permissions
             self::USER_MANAGE,
             self::LOCATION_MANAGE,
             self::REGISTER_ENROLL,
+            self::SETTINGS_MANAGE,
+            self::ROLE_MANAGE,
             self::REPORT_Z_VIEW,
             self::REPORT_SALES_VIEW,
+            self::REPORT_STOCK_VIEW,
             self::AUDIT_VIEW,
             self::STOCK_ADJUST,
             self::STOCK_RECEIVE,
@@ -158,9 +164,23 @@ final class Permissions
             self::ORDER_TRANSFER,
             self::SHIFT_APPROVE_VARIANCE,
             self::REPORT_SALES_VIEW,
+            self::REPORT_STOCK_VIEW,
             self::STOCK_RECEIVE,
             self::STOCK_COUNT,
             self::STOCK_MOVEMENTS_VIEW,
+        ];
+    }
+
+    /** Catalog grouped for the roles UI. Labels are display copy; keys stay code. */
+    public static function grouped(): array
+    {
+        return [
+            'Orders' => [self::ORDER_OPEN, self::ORDER_LINE_ADD, self::ORDER_LINE_UPDATE, self::ORDER_LINE_VOID, self::ORDER_DISCOUNT_APPLY, self::ORDER_VOID, self::ORDER_REOPEN, self::ORDER_TRANSFER],
+            'Payments & refunds' => [self::PAYMENT_TAKE, self::PAYMENT_VOID, self::REFUND_CREATE],
+            'Shifts & drawer' => [self::SHIFT_OPEN, self::SHIFT_CLOSE, self::SHIFT_CASH_MOVEMENT, self::SHIFT_APPROVE_VARIANCE, self::DRAWER_NO_SALE],
+            'Administration' => [self::CATALOG_VIEW, self::CATALOG_MANAGE, self::USER_MANAGE, self::LOCATION_MANAGE, self::REGISTER_ENROLL, self::SETTINGS_MANAGE, self::ROLE_MANAGE],
+            'Reports' => [self::REPORT_Z_VIEW, self::REPORT_SALES_VIEW, self::REPORT_STOCK_VIEW, self::AUDIT_VIEW],
+            'Stock' => [self::STOCK_ADJUST, self::STOCK_RECEIVE, self::STOCK_COUNT, self::STOCK_MOVEMENTS_VIEW],
         ];
     }
 

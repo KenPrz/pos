@@ -6,16 +6,20 @@ namespace App\Http\Requests\Admin\Users;
 
 use App\Actions\Admin\Users\UpdateUserInput;
 use App\Domain\Rbac\Permissions;
+use App\Http\Requests\Concerns\AuthorizesBackOffice;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 final class UpdateUserRequest extends FormRequest
 {
+    use AuthorizesBackOffice;
+
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::USER_MANAGE);
+        return $this->allowsBackOffice(Permissions::USER_MANAGE);
     }
 
     public function rules(): array
@@ -29,7 +33,10 @@ final class UpdateUserRequest extends FormRequest
             'is_active' => ['sometimes', 'boolean'],
             'roles' => ['sometimes', 'array'],
             'roles.*.location_id' => ['required', 'uuid', 'exists:locations,id'],
-            'roles.*.role' => ['required', 'string', 'in:cashier,supervisor'],
+            'roles.*.role' => ['required', 'string', Rule::exists('role_templates', 'name')],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*.location_id' => ['required', 'uuid', 'exists:locations,id'],
+            'permissions.*.permission' => ['required', 'string', Rule::in(Permissions::all())],
         ];
     }
 
@@ -67,6 +74,7 @@ final class UpdateUserRequest extends FormRequest
             changes: $changes,
             pin: $this->input('pin'),
             roles: $this->has('roles') ? $this->input('roles') : null,
+            permissions: $this->has('permissions') ? $this->input('permissions') : null,
             actorId: $this->user()->id,
         );
     }

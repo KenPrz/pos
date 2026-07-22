@@ -6,7 +6,6 @@
  * surfaces should never accidentally share credentials.
  */
 
-import { isoDate } from './date'
 import { setCurrency } from './currency'
 
 /** Success is always `{ data: ... }`; errors are always `{ error: ... }`. Never both. */
@@ -51,21 +50,70 @@ export class ApiError extends Error {
 const ADMIN_TOKEN_KEY = 'pos.admin_token'
 const ADMIN_USER_KEY = 'pos.admin_user'
 
+// The stored shape folds `sections`/`report_location_ids` into the same object as the
+// user (Task 11) rather than a second localStorage key — one thing to clear on logout,
+// which `clearUser` already does. `AdminUser` itself stays exactly what the login
+// resource's `user` object carries; the two gating fields are stripped back off on read
+// (`adminToken.user()`) so nothing outside this module needs to know about the fold.
+type StoredAdminUser = AdminUser & { sections: string[]; report_location_ids: string[] | null }
+
+function readStored(): StoredAdminUser | null {
+  const raw = localStorage.getItem(ADMIN_USER_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as StoredAdminUser
+  } catch {
+    return null
+  }
+}
+
 export const adminToken = {
   get: () => localStorage.getItem(ADMIN_TOKEN_KEY),
   set: (t: string) => localStorage.setItem(ADMIN_TOKEN_KEY, t),
   clear: () => localStorage.removeItem(ADMIN_TOKEN_KEY),
   // The signed-in user rides alongside the token (Task 8 review) so a page reload can
   // show a name in the carbon bar without waiting on a real query — same idiom as the
-  // register app's tokens.setStaffUser/staffUser.
-  setUser: (u: AdminUser) => localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(u)),
+  // register app's tokens.setStaffUser/staffUser. Task 11 folds `sections` and
+  // `report_location_ids` into the same stored object so a reload restores gating too.
+  setUser: (u: AdminUser, sections: string[], reportLocationIds: string[] | null) =>
+    localStorage.setItem(
+      ADMIN_USER_KEY,
+      JSON.stringify({ ...u, sections, report_location_ids: reportLocationIds }),
+    ),
   user: (): AdminUser | null => {
+    const stored = readStored()
+    if (!stored) return null
+    const { sections: _sections, report_location_ids: _reportLocationIds, ...user } = stored
+    return user
+  },
+  // Defaults to "nothing" rather than "everything" if storage is missing/malformed —
+  // a broken read must never widen access.
+  sections: (): string[] => {
+    const stored = readStored()
+    return Array.isArray(stored?.sections) ? stored.sections : []
+  },
+  // `null` here is a real, meaningful value ("every location" — admin), distinct from
+  // a missing/corrupt read. Only the latter falls back, and it falls back to `[]`
+  // (nothing visible) rather than `null` — a broken read narrowing to zero locations
+  // is safe; narrowing null (all) would be a silent widening of access.
+  reportLocationIds: (): string[] | null => {
+    const stored = readStored()
+    if (!stored) return []
+    const value = stored.report_location_ids
+    if (value === null) return null
+    return Array.isArray(value) ? value : []
+  },
+  // Detects stored admin user objects from before `sections` was added (pre-sections
+  // stored shape) — if a token exists but the stored user lacks the `sections` key,
+  // the session is stale and must be cleared to force re-login.
+  isUserStale: (): boolean => {
     const raw = localStorage.getItem(ADMIN_USER_KEY)
-    if (!raw) return null
+    if (!raw) return false
     try {
-      return JSON.parse(raw) as AdminUser
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      return !('sections' in parsed)
     } catch {
-      return null
+      return false
     }
   },
   clearUser: () => localStorage.removeItem(ADMIN_USER_KEY),
@@ -147,7 +195,22 @@ function put<T>(path: string, body: unknown): Promise<T> {
 // ---------------------------------------------------------------------------
 
 export type AdminUser = { id: string; name: string; email: string | null; is_admin: boolean }
-export type AdminSession = { token: string; user: AdminUser; currency: string }
+/**
+ * `sections` is the canonical, ordered set of back-office nav sections this session may
+ * see (RBAC v2 Task 6/11) — `catalog.manage`, `user.manage`, `location.manage`,
+ * `register.enroll`, `audit.view`, `report.sales.view`, `report.stock.view`,
+ * `settings.manage`, `role.manage`, in that order for an admin; a subset (still in that
+ * relative order) for anyone else. `report_location_ids` is `null` for an admin (every
+ * location); otherwise the union of every location a report permission is held at — the
+ * location switcher filters down to it (Task 11).
+ */
+export type AdminSession = {
+  token: string
+  user: AdminUser
+  sections: string[]
+  report_location_ids: string[] | null
+  currency: string
+}
 
 // ---------------------------------------------------------------------------
 // Catalog wire types — verified against app/Http/Resources/Admin/*.php (Task 9).
@@ -222,7 +285,22 @@ export type Discount = {
  * ever sends `{ location_id, role }` back (RoleAssignments::sync ignores anything else),
  * so `location_name` is optional on the way out and simply dropped by the caller.
  */
-export type RoleAssignment = { location_id: string; location_name: string; role: 'cashier' | 'supervisor' }
+/**
+ * `role` is a role template NAME (`role_templates.name`), not a fixed pair — RBAC v2
+ * (Task 4) lets admins create arbitrary custom templates (e.g. "shift-lead") alongside
+ * the two system ones, and `UpdateUserRequest`/`CreateUserRequest` validate this field
+ * against `role_templates.name`, not an enum. `cashier`/`supervisor` are simply the two
+ * templates that always exist (`is_system: true`), never the only ones on offer.
+ */
+export type RoleAssignment = { location_id: string; location_name: string; role: string }
+
+/**
+ * A direct, per-location permission grant — independent of (and additive to) whatever
+ * a user's role already carries at that location. `location_name` rides along on read
+ * the same way `RoleAssignment.location_name` does (`PermissionAssignments::describe`);
+ * writes only ever need `{ location_id, permission }`.
+ */
+export type PermissionGrant = { location_id: string; location_name?: string; permission: string }
 
 // Deliberately not named `AdminUser` — that type already means "the signed-in admin"
 // (AdminSessionResource, no roles/is_active). This is a managed user row.
@@ -233,7 +311,17 @@ export type ManagedUser = {
   is_admin: boolean
   is_active: boolean
   roles: RoleAssignment[]
+  permissions: PermissionGrant[]
 }
+
+// ---------------------------------------------------------------------------
+// Role templates & the permission catalog (RBAC v2 Task 10) — verified against
+// AdminRoleResource.php and ListPermissionsController.php.
+// ---------------------------------------------------------------------------
+
+export type Role = { id: string; name: string; is_system: boolean; permissions: string[]; assigned_users: number }
+
+export type PermissionGroup = { label: string; permissions: string[] }
 
 export type Location = {
   id: string
@@ -244,6 +332,11 @@ export type Location = {
   receipt_header: string | null
   receipt_footer: string | null
   is_active: boolean
+  // Per-location overrides (Task 8) — `null` means "use the config default" for both,
+  // same fallback shape as `Setting.source: 'config'` below, just without a visible
+  // source flag (locations don't carry one; the editor has nothing to label).
+  variance_approval_threshold_cents: number | null
+  low_stock_threshold: string | null
 }
 
 export type RegisterActivation = {
@@ -330,22 +423,14 @@ export type AuditLogEntry = {
 export type AuditPage = { rows: AuditLogEntry[]; page: number; has_more: boolean }
 
 // ---------------------------------------------------------------------------
-// Today landing (Task 2, back-office UI rework) — zero new backend. The server has no
-// single "today" endpoint and none is being added: this composes four EXISTING calls
-// client-side (the design spec's frozen contract lists the Today landing's LABELS as
-// one of exactly three permitted exceptions, never a new route).
+// Settings (Task 11) — verified against Settings::all()/GetSettingsController.php.
+// Database-first with a config fallback: `source` says which one an effective value
+// actually came from. There is no way to write an explicit `null` — a PATCH value of
+// `null` means "clear the override", so a `value` on a read is only ever `null` when
+// the config default itself is unset.
 // ---------------------------------------------------------------------------
 
-export type TodayOverview = {
-  /** `group_by: 'day'`, today..today, at the given location — ledger basis. */
-  sales: SalesReport
-  /** `low_only: true` at the given location. */
-  stock: StockReport
-  /** Every register (all locations) — callers filter to their own location's rows. */
-  registers: Register[]
-  /** First page only, unfiltered — the shell's "recent activity" glance, not a report. */
-  audit: AuditPage
-}
+export type Setting = { key: string; value: string | null; source: 'db' | 'config' }
 
 /**
  * Build a query string from a flat params object, dropping `undefined`/empty values —
@@ -383,7 +468,7 @@ export const api = {
   login: async (email: string, password: string): Promise<AdminSession> => {
     const session = await post<AdminSession>('/admin/login', { email, password })
     adminToken.set(session.token)
-    adminToken.setUser(session.user)
+    adminToken.setUser(session.user, session.sections, session.report_location_ids)
     // The back office's entry point for the server's currency — it has no catalog fetch
     // of its own (unlike the register). setCurrency also persists it, so a restored
     // session (stored token, no fresh login) still knows it — see lib/currency.ts.
@@ -414,6 +499,18 @@ export const api = {
     ),
 
   users: catalogEntity<ManagedUser>('users', 'user'),
+  roles: {
+    ...catalogEntity<Role>('roles', 'role'),
+    // Deletes a custom template outright (not an archive — `role_templates` has no
+    // `is_active` column). 422 `role_template_in_use` if it's still assigned anywhere;
+    // 422 `role_template_is_system` for `cashier`/`supervisor` (UI never offers this
+    // for a system template in the first place, but the server is the real gate).
+    deleteRole: (id: string): Promise<void> => post<void>(`/admin/roles/${id}/delete`, {}),
+    // Static catalog data grouped for the role editor and the user permission-grant
+    // picker alike — not a catalogEntity endpoint, there's nothing to create/update.
+    permissionGroups: (): Promise<PermissionGroup[]> =>
+      request<{ groups: PermissionGroup[] }>('/admin/permissions').then((r) => r.groups),
+  },
   locations: catalogEntity<Location>('locations', 'location'),
   registers: {
     ...catalogEntity<Register>('registers', 'register'),
@@ -438,17 +535,20 @@ export const api = {
     list: (params: AuditParams): Promise<AuditPage> => request<AuditPage>(`/admin/audit${qs(params)}`),
   },
 
-  today: {
-    // Same `isoDate` SalesReportView's `defaultRange` uses — one shared helper
-    // (`lib/date.ts`) rather than two copies of `toISOString().slice(0, 10)`.
-    overview: (locationId: string): Promise<TodayOverview> => {
-      const date = isoDate(new Date())
-      return Promise.all([
-        api.reports.sales({ location_id: locationId, from: date, to: date, group_by: 'day' }),
-        api.reports.stock({ location_id: locationId, low_only: true }),
-        api.registers.list(),
-        api.audit.list({ page: 1 }),
-      ]).then(([sales, stock, registers, audit]) => ({ sales, stock, registers, audit }))
-    },
+  // Settings (Task 11) — `update` sends only the changed keys, `null` clearing an
+  // override back to its config default (UpdateSettings.php); both return the FULL,
+  // freshly-effective registry, same shape as `get`.
+  settings: {
+    get: (): Promise<Setting[]> => request<{ settings: Setting[] }>('/admin/settings').then((r) => r.settings),
+    update: (settings: Record<string, string | null>): Promise<Setting[]> =>
+      patch<{ settings: Setting[] }>('/admin/settings', { settings }).then((r) => r.settings),
   },
+
+  // The Today landing (Task 2) used to compose these four calls into one `today.overview`
+  // Promise.all. RBAC v2 Task 11 split it back apart: a session missing one of the
+  // underlying permissions (`report.sales.view`/`report.stock.view`/`register.enroll`/
+  // `audit.view`) must never have that ONE call's 403 take down the whole page —
+  // `TodaySection` now calls `reports.sales`/`reports.stock`/`registers.list`/
+  // `audit.list` above directly, one `useQuery` per widget, each `enabled` only when its
+  // permission is held, so an unpermitted widget never fires a request at all.
 }

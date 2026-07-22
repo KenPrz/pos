@@ -12,6 +12,8 @@ final class CloseShiftController
 {
     public function __invoke(CloseShiftRequest $request, CloseShift $action): CloseShiftResource
     {
-        return new CloseShiftResource($action->execute($request->toInput()));
+        $shift = $action->execute($request->toInput());
+
+        return new CloseShiftResource($shift->loadMissing('register.location'));
     }
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState, type FormEvent } from 'react'
 import { ApiError, api, type Location, type ManagedUser } from '../../lib/api'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { DataTable } from '../../components/DataTable'
@@ -13,7 +13,10 @@ import { Checkbox } from '../../components/ui/checkbox'
 import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 
-type RoleRow = { location_id: string; role: 'cashier' | 'supervisor' }
+// `role` is a role template NAME, not a fixed pair — see `RoleAssignment`'s comment in
+// lib/api.ts. The add-row Select below lists every template `api.roles.list()` returns
+// (system and custom alike), not a hardcoded cashier/supervisor option set.
+type RoleRow = { location_id: string; role: string }
 
 /** `{location_id, location_name, role}[]` -> `{location_id, role}[]`, sorted by location
  * so an unrelated field's edit never reorders this array into a spurious diff. */
@@ -27,9 +30,47 @@ function sameRoles(a: RoleRow[], b: RoleRow[]): boolean {
   return a.length === b.length && a.every((row, i) => row.location_id === b[i].location_id && row.role === b[i].role)
 }
 
+type PermissionRow = { location_id: string; permission: string }
+
+/** `{location_id, location_name, permission}[]` -> `{location_id, permission}[]`,
+ * sorted the same way `toRoleRows` sorts roles — so an unrelated field's edit never
+ * reorders this array into a spurious diff. */
+function toPermissionRows(grants: ManagedUser['permissions']): PermissionRow[] {
+  return grants
+    .map((g) => ({ location_id: g.location_id, permission: g.permission }))
+    .sort((a, b) => a.location_id.localeCompare(b.location_id) || a.permission.localeCompare(b.permission))
+}
+
+function samePermissions(a: PermissionRow[], b: PermissionRow[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((row, i) => row.location_id === b[i].location_id && row.permission === b[i].permission)
+  )
+}
+
 // Radix `Select.Item` rejects an empty-string value — see SimpleEditor's identical
 // sentinel. "Add location" starts with nothing chosen, so it needs one.
 const NONE_LOCATION = '__none__'
+// Same sentinel, own name for the permission grants' own two selects below — the
+// permission list loads asynchronously (api.roles.permissionGroups()), so "nothing
+// chosen yet" needs a placeholder value the same way the location select does.
+const NONE_PERMISSION = '__none__'
+// Same sentinel again, for the role-add Select — the template list now loads
+// asynchronously too (api.roles.list()), so it starts unselected rather than
+// defaulting to "cashier".
+const NONE_ROLE = '__none__'
+
+// Same list-query idiom as UsersSection's/PlacesSection's/RolesPanel's useAdminList
+// (Task 9/10): react-query v5 dropped `onError`, so a settled query error is watched
+// via effect instead — the add-row Selects below now reach 401 the same way every
+// other admin list does, rather than silently rendering empty.
+function useAdminList<T>(key: string, queryFn: () => Promise<T[]>, onUnauthorized: () => void) {
+  const query = useQuery({ queryKey: ['admin', key], queryFn })
+  useEffect(() => {
+    if (query.error instanceof ApiError && query.error.status === 401) onUnauthorized()
+  }, [query.error, onUnauthorized])
+  return query
+}
 
 /**
  * Name/email/password/PIN + per-location roles + is_admin/is_active. PIN and password
@@ -67,7 +108,11 @@ export function UserEditor({
   const initialRoles = user ? toRoleRows(user.roles) : []
   const [roles, setRoles] = useState<RoleRow[]>(initialRoles)
   const [newRoleLocationId, setNewRoleLocationId] = useState('')
-  const [newRoleRole, setNewRoleRole] = useState<'cashier' | 'supervisor'>('cashier')
+  const [newRoleRole, setNewRoleRole] = useState('')
+  const initialPermissions = user ? toPermissionRows(user.permissions) : []
+  const [permissions, setPermissions] = useState<PermissionRow[]>(initialPermissions)
+  const [newGrantLocationId, setNewGrantLocationId] = useState('')
+  const [newGrantPermission, setNewGrantPermission] = useState('')
   const [error, setError] = useState<string | null>(null)
   // Archive-style confirm (brief's global constraint) — set only when Save would
   // otherwise deactivate; the dialog's Confirm re-plays the exact body already computed.
@@ -91,15 +136,43 @@ export function UserEditor({
   const locationName = (id: string) => locations.find((l) => l.id === id)?.name ?? '—'
   const availableLocations = locations.filter((l) => !roles.some((r) => r.location_id === l.id))
 
+  // Role templates for the add-row's role Select — every template (system and custom
+  // alike), not a hardcoded cashier/supervisor pair; see RoleAssignment's comment in
+  // lib/api.ts. Same list `RolesPanel` uses, so this shares its cache.
+  const roleTemplates = useAdminList('roles', api.roles.list, onUnauthorized)
+  const roleNames = roleTemplates.data?.map((r) => r.name) ?? []
+
   const addRole = () => {
-    if (newRoleLocationId === '') return
+    if (newRoleLocationId === '' || newRoleRole === '') return
     setRoles((rs) => [...rs, { location_id: newRoleLocationId, role: newRoleRole }].sort((a, b) => a.location_id.localeCompare(b.location_id)))
     setNewRoleLocationId('')
-    setNewRoleRole('cashier')
+    setNewRoleRole('')
   }
 
   const removeRole = (locationId: string) => {
     setRoles((rs) => rs.filter((r) => r.location_id !== locationId))
+  }
+
+  // Direct permission grants (Task 10, RBAC v2) — independent of the roles block
+  // above: a location can appear here more than once (one row per permission), so
+  // unlike `availableLocations` there is nothing to filter out of the location picker.
+  const permissionGroups = useAdminList('permission-groups', api.roles.permissionGroups, onUnauthorized)
+  const flatPermissions = permissionGroups.data?.flatMap((g) => g.permissions) ?? []
+
+  const addPermissionGrant = () => {
+    if (newGrantLocationId === '' || newGrantPermission === '') return
+    setPermissions((rows) => {
+      if (rows.some((r) => r.location_id === newGrantLocationId && r.permission === newGrantPermission)) return rows
+      return [...rows, { location_id: newGrantLocationId, permission: newGrantPermission }].sort(
+        (a, b) => a.location_id.localeCompare(b.location_id) || a.permission.localeCompare(b.permission),
+      )
+    })
+    setNewGrantLocationId('')
+    setNewGrantPermission('')
+  }
+
+  const removePermissionGrant = (locationId: string, permission: string) => {
+    setPermissions((rows) => rows.filter((r) => !(r.location_id === locationId && r.permission === permission)))
   }
 
   const submit = (e: FormEvent) => {
@@ -128,6 +201,10 @@ export function UserEditor({
 
     if (user === null ? roles.length > 0 : !sameRoles(roles, initialRoles)) {
       body.roles = roles.map((r) => ({ location_id: r.location_id, role: r.role }))
+    }
+
+    if (user === null ? permissions.length > 0 : !samePermissions(permissions, initialPermissions)) {
+      body.permissions = permissions.map((r) => ({ location_id: r.location_id, permission: r.permission }))
     }
 
     // Deactivation behind a confirm (brief's global constraint): deactivating an existing
@@ -222,21 +299,99 @@ export function UserEditor({
             </Select>
           </FieldRow>
           <FieldRow label="Add role">
-            <Select value={newRoleRole} onValueChange={(v) => setNewRoleRole(v as 'cashier' | 'supervisor')}>
+            <Select value={newRoleRole || NONE_ROLE} onValueChange={(v) => setNewRoleRole(v === NONE_ROLE ? '' : v)}>
               <SelectTrigger id="user-add-role-role">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="cashier">Cashier</SelectItem>
-                <SelectItem value="supervisor">Supervisor</SelectItem>
+                <SelectItem value={NONE_ROLE}>—</SelectItem>
+                {roleNames.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </FieldRow>
-          <Button type="button" variant="tertiary" onClick={addRole} disabled={newRoleLocationId === ''}>
+          <Button
+            type="button"
+            variant="tertiary"
+            onClick={addRole}
+            disabled={newRoleLocationId === '' || newRoleRole === ''}
+          >
             Add
           </Button>
         </div>
       )}
+
+      <Divider />
+
+      <CardTitle className="mb-md">Direct permissions</CardTitle>
+      <DataTable<PermissionRow>
+        columns={[
+          { key: 'location', header: 'Location', render: (r) => locationName(r.location_id) },
+          { key: 'permission', header: 'Permission', render: (r) => r.permission },
+          {
+            key: 'actions',
+            header: 'Actions',
+            render: (r) => (
+              <Button type="button" variant="ghost" onClick={() => removePermissionGrant(r.location_id, r.permission)}>
+                Remove
+              </Button>
+            ),
+          },
+        ]}
+        rows={permissions}
+        rowKey={(r) => `${r.location_id}|${r.permission}`}
+        empty={{ title: 'No direct permission grants yet.' }}
+      />
+
+      <div className="mt-md flex flex-wrap items-end gap-md">
+        <FieldRow label="Grant location">
+          <Select
+            value={newGrantLocationId || NONE_LOCATION}
+            onValueChange={(v) => setNewGrantLocationId(v === NONE_LOCATION ? '' : v)}
+          >
+            <SelectTrigger id="user-add-permission-location">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE_LOCATION}>—</SelectItem>
+              {locations.map((l) => (
+                <SelectItem key={l.id} value={l.id}>
+                  {l.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FieldRow>
+        <FieldRow label="Grant permission">
+          <Select
+            value={newGrantPermission || NONE_PERMISSION}
+            onValueChange={(v) => setNewGrantPermission(v === NONE_PERMISSION ? '' : v)}
+          >
+            <SelectTrigger id="user-add-permission-permission">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE_PERMISSION}>—</SelectItem>
+              {flatPermissions.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {p}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FieldRow>
+        <Button
+          type="button"
+          variant="tertiary"
+          onClick={addPermissionGrant}
+          disabled={newGrantLocationId === '' || newGrantPermission === ''}
+        >
+          Grant
+        </Button>
+      </div>
 
       <ConfirmDialog
         open={pendingDeactivate !== null}

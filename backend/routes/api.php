@@ -36,6 +36,13 @@ use App\Http\Controllers\Admin\Registers\ListRegistersController;
 use App\Http\Controllers\Admin\Registers\UpdateRegisterController;
 use App\Http\Controllers\Admin\Reports\SalesReportController;
 use App\Http\Controllers\Admin\Reports\StockReportController;
+use App\Http\Controllers\Admin\Roles\CreateRoleController;
+use App\Http\Controllers\Admin\Roles\DeleteRoleController;
+use App\Http\Controllers\Admin\Roles\ListPermissionsController;
+use App\Http\Controllers\Admin\Roles\ListRolesController;
+use App\Http\Controllers\Admin\Roles\UpdateRoleController;
+use App\Http\Controllers\Admin\Settings\GetSettingsController;
+use App\Http\Controllers\Admin\Settings\UpdateSettingsController;
 use App\Http\Controllers\Admin\Users\CreateUserController;
 use App\Http\Controllers\Admin\Users\ListUsersController;
 use App\Http\Controllers\Admin\Users\UpdateUserController;
@@ -148,6 +155,20 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/users', CreateUserController::class)->name('admin.users.create');
         Route::patch('/users/{user}', UpdateUserController::class)->name('admin.users.update');
 
+        // Role templates (RBAC v2): the runtime definition of a role, editable at
+        // runtime and materialized per-location by RoleProvisioner. Delete, not
+        // archive — role_templates has no is_active column, and DeleteRole refuses
+        // while any assignment still points at it. Every mutation audits
+        // admin.role.create|update|delete.
+        Route::get('/roles', ListRolesController::class)->name('admin.roles.index');
+        Route::post('/roles', CreateRoleController::class)->name('admin.roles.create');
+        Route::patch('/roles/{role_template}', UpdateRoleController::class)->name('admin.roles.update');
+        Route::post('/roles/{role_template}/delete', DeleteRoleController::class)->name('admin.roles.delete');
+
+        // The grouped permission catalog — static data, backs the role editor and the
+        // user-management screen's role picker.
+        Route::get('/permissions', ListPermissionsController::class)->name('admin.permissions.index');
+
         // Location and register settings (M6 task 5). No DELETE routes here either —
         // archive via PATCH is_active, same as catalog.
         Route::get('/locations', ListLocationsController::class)->name('admin.locations.list');
@@ -164,6 +185,11 @@ Route::prefix('v1')->group(function (): void {
         // the new code is typed at the terminal. See ActivateRegister.
         Route::post('/registers/{register}/activation-code', IssueActivationCodeController::class)
             ->name('admin.registers.activation_code');
+
+        // Business identity settings (RBAC-v2 task 7): database-backed, config fallback
+        // until an admin sets a value. See App\Domain\Settings\Settings.
+        Route::get('/settings', GetSettingsController::class)->name('admin.settings.get');
+        Route::patch('/settings', UpdateSettingsController::class)->name('admin.settings.update');
 
         // Reports (M6 task 6). Reads only — no audit. day/user are ledger-basis (from
         // payments + refunds); category is line-basis (non-voided lines of closed

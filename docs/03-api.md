@@ -46,6 +46,11 @@ POST /api/v1/staff/login             # device token + PIN
   → { staff_token, user: { id, name, is_admin, permissions[] }, expires_at }
 ```
 
+`permissions[]` here is the union of every role-derived and directly-granted permission
+this user holds **at the requesting register's location** — `05-rbac.md`'s "direct
+per-location grants" resolve at login exactly like role permissions, no register-tier
+code changed to make that true.
+
 Requests that act on behalf of a person send **both**:
 
 ```
@@ -72,20 +77,45 @@ A third, independent tier (M6) — no device, no location, no PIN:
 ```
 POST /api/v1/admin/login
   { "email": "owner@example.com", "password": "..." }
-  → { token, user: { id, name, email, is_admin }, currency }   # 401 invalid_credentials
+  → { token, user: { id, name, email, is_admin }, sections[], report_location_ids,
+      currency }                                          # 401 invalid_credentials
 
 POST /api/v1/admin/logout
 ```
 
-**Admin-only in v1:** wrong email, wrong password, deactivated, and non-admin all answer
-identically (`401 invalid_credentials`) — the same user-enumeration defense as PIN login,
-extended to the back office. See `05-rbac.md` for why there's no supervisor/bookkeeper
-tier yet. Every request under `/admin/*` (below) carries this token the same way every
-other tier carries its own:
+**Permission-based, not admin-only (RBAC v2).** Through M6 this tier was `is_admin`-only;
+now any active user holding at least one admin-tier permission — `catalog.manage`,
+`user.manage`, `location.manage`, `register.enroll`, `audit.view`, `report.sales.view`,
+`report.stock.view`, `settings.manage`, `role.manage` — anywhere, via a role or a direct
+grant, may sign in. Wrong email, wrong password, deactivated, and
+zero-admin-tier-permissions all still answer identically (`401 invalid_credentials`) —
+the same user-enumeration defense as PIN login, now covering a wider set of users who can
+pass it. `is_admin` is unaffected and still the only unconditional, every-location,
+every-section tier. Full rule (the "holds it anywhere" resolution, and why) in
+`05-rbac.md`.
+
+`sections[]` is the admin-tier permissions this session holds, in canonical order
+(`is_admin` ⇒ every section) — the back-office sidebar renders only these; the API
+refuses the rest regardless of what the client tries to render.
+`report_location_ids` is `null` for an admin (every location) or the union of every
+location where `report.sales.view`/`report.stock.view` is held — the location switcher
+filters its options to this set, since holding a report permission at one store doesn't
+mean holding it everywhere even though back-office *login itself* is "anywhere."
+
+Every request under `/admin/*` (below) carries this token the same way every other tier
+carries its own:
 
 ```
 Authorization: Bearer <admin token>
 ```
+
+**The gate checks the token's ability, not just its holder's permissions.** A register
+staff-session token and an admin-login token can both authenticate as the same
+underlying user, so `EnsureBackOffice` additionally requires the presented token to
+carry the `admin` Sanctum ability (only `AdminLogin` mints that) — otherwise a
+supervisor's staff token, which already holds `report.sales.view`, would pass the
+permission check alone. See `05-rbac.md`'s Back-office access section for the full
+reasoning.
 
 ## Errors
 
@@ -105,10 +135,10 @@ One envelope (`01-architecture.md`):
 | --- | --- |
 | 400 | `validation_failed` |
 | 401 | `invalid_device_token`, `invalid_pin`, `staff_session_expired`, `invalid_credentials`, `invalid_activation_code`, `activation_code_expired` |
-| 403 | `forbidden`, `requires_supervisor`, `wrong_location` (mostly structural — location scoping yields 404s; reserved for record/register location disagreements) |
+| 403 | `forbidden`, `requires_supervisor`, `discount_needs_supervisor`, `wrong_location` (mostly structural — location scoping yields 404s; reserved for record/register location disagreements) |
 | 404 | `not_found` |
 | 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders`, `line_already_voided`, `payment_already_voided`, `payment_shift_closed` |
-| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use`, `split_too_fine`, `self_lockout` |
+| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use`, `split_too_fine`, `self_lockout`, `role_template_in_use`, `role_template_is_system` |
 | 429 | `too_many_pin_attempts`, `too_many_requests` |
 
 `code` is stable forever once shipped; clients branch on it. `message` is for humans and
@@ -393,13 +423,22 @@ divide into that many non-zero parts (`422 split_too_fine`).
 ### Discounts
 
 ```
-POST   /api/v1/orders/{id}/discounts             # If-Match, usually supervisor
+POST   /api/v1/orders/{id}/discounts             # If-Match, floor: order.line.add
   { "discount_id": "...", "order_line_id": null, "reason": "Manager comp" }
+  → 403 discount_needs_supervisor                # if the discount's own flag says so
 DELETE /api/v1/orders/{id}/discounts/{discountId}
 ```
 
 Sending `order_line_id: null` makes it order-level. The server resolves percent → cents
 and stores the resolved amount.
+
+**Whether this needs a supervisor depends on the discount row, not the route (RBAC
+v2).** The route only enforces the floor, `order.line.add` — any staffer who can ring up
+a sale can attempt one. `discounts.requires_supervisor` (default `true`) is checked
+*after* the row loads, inside the transaction: a cashier-safe discount (flag `false`)
+succeeds for anyone at the floor permission; a normal one requires
+`order.discount.apply` too, and failing that check is `403 discount_needs_supervisor`,
+not the generic `forbidden`. See `05-rbac.md` for why this lives in the action.
 
 ### Closing
 
@@ -491,17 +530,21 @@ is rejected: that money never came through us.
 
 The original order is never modified.
 
-## Back office (`/api/v1/admin/*`, admin-only)
+## Back office (`/api/v1/admin/*`, permission-gated)
 
-Every route below requires the admin bearer token from Auth, above. All of it is
-conventional CRUD — `GET` lists (unpaginated; v1's tables are seed-sized, not
-production-scale), `POST` creates, `PATCH` applies only the keys it's sent — with one
+Every route below requires the admin-login bearer token from Auth, above, **and** the
+route's own permission (each section below names it) — `is_admin` bypasses every check.
+All of it is conventional CRUD — `GET` lists (unpaginated; v1's tables are seed-sized,
+not production-scale), `POST` creates, `PATCH` applies only the keys it's sent — with one
 deliberate exception: **there is no `DELETE` route anywhere under `/admin/*`.** Catalog
 rows, locations, and registers are **archived, never deleted** — `PATCH { "is_active":
 false }` — because an order line, a receipt, or a report from last month still points at
 that row by id, and a hard delete would either cascade into history or leave a dangling
-reference. Every mutation writes one `audit_log` row (`admin.<entity>.create` /
-`admin.<entity>.update`), which is what the audit viewer below reads.
+reference. Role templates are the one exception, and even then not through the `DELETE`
+verb (`POST /admin/roles/{id}/delete`, below) — a template genuinely has nothing left
+pointing at it once unassigned. Every mutation writes one `audit_log` row
+(`admin.<entity>.create` / `admin.<entity>.update` / `admin.<entity>.delete`), which is
+what the audit viewer below reads.
 
 ### Catalog
 
@@ -532,25 +575,82 @@ everything the product had.
 ```
 GET|POST /api/v1/admin/users            PATCH /api/v1/admin/users/{id}
   { "name": "...", "email": "...", "pin": "...", "is_admin": false,
-    "roles": [ { "location_id": "...", "role": "cashier" } ] }
+    "roles": [ { "location_id": "...", "role": "cashier" } ],
+    "permissions": [ { "location_id": "...", "permission": "report.sales.view" } ] }
+```
+Gated `user.manage`.
+
+`roles` and `permissions` each replace every existing assignment of their own kind for
+that user — full-set-replace, never an add/remove pair, the same shape for both.
+Omitting either key from a `PATCH` leaves that kind of assignment untouched; sending
+`[]` clears every one of that kind. `roles.role` validates against the current set of
+role-template names (RBAC v2 — no longer a hardcoded `cashier`/`supervisor` pair, see
+`05-rbac.md`); `permissions.permission` validates against the permission catalog
+(`GET /admin/permissions`, below). An admin cannot demote or deactivate **themselves**
+through this endpoint — `422 self_lockout` — because with `is_admin` remaining the only
+unconditional tier, there's no guaranteed second admin online to undo it.
+
+### Roles (RBAC v2)
+
+```
+GET  /api/v1/admin/roles
+  → { items: [ { id, name, is_system, permissions[], assigned_users } ] }
+POST /api/v1/admin/roles
+  { "name": "shift-lead", "permissions": ["order.line.void", "..."] }
+PATCH /api/v1/admin/roles/{id}
+  { "name": "...", "permissions": [...] }             # 422 role_template_is_system on a name change
+POST /api/v1/admin/roles/{id}/delete
+  → { deleted: true }                                 # 422 role_template_in_use, role_template_is_system
+
+GET  /api/v1/admin/permissions
+  → { groups: [ { label, permissions[] } ] }           # the catalog, grouped for the UI
 ```
 
-`roles`, when sent, replaces every existing assignment for that user — full-set-replace,
-never an add/remove pair. Omitting `roles` from a `PATCH` leaves assignments untouched;
-sending `roles: []` clears every one. An admin cannot demote or deactivate **themselves**
-through this endpoint — `422 self_lockout` — because with only one auth tier above
-`admin` (none), there's no guaranteed second admin online to undo it.
+All gated `role.manage`, except the two read endpoints — `GET /admin/roles` and
+`GET /admin/permissions` — which also accept `user.manage` — the user editor's role
+and direct-grant pickers need the same lists without needing role-editing rights.
+`role_templates.name` is unique; `cashier` and
+`supervisor` are `is_system` (permissions editable, name and existence pinned — every
+seed and doc assumes they exist under those names). A `PATCH` or delete on a system
+template's name/existence is `422 role_template_is_system`; deleting a custom template
+still assigned somewhere is `422 role_template_in_use`, with `assigned_users` in
+`details` — unassign everywhere first. Editing a template's permission set (or renaming
+a custom one) re-materializes it at **every** location in the same request; a location
+created afterward gets the current template set automatically (`CreateLocation` calls
+the same provisioning). See `05-rbac.md` for the full model.
 
 ### Locations and registers
 
 ```
 GET|POST /api/v1/admin/locations        PATCH /api/v1/admin/locations/{id}
+  { "name": "...", "code": "...", "timezone": "...", "prices_include_tax": false,
+    "receipt_header": "...", "receipt_footer": "...", "is_active": true,
+    "variance_approval_threshold_cents": null, "low_stock_threshold": null }
+
 GET|POST /api/v1/admin/registers        PATCH /api/v1/admin/registers/{id}
   { "mode": "retail" | "food" }                       # picks the register's UI
 
 POST /api/v1/admin/registers/{id}/activation-code
   → { activation_code, expires_at }        # shown exactly once
 ```
+The location endpoints are gated `location.manage`, except `GET /admin/locations`,
+which accepts any admin-tier section — location names are low-sensitivity reference
+data every permitted section (the location switcher, the user editor, reports)
+composes from, not something worth gating behind `location.manage` specifically. The
+register endpoints — including activation-code issuance — are gated `register.enroll`,
+not `location.manage`: enrolling and re-keying terminals is its own trust decision,
+separate from editing location settings.
+
+**Per-location thresholds (RBAC v2).** `variance_approval_threshold_cents` (integer,
+`>= 0`) and `low_stock_threshold` (decimal string, `>= 0`) override the deployed config
+default (`pos.shifts.variance_approval_threshold_cents`, `pos.stock.low_threshold`) for
+this location alone. **`null` explicitly clears an override back to the config
+default** — sent as `null` on create or update, it is stored/kept as `null`, not
+coerced to the config value at write time; `ApproveVariance`, `CloseShiftResource`, and
+the stock report all resolve `location->column ?? config(...)` at *read* time instead,
+so a later config change takes effect at every location that never set an override,
+without a data migration. Omitting either key from a `PATCH` leaves it untouched, same
+as every other partial update in this API.
 
 Admins see and handle only the opaque activation code — the raw device token is minted
 directly to the terminal by `POST /registers/activate` and never crosses the admin
@@ -577,6 +677,28 @@ transfer picker, or finding another open register to approve a variance from), w
 a staff action even though it never touches money or the back office. It needs a staff
 session like any other staff-tier route, not an admin one.
 
+### Settings (RBAC v2)
+
+```
+GET   /api/v1/admin/settings
+  → { settings: [ { key, value, source: "db" | "config" }, ... ] }
+PATCH /api/v1/admin/settings
+  { "settings": { "business.name": "...", "business.tax_id": null } }
+  → { settings: [ ... ] }                              # the full registry, post-write
+```
+
+Gated `settings.manage`. The registry today is `business.name`, `business.address`,
+`business.tax_id` — the business-identity fields receipts read (`02-data-model.md`).
+`source` tells the caller whether a value is a database override (`"db"`) or the
+deployed config fallback (`"config"`) — config is what engineers deploy, the database is
+what admins change at runtime (`04-backend-conventions.md`), and this response is how
+the UI shows which one is currently in effect. **Sending `null` for a key explicitly
+clears its override**, falling back to config again — there is no way to store an
+explicit null value, because a stored null would pin `source: "db"` forever with no path
+back to config. An unregistered key in the `PATCH` body is `422 validation_failed`.
+Every write is audited (`admin.settings.update`, with `changed`/`cleared` key lists),
+even though no single key is itself money-moving.
+
 ## Reports
 
 ```
@@ -585,14 +707,21 @@ GET /api/v1/reports/z?shift_id=                                       # staff ti
       orders_closed, orders_voided, orders_split, expected_cash_cents }
 
 GET /api/v1/admin/reports/sales?location_id=&from=&to=&group_by=day|category|user
-  → { rows[], totals, basis }
+  → { rows[], totals, basis }                            # gated report.sales.view
 
 GET /api/v1/admin/reports/stock?location_id=&low_only=true
-  → { rows[] }
+  → { rows[] }                                            # gated report.stock.view
 
 GET /api/v1/admin/audit?entity_type=&entity_id=&user_id=&action=&from=&to=&page=
   → { rows[], page, has_more }                                        # 50 rows/page
 ```
+
+**Both report endpoints additionally check the requested `location_id` against where the
+caller actually holds the permission** (RBAC v2) — holding `report.sales.view` or
+`report.stock.view` *somewhere* is what gets a non-admin into the back office at all
+(`sections[]`, above); it is not a blank check to query every location's numbers. A
+`location_id` outside that set is refused even for an otherwise-valid back-office
+session; `is_admin` is exempt (every location). See `05-rbac.md`.
 
 All date filtering is on `business_date` (`02-data-model.md`), so a report means the same
 thing regardless of the timezone of whoever runs it. The Z-report's `orders_split` (M6)

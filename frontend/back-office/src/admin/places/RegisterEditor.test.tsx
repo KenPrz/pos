@@ -25,7 +25,18 @@ vi.mock('../../lib/api', async (importOriginal) => {
 })
 
 const LOCATIONS: Location[] = [
-  { id: 'loc-1', code: 'DT', name: 'Downtown', timezone: 'America/Chicago', prices_include_tax: false, receipt_header: null, receipt_footer: null, is_active: true },
+  {
+    id: 'loc-1',
+    code: 'DT',
+    name: 'Downtown',
+    timezone: 'America/Chicago',
+    prices_include_tax: false,
+    receipt_header: null,
+    receipt_footer: null,
+    is_active: true,
+    variance_approval_threshold_cents: null,
+    low_stock_threshold: null,
+  },
 ]
 
 const REGISTER: Register = {

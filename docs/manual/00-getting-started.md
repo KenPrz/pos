@@ -52,7 +52,8 @@ what else the shell adds once it's running.
 
 ## Roles
 
-Three roles cover everything. They're deliberately coarse:
+Roles are manageable in the back office, so the exact set can differ by business — but
+the seeded pair below covers the common cases out of the box and is deliberately coarse:
 
 - **Cashier** — rings up sales, opens and closes their own shift, takes payments.
 - **Supervisor** — everything a cashier can do, plus the actions that let money or
