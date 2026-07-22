@@ -148,6 +148,10 @@ manual: ## Build docs/user-manual/user-manual.pdf (host python3; pinned deps int
 	@docs/user-manual/.venv/bin/pip install -q markdown==3.7 pymdown-extensions==10.12 weasyprint==63.1
 	docs/user-manual/.venv/bin/python docs/user-manual/build_pdf.py
 
+manual-shots: ## Capture user-manual screenshots (needs `make dev` up + POS_SEED_CATALOGS=grocery,restaurant,cafe make seed)
+	cd docs/user-manual && npm install --no-fund --no-audit && npx playwright install chromium
+	node docs/user-manual/capture_screenshots.mjs
+
 test: test-backend test-web test-bo ## All suites, in containers
 
 # -e overrides beat phpunit.xml <env> values by design (real env wins — the
