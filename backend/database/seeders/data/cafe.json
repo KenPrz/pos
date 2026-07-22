@@ -1,0 +1,234 @@
+{
+  "categories": [
+    {
+      "name": "Coffee",
+      "sort_order": 1
+    },
+    {
+      "name": "Non-Coffee",
+      "sort_order": 2
+    },
+    {
+      "name": "Pastries",
+      "sort_order": 3
+    },
+    {
+      "name": "Sandwiches",
+      "sort_order": 4
+    }
+  ],
+  "modifier_groups": [
+    {
+      "name": "Milk",
+      "min_select": 1,
+      "max_select": 1,
+      "modifiers": [
+        {"name": "Fresh Milk", "price_delta_cents": 0},
+        {"name": "Oat Milk", "price_delta_cents": 3000},
+        {"name": "Soy Milk", "price_delta_cents": 2500},
+        {"name": "No Milk", "price_delta_cents": -1000}
+      ]
+    },
+    {
+      "name": "Cup Size",
+      "min_select": 1,
+      "max_select": 1,
+      "modifiers": [
+        {"name": "12 oz", "price_delta_cents": 0},
+        {"name": "16 oz", "price_delta_cents": 3000}
+      ]
+    },
+    {
+      "name": "Extras",
+      "min_select": 0,
+      "max_select": 3,
+      "modifiers": [
+        {"name": "Extra Shot", "price_delta_cents": 4000},
+        {"name": "Vanilla Syrup", "price_delta_cents": 2500},
+        {"name": "Whipped Cream", "price_delta_cents": 2000}
+      ]
+    }
+  ],
+  "products": [
+    {
+      "name": "Kapeng Barako",
+      "description": "Strong, full-bodied Batangas barako coffee, brewed black.",
+      "category": "Coffee",
+      "modifier_groups": ["Cup Size", "Extras"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-BARAKO", "barcode": null, "price_cents": 12000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Americano",
+      "description": "Espresso shots topped with hot water for a clean, bold cup.",
+      "category": "Coffee",
+      "modifier_groups": ["Cup Size", "Extras"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-AMERICANO", "barcode": null, "price_cents": 13000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Cappuccino",
+      "description": "Espresso with steamed milk and a thick layer of milk foam.",
+      "category": "Coffee",
+      "modifier_groups": ["Milk", "Cup Size", "Extras"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-CAPPUCCINO", "barcode": null, "price_cents": 16000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Café Latte",
+      "description": "Espresso with steamed milk and a light layer of foam.",
+      "category": "Coffee",
+      "modifier_groups": ["Milk", "Cup Size", "Extras"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-LATTE", "barcode": null, "price_cents": 16500, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Spanish Latte",
+      "description": "Espresso sweetened with condensed milk and finished with steamed milk.",
+      "category": "Coffee",
+      "modifier_groups": ["Milk", "Cup Size", "Extras"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-SPANISH", "barcode": null, "price_cents": 18000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Caramel Macchiato",
+      "description": "Vanilla-steamed milk topped with espresso and a caramel drizzle.",
+      "category": "Coffee",
+      "modifier_groups": ["Milk", "Cup Size", "Extras"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-CARAMEL", "barcode": null, "price_cents": 19000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Mocha",
+      "description": "Espresso, chocolate syrup, and steamed milk, topped with a light dusting of cocoa.",
+      "category": "Coffee",
+      "modifier_groups": ["Milk", "Cup Size", "Extras"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-MOCHA", "barcode": null, "price_cents": 18500, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Cold Brew",
+      "description": "Coarse-ground coffee steeped in cold water for twelve hours, served over ice.",
+      "category": "Coffee",
+      "modifier_groups": ["Cup Size", "Extras"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-COLDBREW", "barcode": null, "price_cents": 17000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Hot Chocolate",
+      "description": "Rich melted chocolate blended with steamed milk.",
+      "category": "Non-Coffee",
+      "modifier_groups": ["Milk", "Cup Size"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-HOTCHOC", "barcode": null, "price_cents": 15000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Matcha Latte",
+      "description": "Whisked Japanese green tea powder blended with steamed milk.",
+      "category": "Non-Coffee",
+      "modifier_groups": ["Milk", "Cup Size", "Extras"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-MATCHA", "barcode": null, "price_cents": 19000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Iced Tea",
+      "description": "House-brewed black tea served chilled over ice.",
+      "category": "Non-Coffee",
+      "modifier_groups": ["Cup Size"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-ICEDTEA", "barcode": null, "price_cents": 10000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Fresh Mango Shake",
+      "description": "Ripe Philippine mangoes blended with milk and ice until smooth.",
+      "category": "Non-Coffee",
+      "modifier_groups": ["Cup Size"],
+      "variants": [
+        {"name": "Default", "sku": "CAF-MANGO", "barcode": null, "price_cents": 15000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Ensaymada",
+      "description": "Soft brioche-like bun topped with butter, sugar, and grated cheese.",
+      "category": "Pastries",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "CAF-ENSAYMADA", "barcode": null, "price_cents": 9000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Pandesal (3 pcs)",
+      "description": "Warm, freshly baked Filipino bread rolls with a soft crumb, served three to an order.",
+      "category": "Pastries",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "CAF-PANDESAL", "barcode": null, "price_cents": 5000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Ube Cheese Pandesal",
+      "description": "Pandesal filled with sweet ube jam and a slice of melting cheese.",
+      "category": "Pastries",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "CAF-UBEPANDESAL", "barcode": null, "price_cents": 7500, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Banana Bread Slice",
+      "description": "Moist banana loaf slice studded with walnuts.",
+      "category": "Pastries",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "CAF-BANANA", "barcode": null, "price_cents": 9500, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Egg Pie Slice",
+      "description": "Creamy custard pie slice with a golden, lightly caramelized top.",
+      "category": "Pastries",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "CAF-EGGPIE", "barcode": null, "price_cents": 8500, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Chicken Pesto Sandwich",
+      "description": "Grilled chicken breast, basil pesto, and tomato on toasted ciabatta.",
+      "category": "Sandwiches",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "CAF-PESTO", "barcode": null, "price_cents": 18500, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Ham & Cheese Croissant",
+      "description": "Buttery croissant filled with sliced ham and melted cheese, toasted.",
+      "category": "Sandwiches",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "CAF-HAMCHEESE", "barcode": null, "price_cents": 16000, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    },
+    {
+      "name": "Tuna Melt",
+      "description": "Tuna salad and melted cheese grilled between slices of thick-cut bread.",
+      "category": "Sandwiches",
+      "modifier_groups": [],
+      "variants": [
+        {"name": "Default", "sku": "CAF-TUNAMELT", "barcode": null, "price_cents": 17500, "cost_cents": null, "track_inventory": false, "tax_exempt": false}
+      ]
+    }
+  ]
+}
