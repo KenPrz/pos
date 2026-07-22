@@ -875,8 +875,7 @@ depends on where the till is running:
 - In the desktop shell, **Print** is meant to send the receipt straight to
   the till's thermal printer instead.
 
-> Note: today, only a **mock** printer driver ships — `frontend/native`'s
-> own README says so plainly. It writes the receipt out to a file rather
+> Note: today, only a **mock** printer driver ships — it writes the receipt out to a file rather
 > than actually driving hardware, so **Print** in the shell doesn't yet put
 > paper through a real printer. A browser tab's print dialog is the one
 > path here that already produces real paper, because it was never the
