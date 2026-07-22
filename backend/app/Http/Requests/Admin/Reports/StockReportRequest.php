@@ -12,7 +12,7 @@ final class StockReportRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::REPORT_SALES_VIEW);
+        return $this->user()->can(Permissions::REPORT_STOCK_VIEW);
     }
 
     public function rules(): array
