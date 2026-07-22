@@ -31,6 +31,9 @@ final class UpdateUserRequest extends FormRequest
             'roles' => ['sometimes', 'array'],
             'roles.*.location_id' => ['required', 'uuid', 'exists:locations,id'],
             'roles.*.role' => ['required', 'string', Rule::exists('role_templates', 'name')],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*.location_id' => ['required', 'uuid', 'exists:locations,id'],
+            'permissions.*.permission' => ['required', 'string', Rule::in(Permissions::all())],
         ];
     }
 
@@ -68,6 +71,7 @@ final class UpdateUserRequest extends FormRequest
             changes: $changes,
             pin: $this->input('pin'),
             roles: $this->has('roles') ? $this->input('roles') : null,
+            permissions: $this->has('permissions') ? $this->input('permissions') : null,
             actorId: $this->user()->id,
         );
     }

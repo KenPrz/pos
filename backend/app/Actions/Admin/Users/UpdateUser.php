@@ -7,6 +7,7 @@ namespace App\Actions\Admin\Users;
 use App\Actions\Auth\SetStaffPin;
 use App\Actions\Auth\SetStaffPinInput;
 use App\Domain\Audit\AuditLogger;
+use App\Domain\Rbac\PermissionAssignments;
 use App\Domain\Rbac\RoleAssignments;
 use App\Exceptions\Domain\EmailOrPinRequired;
 use App\Exceptions\Domain\SelfLockout;
@@ -18,6 +19,7 @@ final class UpdateUser
     public function __construct(
         private readonly SetStaffPin $setPin,
         private readonly RoleAssignments $roles,
+        private readonly PermissionAssignments $permissions,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -53,6 +55,17 @@ final class UpdateUser
                 $roleChanges = $this->roles->sync($user, $in->roles);
             }
 
+            // Permissions right after roles, before the PIN and the plain-column fill —
+            // same slot in the ordering as roles, for the same reason: every model_has_*
+            // write belongs before the PIN write below, whose own comment explains why
+            // the CHECK only ever sees one statement's committed state at a time, never
+            // the request's final intent. Keeping both assignment syncs grouped here
+            // keeps that invariant in one place instead of reasoned out per table.
+            $permissionChanges = null;
+            if ($in->permissions !== null) {
+                $permissionChanges = $this->permissions->sync($user, $in->permissions);
+            }
+
             // Then the PIN, before the plain-column fill: if this request also nulls the
             // email, `pin_hash` must already be persisted on the row by the time that
             // UPDATE runs, or the CHECK above would be satisfied in memory but violated
@@ -67,6 +80,9 @@ final class UpdateUser
             $payload = ['changed' => array_keys($in->changes)];
             if ($roleChanges !== null && $roleChanges !== []) {
                 $payload['roles'] = $roleChanges;
+            }
+            if ($permissionChanges !== null && ($permissionChanges['added'] !== [] || $permissionChanges['removed'] !== [])) {
+                $payload['permissions'] = $permissionChanges;
             }
 
             $this->audit->record('admin.user.update', $user, $in->actorId, $payload);

@@ -32,6 +32,9 @@ final class CreateUserRequest extends FormRequest
             'roles' => ['sometimes', 'array'],
             'roles.*.location_id' => ['required', 'uuid', 'exists:locations,id'],
             'roles.*.role' => ['required', 'string', Rule::exists('role_templates', 'name')],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*.location_id' => ['required', 'uuid', 'exists:locations,id'],
+            'permissions.*.permission' => ['required', 'string', Rule::in(Permissions::all())],
         ];
     }
 
@@ -60,6 +63,7 @@ final class CreateUserRequest extends FormRequest
             pin: $this->input('pin'),
             isAdmin: $this->boolean('is_admin', false),
             roles: $this->input('roles', []),
+            permissions: $this->input('permissions', []),
             actorId: $this->user()->id,
         );
     }
