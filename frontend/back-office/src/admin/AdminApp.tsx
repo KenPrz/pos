@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, adminToken, api, type AdminSession, type AdminUser } from '../lib/api'
+import { initCurrencyFromStorage } from '../lib/currency'
 import { LoginScreen } from './LoginScreen'
 import { Shell } from './Shell'
 
@@ -28,7 +29,10 @@ export function AdminApp() {
   useEffect(() => {
     // A reload has no in-memory `user` yet — hydrate it from the cache Task 8's review
     // added alongside the token, so the carbon bar shows a name immediately rather than
-    // waiting on a real query (there isn't a "who am I" endpoint to ask).
+    // waiting on a real query (there isn't a "who am I" endpoint to ask). The currency
+    // (set by login) needs the same restore: a reload has a token but no fresh login
+    // response, so pull it back from localStorage rather than defaulting to 'USD'.
+    initCurrencyFromStorage()
     if (adminToken.get()) {
       setUser(adminToken.user())
       setStage({ name: 'shell' })

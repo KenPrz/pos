@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import { FloorScreen } from './FloorScreen'
 import { api, type Order, type OpenShiftRegister } from '../lib/api'
+import { setCurrency } from '../lib/currency'
 
 // Same idiom as ModifierSheet.test.tsx: vitest doesn't run with `globals: true`, so
 // @testing-library/react's auto-cleanup never registers itself — do it by hand or DOM
@@ -21,6 +22,9 @@ afterEach(cleanup)
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(api.openShiftRegisters).mockResolvedValue([])
+  // Explicit, not relying on lib/currency's pre-load default: this suite never fetches
+  // the catalog (the thing that would normally set it).
+  setCurrency('USD')
 })
 
 // Module mock: keep everything real (ApiError, types, other api.* members) except the
@@ -113,7 +117,9 @@ describe('FloorScreen', () => {
     vi.mocked(api.openOrders).mockResolvedValue([order])
     const { onResume } = renderFloor()
 
-    const card = await screen.findByRole('button', { name: /12/ })
+    // findByRole's accessible-name computation can exceed the default 1s wait on a
+    // loaded CI/container host — this one query gets a longer leash, not a logic change.
+    const card = await screen.findByRole('button', { name: /12/ }, { timeout: 5000 })
     fireEvent.click(card)
 
     expect(onResume).toHaveBeenCalledWith(order)

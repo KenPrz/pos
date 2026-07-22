@@ -4,13 +4,13 @@
 # freshly seeded stack: two tabs on two registers, modifiers (with a repeated one),
 # a fired course, a qty bump on a fired line, a transfer, a three-way split paid
 # across cash and card, a forced-and-approved drawer variance, and a clean close.
-# Set POS_DEVICE_TOKEN (Till 2, food) and POS_DEVICE_TOKEN_2 (Till 1) first — both
-# printed by `php artisan migrate:fresh --seed`. Never a token literal in this file.
+# Set POS_DEVICE_TOKEN (RST / Till 2) and POS_DEVICE_TOKEN_2 (RST / Till 1) first — the
+# Manila Restaurant's two food-mode tills. Never a token literal in this file.
 #
 set -euo pipefail
 API=http://127.0.0.1:8000/api/v1
-DEVICE="${POS_DEVICE_TOKEN:?set POS_DEVICE_TOKEN to the Till 2 (food) device token, printed by php artisan migrate:fresh --seed}"
-DEVICE2="${POS_DEVICE_TOKEN_2:?set POS_DEVICE_TOKEN_2 to the Till 1 device token, printed by php artisan migrate:fresh --seed}"
+DEVICE="${POS_DEVICE_TOKEN:?set POS_DEVICE_TOKEN to the RST / Till 2 device token, printed by php artisan migrate:fresh --seed}"
+DEVICE2="${POS_DEVICE_TOKEN_2:?set POS_DEVICE_TOKEN_2 to the RST / Till 1 device token, printed by php artisan migrate:fresh --seed}"
 D="Authorization: Bearer $DEVICE"
 D2="Authorization: Bearer $DEVICE2"
 J='Content-Type: application/json'
@@ -37,8 +37,8 @@ LOGIN_B1=$(req POST /staff/login -H "$D2" -d '{"pin":"2222"}')
 BOB1=$(echo "$LOGIN_B1" | jq -r .data.staff_token)
 B1="X-Staff-Token: $BOB1"
 TILL1=$(echo "$LOGIN_B1" | jq -r .data.register.id)
-[ "$(echo "$LOGIN_B1" | jq -r .data.register.mode)" = "retail" ] || fail "Till 1 is not in retail mode"
-echo "2. Bob (supervisor) logged in at Till 1 (retail mode, $TILL1)"
+[ "$(echo "$LOGIN_B1" | jq -r .data.register.mode)" = "food" ] || fail "Till 1 is not in food mode"
+echo "2. Bob (supervisor) logged in at Till 1 (food mode, $TILL1)"
 
 SHIFT2=$(req POST /shifts/open -H "$D" -H "$A" -d '{"opening_float_cents":10000}' | jq -r .data.shift.id)
 echo "3. Till 2 shift open, float 10000"
@@ -48,13 +48,13 @@ echo "4. Till 1 shift open, float 10000"
 
 # --- catalog lookups ---
 CATALOG=$(req GET /catalog -H "$D")
-LATTE=$(echo "$CATALOG" | jq -r '.data.variants[] | select(.sku=="LATTE") | .id')
-CHEDDAR=$(echo "$CATALOG" | jq -r '.data.variants[] | select(.sku=="CHEESE-KG") | .id')
-TSHIRT_M=$(echo "$CATALOG" | jq -r '.data.variants[] | select(.sku=="TSHIRT-BLUE-M") | .id')
-OAT=$(echo "$CATALOG" | jq -r '.data.modifiers[] | select(.name=="Oat") | .id')
-WHOLE=$(echo "$CATALOG" | jq -r '.data.modifiers[] | select(.name=="Whole") | .id')
-EXTRA_SHOT=$(echo "$CATALOG" | jq -r '.data.modifiers[] | select(.name=="Extra shot") | .id')
-echo "5. catalog resolved: latte, cheddar, t-shirt/M, oat, whole, extra shot"
+ADOBO=$(echo "$CATALOG" | jq -r '.data.variants[] | select(.sku=="RST-ADOBO-CHK") | .id')
+FRIED_RICE=$(echo "$CATALOG" | jq -r '.data.variants[] | select(.sku=="RST-GARLIC-RICE") | .id')
+HALO=$(echo "$CATALOG" | jq -r '.data.variants[] | select(.sku=="RST-HALOHALO") | .id')
+GARLIC_RICE=$(echo "$CATALOG" | jq -r '.data.modifiers[] | select(.name=="Garlic Rice") | .id')
+PLAIN_RICE=$(echo "$CATALOG" | jq -r '.data.modifiers[] | select(.name=="Plain Rice") | .id')
+EXTRA_EGG=$(echo "$CATALOG" | jq -r '.data.modifiers[] | select(.name=="Extra Egg") | .id')
+echo "5. catalog resolved: adobo, garlic fried rice, halo-halo, garlic rice, plain rice, extra egg"
 
 # ============================================================
 # Tab A (Till 2 / Alice): table T1, a fired course, a qty bump, then a transfer
@@ -65,21 +65,21 @@ ORDER_A=$(echo "$OA" | jq -r .data.order.id)
 [ "$(echo "$OA" | jq -r .data.order.table_ref)" = "T1" ] || fail "Tab A table_ref not set"
 echo "6. Tab A opened at T1: $ORDER_A"
 
-# latte x2, oat milk + a repeated modifier (double shot = 'Extra shot' selected twice —
+# adobo x2, garlic rice + a repeated modifier (double egg = 'Extra Egg' selected twice —
 # 03-api.md: modifiers[] accepts repeats). Line math re-derived from the response's own
 # fields rather than hardcoded, so this proves the *server* applied the modifiers.
 R=$(req POST "/orders/$ORDER_A/lines" -H "$D" -H "$A" -H 'If-Match: 0' \
-  -d "{\"variant_id\":\"$LATTE\",\"qty\":\"2\",\"modifiers\":[\"$OAT\",\"$EXTRA_SHOT\",\"$EXTRA_SHOT\"]}")
+  -d "{\"variant_id\":\"$ADOBO\",\"qty\":\"2\",\"modifiers\":[\"$GARLIC_RICE\",\"$EXTRA_EGG\",\"$EXTRA_EGG\"]}")
 LINE1=$(echo "$R" | jq -r .data.line.id)
 MODCOUNT=$(echo "$R" | jq '.data.line.modifiers | length')
-[ "$MODCOUNT" = "3" ] || fail "expected 3 modifier rows (oat + 2x extra shot), got $MODCOUNT"
+[ "$MODCOUNT" = "3" ] || fail "expected 3 modifier rows (garlic rice + 2x extra egg), got $MODCOUNT"
 UNIT=$(echo "$R" | jq .data.line.unit_price_cents)
 MODSUM=$(echo "$R" | jq '[.data.line.modifiers[].price_delta_cents] | add')
 QTY=$(echo "$R" | jq -r .data.line.qty | cut -d. -f1)
 EXPECT_LINE_TOTAL=$(( (UNIT + MODSUM) * QTY ))
 ACTUAL_LINE_TOTAL=$(echo "$R" | jq .data.line.line_total_cents)
 [ "$ACTUAL_LINE_TOTAL" = "$EXPECT_LINE_TOTAL" ] || fail "modifier math: expected $EXPECT_LINE_TOTAL got $ACTUAL_LINE_TOTAL"
-echo "7. course 1: latte x2 + oat + double shot — unit=$UNIT modsum=$MODSUM line_total=$ACTUAL_LINE_TOTAL (server-verified)"
+echo "7. course 1: adobo x2 + garlic rice + double egg — unit=$UNIT modsum=$MODSUM line_total=$ACTUAL_LINE_TOTAL (server-verified)"
 
 R=$(req PATCH "/orders/$ORDER_A/lines/$LINE1/prep" -H "$D" -H "$A" -d '{"state":"in_progress"}')
 [ "$(echo "$R" | jq -r .data.line.prep_state)" = "in_progress" ] || fail "course 1 not fired"
@@ -87,9 +87,9 @@ R=$(req PATCH "/orders/$ORDER_A/lines/$LINE1/prep" -H "$D" -H "$A" -d '{"state":
 echo "8. course 1 fired (in_progress); order version unchanged (prep is lock-free)"
 
 R=$(req POST "/orders/$ORDER_A/lines" -H "$D" -H "$A" -H 'If-Match: 1' \
-  -d "{\"variant_id\":\"$CHEDDAR\",\"qty\":\"1\"}")
+  -d "{\"variant_id\":\"$FRIED_RICE\",\"qty\":\"1\"}")
 [ "$(echo "$R" | jq -r .data.order.version)" = "2" ] || fail "second course add-line should bump to version 2"
-echo "9. course 2 added (cheddar, no modifiers required): total=$(echo "$R" | jq .data.order.total_cents)"
+echo "9. course 2 added (garlic fried rice, no modifiers required): total=$(echo "$R" | jq .data.order.total_cents)"
 
 R=$(req PATCH "/orders/$ORDER_A/lines/$LINE1" -H "$D" -H "$A" -H 'If-Match: 2' -d '{"qty":"3"}')
 [ "$(echo "$R" | jq -r .data.line.qty)" = "3.000" ] || fail "qty bump 2->3 did not stick"
@@ -105,18 +105,18 @@ OB=$(req POST /orders -H "$D" -H "$A" -d '{"table_ref":"T2"}')
 ORDER_B=$(echo "$OB" | jq -r .data.order.id)
 echo "11. Tab B opened at T2: $ORDER_B"
 
-# Original latte qty on Tab B, tracked so the split assertion below can compute the
+# Original adobo qty on Tab B, tracked so the split assertion below can compute the
 # *expected* allocated qty independently rather than merely checking "not 1.000".
-LATTE_B_QTY_MILLI=1000   # qty "1" == 1.000 == 1000 thousandths (Quantity::SCALE)
+ADOBO_B_QTY_MILLI=1000   # qty "1" == 1.000 == 1000 thousandths (Quantity::SCALE)
 req POST "/orders/$ORDER_B/lines" -H "$D" -H "$A" -H 'If-Match: 0' \
-  -d "{\"variant_id\":\"$LATTE\",\"qty\":\"1\",\"modifiers\":[\"$WHOLE\"]}" > /dev/null
+  -d "{\"variant_id\":\"$ADOBO\",\"qty\":\"1\",\"modifiers\":[\"$PLAIN_RICE\"]}" > /dev/null
 req POST "/orders/$ORDER_B/lines" -H "$D" -H "$A" -H 'If-Match: 1' \
-  -d "{\"variant_id\":\"$CHEDDAR\",\"qty\":\"1\"}" > /dev/null
+  -d "{\"variant_id\":\"$FRIED_RICE\",\"qty\":\"1\"}" > /dev/null
 R=$(req POST "/orders/$ORDER_B/lines" -H "$D" -H "$A" -H 'If-Match: 2' \
-  -d "{\"variant_id\":\"$TSHIRT_M\",\"qty\":\"1\"}")
+  -d "{\"variant_id\":\"$HALO\",\"qty\":\"1\"}")
 [ "$(echo "$R" | jq -r .data.order.version)" = "3" ] || fail "Tab B should be at version 3 after three lines"
 TOTAL_B=$(echo "$R" | jq .data.order.total_cents)
-echo "12. Tab B: three lines (latte, cheddar, t-shirt), total=$TOTAL_B"
+echo "12. Tab B: three lines (adobo, garlic fried rice, halo-halo), total=$TOTAL_B"
 
 SPLIT_WAYS=3
 SPLIT=$(req POST "/orders/$ORDER_B/split" -H "$D" -H "$A" -H 'If-Match: 3' -H "Idempotency-Key: $(uuidgen)" -d "{\"ways\":$SPLIT_WAYS}")
@@ -130,10 +130,10 @@ SUM_CHILDREN=$((T0 + T1 + T2))
 [ "$SUM_CHILDREN" = "$TOTAL_B" ] || fail "split children ($SUM_CHILDREN) do not sum to original Tab B total ($TOTAL_B)"
 echo "13. Tab B split 3 ways: children totals $T0 + $T1 + $T2 = $SUM_CHILDREN (matches original $TOTAL_B)"
 
-LATTE_QTYS=$(echo "$SPLIT" | jq -r '.data.orders[].lines[] | select(.sku=="LATTE") | .qty')
-QTY_SUM=$(echo "$LATTE_QTYS" | awk '{s+=$1} END{printf "%.3f", s}')
-[ "$QTY_SUM" = "1.000" ] || fail "split latte qtys ($LATTE_QTYS) do not sum back to 1.000"
-echo "14. split latte line qtys: $(echo "$LATTE_QTYS" | tr '\n' ' ')(fractional, allocator-exact, sum $QTY_SUM)"
+ADOBO_QTYS=$(echo "$SPLIT" | jq -r '.data.orders[].lines[] | select(.sku=="RST-ADOBO-CHK") | .qty')
+QTY_SUM=$(echo "$ADOBO_QTYS" | awk '{s+=$1} END{printf "%.3f", s}')
+[ "$QTY_SUM" = "1.000" ] || fail "split adobo qtys ($ADOBO_QTYS) do not sum back to 1.000"
+echo "14. split adobo line qtys: $(echo "$ADOBO_QTYS" | tr '\n' ' ')(fractional, allocator-exact, sum $QTY_SUM)"
 
 req POST "/orders/$CHILD0/payments" -H "$D" -H "$A" -H 'If-Match: 0' -H "Idempotency-Key: $(uuidgen)" \
   -d "{\"driver\":\"cash\",\"amount_cents\":$T0,\"tendered_cents\":$T0}" \
@@ -146,11 +146,11 @@ req POST "/orders/$CHILD2/payments" -H "$D" -H "$A" -H 'If-Match: 0' -H "Idempot
   | jq -e '.data.order.status == "closed"' > /dev/null || fail "split child 3 (card) did not close"
 echo "15. all three children paid and closed (cash, cash, card) — total cash from the split: $((T0 + T1))"
 
-# Expected qty for child 0's latte line, computed independently of the server response:
+# Expected qty for child 0's adobo line, computed independently of the server response:
 # the same earliest-absorbs-the-remainder allocator SplitOrder::allocateMilli() uses,
 # applied by hand to the known original qty (1.000 == 1000 milli) and SPLIT_WAYS.
-BASE_MILLI=$((LATTE_B_QTY_MILLI / SPLIT_WAYS))
-REMAINDER_MILLI=$((LATTE_B_QTY_MILLI - BASE_MILLI * SPLIT_WAYS))
+BASE_MILLI=$((ADOBO_B_QTY_MILLI / SPLIT_WAYS))
+REMAINDER_MILLI=$((ADOBO_B_QTY_MILLI - BASE_MILLI * SPLIT_WAYS))
 CHILD0_MILLI=$BASE_MILLI
 if [ 0 -lt "$REMAINDER_MILLI" ]; then
   CHILD0_MILLI=$((BASE_MILLI + 1))
@@ -158,7 +158,7 @@ fi
 EXPECT_CHILD0_QTY=$(printf "%d.%03d" $((CHILD0_MILLI / 1000)) $((CHILD0_MILLI % 1000)))
 
 RECEIPT=$(req GET "/orders/$CHILD0/receipt" -H "$D" -H "$A")
-RECEIPT_QTY=$(echo "$RECEIPT" | jq -r '.data.lines[] | select(.sku=="LATTE") | .qty')
+RECEIPT_QTY=$(echo "$RECEIPT" | jq -r '.data.lines[] | select(.sku=="RST-ADOBO-CHK") | .qty')
 [ "$RECEIPT_QTY" = "$EXPECT_CHILD0_QTY" ] || fail "receipt qty should be the allocated $EXPECT_CHILD0_QTY, got $RECEIPT_QTY"
 echo "16. receipt renders the fractional qty: $RECEIPT_QTY (matches the hand-computed allocation)"
 

@@ -531,6 +531,78 @@ tests. All three e2e scripts green via `make e2e`.
 
 ---
 
+## Manila catalog seeders
+
+The Downtown/London demo seed — invented SKUs, invented prices, no real geography — is
+gone. Seeding now builds a believable Manila business instead.
+
+- **`POS_SEED_CATALOGS`** (env, default `grocery`) picks a comma-separated subset of
+  three catalogs, each with its own location, all `Asia/Manila`,
+  `prices_include_tax=true`, 12% VAT with fresh produce VAT-exempt:
+  - **grocery** (`GRC`) — 200 real Philippine retail items sourced from Open Food
+    Facts, real brands; sourced items carry their own real-world EAN-13 barcodes and
+    the 11 curated items with no sourceable barcode carry a generated, checksum-valid
+    EAN-13 instead.
+  - **restaurant** (`RST`) — 30 dishes off a researched Filipino menu, with
+    rice/size/spice/add-on modifiers exercising the same modifier machinery M5 built.
+  - **cafe** (`CAF`) — 20 drinks and pastries.
+  - `POS_CURRENCY` is now `PHP` throughout.
+- **Data is committed JSON**, not generated at seed time —
+  `backend/database/seeders/data/{grocery,restaurant,cafe}.json` — so the catalogs are
+  reviewable and diffable like any other change. `tests/Unit/SeedDataTest.php` pins
+  their shape (counts, currency, barcode format, modifier structure) so a bad edit to
+  the JSON fails a fast unit test instead of surfacing as a weird e2e failure three
+  layers away.
+- **e2e re-anchored on the new geography:** `e2e-retail-day.sh` and `e2e-admin-day.sh`
+  now run against GRC, `e2e-lunch-service.sh` against RST. `make e2e` seeds all three
+  catalogs once, then reseeds grocery alone before `e2e-admin-day.sh` so its
+  sales-report assertions hold against a known-fresh count (see the deferred-table entry
+  on delta-based assertions above).
+- **Re-anchoring the e2e caught a real bug, not just a fixture mismatch.** Retail's old
+  Downtown location was tax-exclusive; GRC is tax-inclusive, and pushing refunds through
+  it for the first time exposed a latent M4 defect: `RefundOrder` computed its refund
+  basis as `line_total_cents + tax_cents` unconditionally. That's right when
+  `line_total_cents` is net and tax is added on top, but at a tax-inclusive location
+  `line_total_cents` is already the VAT-inclusive gross and `tax_cents` is only the
+  portion embedded in it — so every refund at a tax-inclusive location was over-paying
+  the customer by the VAT a second time. Fixed by branching on the order's own
+  `prices_include_tax` snapshot (no new query — the locked order already carries it),
+  with regression tests added at both tax modes (commit `7a0c0e0`).
+
+**Status: complete.** 490 backend tests, 112 register-app tests, 133 back-office-app
+tests. All three e2e scripts green via `make e2e`.
+
+---
+
+## User manual
+
+A screenshot-rich manual for the people actually running a store, not the people
+building it — `docs/user-manual/`: four Markdown sources (overview and back-office
+chapters, register chapters covering selling/food-service/shifts/shell, an FAQ, a
+troubleshooting guide, a glossary), 31 staged Playwright screenshots of the Manila seed
+(activation through Z-report on the register side, login through audit on the
+back-office side), and a WeasyPrint build turning both into a single 49-page PDF.
+`make manual` builds the PDF (pinned deps into a local venv, no system Python
+pollution); `make manual-shots` drives Playwright against a running `make dev` +
+seeded stack to (re)capture the screenshots. `.github/workflows/manual.yml` rebuilds
+the PDF on every push to `main` touching `docs/user-manual/**` and commits it back, mirroring
+`wiki.yml`'s shape — the paths filter excludes the PDF and rendered diagrams
+themselves so the bot's own commit doesn't retrigger the workflow. The pipeline itself
+was ported from a sibling project's proven implementation rather than built from
+scratch.
+
+Capturing the screenshots against a real seeded stack surfaced a real bug, not just a
+fixture mismatch: both frontends hardcoded a display-only USD const, so a Manila store
+priced in PHP still showed dollar signs on every screen. The server has always known
+its own currency; the catalog response and the admin-login response now carry it too,
+and each frontend reads it at boot instead of closing over a stale constant (commit
+`c761424`). The manual's screenshots were recaptured afterward, in pesos.
+
+**Status: complete.** `docs/user-manual/user-manual.pdf`, 49 pages, builds clean via
+`make manual`; CI rebuild wired via `manual.yml`.
+
+---
+
 ## Sequencing rationale
 
 - **Money before schema** — everything computes on it.

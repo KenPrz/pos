@@ -25,6 +25,7 @@ final class AdminSessionResource extends JsonResource
                 'email' => $session->user->email,
                 'is_admin' => $session->user->is_admin,
             ],
+            'currency' => config('pos.currency'),
         ];
     }
 }

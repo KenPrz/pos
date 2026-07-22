@@ -7,10 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { ApiError, api, tokens, type Shift, type ShiftCloseResult } from '../lib/api'
+import { getCurrency } from '../lib/currency'
 import { cents, formatMoney, parseCentsOrNull } from '../lib/money'
 
-const CURRENCY = 'USD' // display only; the server owns all arithmetic
-const fm = (n: number) => formatMoney(cents(n), CURRENCY)
+// display only; the server owns all arithmetic
+const fm = (n: number) => formatMoney(cents(n), getCurrency())
 
 // The blind-count mask (Task 13): a cashier who can see the expected figure before
 // counting is primed to just type it back rather than count. Presentation only — the

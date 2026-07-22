@@ -25,14 +25,20 @@ Five steps, in order — the third is a paste, not a command:
 3. Paste that value into `.env` as `POS_DEV_APP_KEY`.
 4. `make dev` — brings up the full dev stack: database, API, register app, back
    office.
-5. `make seed` — runs a fresh migrate and seeds a believable business: two locations,
-   staff at every role, a catalog covering both retail and food service.
+5. `make seed` — runs a fresh migrate and seeds a believable business: by default one
+   Manila grocery location (`GRC`), staff at every role, a real Philippine retail
+   catalog. Set `POS_SEED_CATALOGS=grocery,restaurant,cafe` (any subset, comma-separated)
+   to also bring up the Manila Restaurant (`RST`) and Manila Cafe (`CAF`) locations,
+   covering food service alongside retail.
 
 `make seed` prints three tables, and you'll want all three the first time:
 
 - **Development PINs** — one row per person, with their PIN and role, e.g. Alice /
-  `1111` / cashier @ Downtown. Use one of these to clock in at a register.
-- **Device tokens** — one row per till, register name and device token (e.g. `DT /
+  `1111` / cashier @ GRC. Alice (cashier) and Bob (supervisor) hold their role at
+  *every* seeded location; Maria (`3333`) is cashier at the first location and
+  supervisor at the second when a second one exists; Priya (`4444`) is a global admin.
+  Use one of these to clock in at a register.
+- **Device tokens** — one row per till, register name and device token (e.g. `GRC /
   Till 1`). These are for scripts and direct API work (the e2e scripts consume them
   this way) — the register's activation screen no longer takes a raw token at all.
   To bring a till online through its own screen, sign in to the back office with the

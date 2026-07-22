@@ -3,12 +3,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { api, type CatalogProduct, type CatalogVariant } from '../lib/api'
+import { getCurrency } from '../lib/currency'
 import { MoneyText } from '@/components/MoneyText'
 import { TileButton } from '@/components/TileButton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ModifierSheet } from './ModifierSheet'
-
-const CURRENCY = 'USD'
 
 /**
  * Food-mode ordering surface: a category tab strip plus a tile grid, replacing the idle
@@ -62,7 +61,7 @@ export function MenuGrid({
   const pendingModifiers = pending ? (catalog.data?.modifiers ?? []).filter((m) => pendingGroupIds.has(m.group_id)) : []
 
   const tileMeta = (variant: CatalogVariant) => (
-    <MoneyText cents={variant.price_cents} currency={CURRENCY} size="line" className="text-ink" />
+    <MoneyText cents={variant.price_cents} currency={getCurrency()} size="line" className="text-ink" />
   )
 
   return (

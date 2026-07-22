@@ -59,7 +59,7 @@ services:
       DB_DATABASE: pos
       DB_USERNAME: pos
       DB_PASSWORD: ${POS_DEV_DB_PASSWORD:-pos}
-      POS_CURRENCY: USD
+      POS_CURRENCY: PHP
       POS_BUSINESS_NAME: "Dev Trading Co"
     healthcheck:
       # Ready means "composer install finished AND the app answers" — first boot

@@ -9,15 +9,16 @@
 # the paid order's receipt didn't move (snapshot), the three sales-report slices
 # attribute the same sale by day/category/user, the audit log turns up every write, and
 # the shift closes clean.
-# Set POS_ADMIN_EMAIL / POS_ADMIN_PASSWORD (back-office login), POS_DEVICE_TOKEN (Till 1
-# at Downtown — printed by php artisan migrate:fresh --seed) and POS_E2E_PIN (any 4-6
-# digit PIN for the cashier this script hires) first. Never a token literal in this file.
+# Set POS_ADMIN_EMAIL / POS_ADMIN_PASSWORD (back-office login), POS_DEVICE_TOKEN (GRC /
+# Till 1 at the Manila Grocery — printed by php artisan migrate:fresh --seed) and
+# POS_E2E_PIN (any 4-6 digit PIN for the cashier this script hires) first. Never a
+# token literal in this file.
 #
 set -euo pipefail
 API=http://127.0.0.1:8000/api/v1
 ADMIN_EMAIL="${POS_ADMIN_EMAIL:?set POS_ADMIN_EMAIL to the back-office admin email, printed by php artisan migrate:fresh --seed}"
 ADMIN_PASSWORD="${POS_ADMIN_PASSWORD:?set POS_ADMIN_PASSWORD to the back-office admin password, printed by php artisan migrate:fresh --seed}"
-DEVICE="${POS_DEVICE_TOKEN:?set POS_DEVICE_TOKEN to the Till 1 (Downtown) device token, printed by php artisan migrate:fresh --seed}"
+DEVICE="${POS_DEVICE_TOKEN:?set POS_DEVICE_TOKEN to the GRC / Till 1 (Manila Grocery) device token, printed by php artisan migrate:fresh --seed}"
 E2E_PIN="${POS_E2E_PIN:?set POS_E2E_PIN to a 4-6 digit PIN for the cashier this script hires}"
 J='Content-Type: application/json'
 
@@ -51,9 +52,9 @@ echo "1. admin logged in via POST /admin/login"
 # --- 2. build a menu item from nothing ---
 
 LOCATIONS=$(req GET /admin/locations -H "$AD")
-DOWNTOWN_ID=$(echo "$LOCATIONS" | jq -r '.data.items[] | select(.code=="DT") | .id')
-[ -n "$DOWNTOWN_ID" ] && [ "$DOWNTOWN_ID" != "null" ] || fail "could not resolve Downtown (DT) location id"
-echo "2. Downtown (DT) resolved: $DOWNTOWN_ID"
+GROCERY_ID=$(echo "$LOCATIONS" | jq -r '.data.items[] | select(.code=="GRC") | .id')
+[ -n "$GROCERY_ID" ] && [ "$GROCERY_ID" != "null" ] || fail "could not resolve Manila Grocery (GRC) location id"
+echo "2. Manila Grocery (GRC) resolved: $GROCERY_ID"
 
 CATEGORY=$(req POST /admin/categories -H "$AD" -d '{"name":"Drinks","sort_order":1}')
 CATEGORY_ID=$(echo "$CATEGORY" | jq -r .data.category.id)
@@ -69,13 +70,12 @@ PRODUCT_ID=$(echo "$PRODUCT" | jq -r .data.product.id)
 [ "$(echo "$PRODUCT" | jq -r .data.product.kind)" = "service" ] || fail "product kind should be service"
 echo "5. product created: Flat White ($PRODUCT_ID)"
 
-# Downtown is prices_include_tax=false (tax added at the till, not baked into the shelf
-# price — docs/02-data-model.md), so attaching the 10% rate above to this variant would
-# make every downstream total 110% of the round numbers this walkthrough asserts. The
-# tax rate is still exercised end-to-end (created, listed, available for a real variant);
-# this particular untracked service item is deliberately left tax-exempt (tax_rate_id
-# omitted, which CreateVariantRequest allows) so the modifier/reporting math below stays
-# exact.
+# The Manila Grocery is prices_include_tax=true (VAT lives inside the shelf price —
+# docs/02-data-model.md). This untracked service item deliberately carries no tax rate
+# at all (tax_rate_id omitted, which CreateVariantRequest allows), so every total below
+# is the same round number in either tax mode and the modifier/reporting math stays
+# exact. The 10% rate created above is still exercised end-to-end (created, listed,
+# available for a real variant).
 VARIANT=$(req POST /admin/variants -H "$AD" -d "{\"product_id\":\"$PRODUCT_ID\",\"name\":\"Regular\",\"sku\":\"FW-1\",\"price_cents\":450,\"track_inventory\":false}")
 VARIANT_ID=$(echo "$VARIANT" | jq -r .data.variant.id)
 [ "$(echo "$VARIANT" | jq .data.variant.price_cents)" = "450" ] || fail "variant should be 450c"
@@ -98,21 +98,21 @@ echo "9. Milk attached to Flat White"
 
 # --- 3. hire Eve ---
 
-EVE=$(req POST /admin/users -H "$AD" -d "{\"name\":\"Eve\",\"pin\":\"$E2E_PIN\",\"roles\":[{\"location_id\":\"$DOWNTOWN_ID\",\"role\":\"cashier\"}]}")
+EVE=$(req POST /admin/users -H "$AD" -d "{\"name\":\"Eve\",\"pin\":\"$E2E_PIN\",\"roles\":[{\"location_id\":\"$GROCERY_ID\",\"role\":\"cashier\"}]}")
 EVE_ID=$(echo "$EVE" | jq -r .data.user.id)
-echo "10. Eve hired, cashier @ DT ($EVE_ID)"
+echo "10. Eve hired, cashier @ GRC ($EVE_ID)"
 
 USERS=$(req GET /admin/users -H "$AD")
 EVE_ROW=$(echo "$USERS" | jq -c --arg id "$EVE_ID" '.data.items[] | select(.id==$id)')
 [ -n "$EVE_ROW" ] || fail "Eve does not appear in GET /admin/users"
-EVE_ROLE=$(echo "$EVE_ROW" | jq -r --arg loc "$DOWNTOWN_ID" '.roles[] | select(.location_id==$loc) | .role')
-[ "$EVE_ROLE" = "cashier" ] || fail "Eve's cashier role @ DT did not stick, got: $EVE_ROLE"
-echo "11. Eve confirmed in GET /admin/users with cashier role @ DT"
+EVE_ROLE=$(echo "$EVE_ROW" | jq -r --arg loc "$GROCERY_ID" '.roles[] | select(.location_id==$loc) | .role')
+[ "$EVE_ROLE" = "cashier" ] || fail "Eve's cashier role @ GRC did not stick, got: $EVE_ROLE"
+echo "11. Eve confirmed in GET /admin/users with cashier role @ GRC"
 
 # --- 4. Till 1 to food mode, issue + redeem an activation code ---
 
 REGISTERS=$(req GET /admin/registers -H "$AD")
-TILL1_ID=$(echo "$REGISTERS" | jq -r --arg loc "$DOWNTOWN_ID" '.data.items[] | select(.location_id==$loc and .name=="Till 1") | .id')
+TILL1_ID=$(echo "$REGISTERS" | jq -r --arg loc "$GROCERY_ID" '.data.items[] | select(.location_id==$loc and .name=="Till 1") | .id')
 [ -n "$TILL1_ID" ] && [ "$TILL1_ID" != "null" ] || fail "could not resolve Till 1's register id"
 echo "12. Till 1 resolved: $TILL1_ID"
 
@@ -183,18 +183,18 @@ RECEIPT2=$(req GET "/orders/$ORDER_ID/receipt" -H "$D" -H "$S")
 [ "$(echo "$RECEIPT2" | jq .data.lines[0].line_total_cents)" = "510" ] || fail "the paid order's receipt drifted after reprice — snapshot broken"
 echo "25. paid order's receipt still reads 510 — the reprice never touched it (snapshot proof)"
 
-SALES_DAY=$(req GET "/admin/reports/sales?location_id=$DOWNTOWN_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=day" -H "$AD")
+SALES_DAY=$(req GET "/admin/reports/sales?location_id=$GROCERY_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=day" -H "$AD")
 [ "$(echo "$SALES_DAY" | jq -r .data.basis)" = "ledger" ] || fail "day report should be ledger-basis"
 [ "$(echo "$SALES_DAY" | jq .data.totals.gross_cents)" = "510" ] || fail "day gross should be exactly 510 on a fresh seed, got $(echo "$SALES_DAY" | jq .data.totals.gross_cents)"
 echo "26. sales report (day, ledger-basis): gross=510"
 
-SALES_CATEGORY=$(req GET "/admin/reports/sales?location_id=$DOWNTOWN_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=category" -H "$AD")
+SALES_CATEGORY=$(req GET "/admin/reports/sales?location_id=$GROCERY_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=category" -H "$AD")
 [ "$(echo "$SALES_CATEGORY" | jq -r .data.basis)" = "lines" ] || fail "category report should be line-basis"
 DRINKS_CENTS=$(echo "$SALES_CATEGORY" | jq '[.data.rows[] | select(.bucket=="Drinks") | .line_total_cents] | add')
 [ "$DRINKS_CENTS" = "510" ] || fail "Drinks category total should be 510, got $DRINKS_CENTS"
 echo "27. sales report (category, line-basis): Drinks=510"
 
-SALES_USER=$(req GET "/admin/reports/sales?location_id=$DOWNTOWN_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=user" -H "$AD")
+SALES_USER=$(req GET "/admin/reports/sales?location_id=$GROCERY_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=user" -H "$AD")
 EVE_CENTS=$(echo "$SALES_USER" | jq '[.data.rows[] | select(.bucket=="Eve") | .gross_cents] | add')
 [ "$EVE_CENTS" = "510" ] || fail "Eve's user-report gross should be 510, got $EVE_CENTS"
 echo "28. sales report (user, ledger-basis): Eve=510"
@@ -239,10 +239,10 @@ echo "34. shift closed clean: counted=5510 variance=0"
 
 echo
 echo "=== Admin day summary ==="
-printf "%-22s %s\n" "Location" "Downtown (DT)"
+printf "%-22s %s\n" "Location" "Manila Grocery (GRC)"
 printf "%-22s %s\n" "Product" "Flat White / FW-1: 450c -> 500c (repriced after sale)"
 printf "%-22s %s\n" "Modifier group" "Milk (min 1, max 1): Oat +60, Whole +0"
-printf "%-22s %s\n" "Staff hired" "Eve — cashier @ DT"
+printf "%-22s %s\n" "Staff hired" "Eve — cashier @ GRC"
 printf "%-22s %s\n" "Register" "Till 1 — retail -> food, activation code issued + redeemed"
 echo
 printf "%-10s %-8s %10s %10s\n" "Order" "Table" "Total" "Status"

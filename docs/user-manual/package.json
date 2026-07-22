@@ -1,0 +1,8 @@
+{
+  "name": "pos-user-manual-capture",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

@@ -1,9 +1,8 @@
 import * as React from 'react'
 import type { OrderLine } from '@/lib/api'
+import { getCurrency } from '@/lib/currency'
 import { cents, formatMoney } from '@/lib/money'
 import { Button } from '@/components/ui/button'
-
-const CURRENCY = 'USD' // display only; the server owns all arithmetic
 
 export interface CartLineProps {
   line: OrderLine
@@ -27,7 +26,7 @@ export function CartLine({ line, onVoid, prepChip }: CartLineProps) {
               <li key={i}>
                 {m.name}
                 {m.price_delta_cents !== 0 && (
-                  <span className="type-money"> {formatMoney(cents(m.price_delta_cents), CURRENCY)}</span>
+                  <span className="type-money"> {formatMoney(cents(m.price_delta_cents), getCurrency())}</span>
                 )}
               </li>
             ))}
@@ -38,7 +37,7 @@ export function CartLine({ line, onVoid, prepChip }: CartLineProps) {
         <span className="type-body-lg type-money shrink-0 text-ink-muted">{line.qty}</span>
       )}
       <span className="type-body-lg type-money shrink-0 text-right">
-        {formatMoney(cents(line.line_total_cents), CURRENCY)}
+        {formatMoney(cents(line.line_total_cents), getCurrency())}
       </span>
       {prepChip}
       {onVoid && (

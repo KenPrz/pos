@@ -9,7 +9,11 @@ COMPOSE_PROD := docker compose -f compose.prod.yml
 COMPOSE_VAR := $(if $(filter prod,$(COMPOSE)),$(COMPOSE_PROD),$(COMPOSE_DEV))
 
 .DEFAULT_GOAL := help
-.PHONY: help dev dev-down logs ps seed migrate dev-key wait-api test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs backup restore restore-drill e2e
+.PHONY: help dev dev-down logs ps seed migrate dev-key wait-api test test-backend test-web test-bo typecheck clean build prod-up prod-down prod-logs backup restore restore-drill e2e manual manual-shots
+
+# Which demo catalogs `make seed` builds — comma-separated subset of
+# grocery,restaurant,cafe. Mirrors config/pos.php's default.
+POS_SEED_CATALOGS ?= grocery
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -62,8 +66,8 @@ wait-api:
 	@tries=0; until $(COMPOSE_DEV) exec api curl -fsS http://localhost:8000/api/v1/health >/dev/null 2>&1; do \
 	  tries=$$((tries+1)); [ "$$tries" -lt 120 ] || { echo "api never became ready — check 'make logs'"; exit 1; }; sleep 5; done
 
-seed: wait-api ## Fresh migrate + seed (prints dev PINs and device tokens)
-	$(COMPOSE_DEV) exec --user pos api php artisan migrate:fresh --seed
+seed: wait-api ## Fresh migrate + seed (prints dev PINs and device tokens; POS_SEED_CATALOGS=grocery,restaurant,cafe for all three catalogs)
+	$(COMPOSE_DEV) exec --user pos -e POS_SEED_CATALOGS=$(POS_SEED_CATALOGS) api php artisan migrate:fresh --seed
 
 migrate: wait-api ## Run pending migrations
 	$(COMPOSE_DEV) exec --user pos api php artisan migrate
@@ -78,11 +82,12 @@ migrate: wait-api ## Run pending migrations
 # prints. The one wrinkle — a Sanctum plaintext token is itself `<id>|<hash>`,
 # and the table's own border character is also `|`, so a naive `awk -F'|'`
 # split misaligns on the token's embedded pipe. Anchoring the sed pattern on
-# the fixed "DT / Till N" label and matching to the LAST `|` on the line
-# (greedy `.*`, trimmed of trailing padding in a second pass) survives it.
-# Only Downtown's tokens are needed: e2e-retail-day.sh and the Till-1 leg of
-# e2e-lunch-service.sh / e2e-admin-day.sh all resolve through Bob/Alice, who
-# only hold roles at Downtown (see DatabaseSeeder::seedStaff).
+# the fixed "GRC / Till N" / "RST / Till N" label and matching to the LAST `|`
+# on the line (greedy `.*`, trimmed of trailing padding in a second pass)
+# survives it.
+# Alice and Bob hold roles at every seeded location; retail-day and admin-day
+# run on the grocery till (GRC), lunch-service on the restaurant's two tills
+# (RST).
 #
 # Each `$(MAKE) seed` below is captured to a file with a plain redirect
 # (`> file 2>&1`), never piped through `tee` — a pipeline's exit status is
@@ -109,33 +114,43 @@ migrate: wait-api ## Run pending migrations
 # here because these files hold live device tokens.
 e2e: E2E_TMP := $(shell mktemp -d)
 e2e: ## Reseed (twice — see comment above), run all three committed e2e proofs, THEN LEAVE THE DEV DB DIRTY with two seeds' + e2e-admin-day's data (re-run `make seed` after for a clean slate). Needs the api container reachable at http://127.0.0.1:8000 — the scripts hardcode it; override POS_DEV_API_PORT back to 8000 in root .env if something else is squatting on it.
-	@$(MAKE) seed > $(E2E_TMP)/pos-seed-out.txt 2>&1 || { cat $(E2E_TMP)/pos-seed-out.txt; exit 1; }
+	@$(MAKE) seed POS_SEED_CATALOGS=grocery,restaurant,cafe > $(E2E_TMP)/pos-seed-out.txt 2>&1 || { cat $(E2E_TMP)/pos-seed-out.txt; exit 1; }
 	@cat $(E2E_TMP)/pos-seed-out.txt
-	@grep '| DT / Till 1 ' $(E2E_TMP)/pos-seed-out.txt | sed -E 's/^\| *DT \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-till1.txt
-	@grep '| DT / Till 2 ' $(E2E_TMP)/pos-seed-out.txt | sed -E 's/^\| *DT \/ Till 2 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-till2.txt
-	@test -s $(E2E_TMP)/pos-e2e-till1.txt && test -s $(E2E_TMP)/pos-e2e-till2.txt || { echo "could not extract DT / Till 1|2 device tokens — seeder's printed table format may have changed"; exit 1; }
-	@echo "extracted: DT/Till1=$$(cut -c1-8 $(E2E_TMP)/pos-e2e-till1.txt)... DT/Till2=$$(cut -c1-8 $(E2E_TMP)/pos-e2e-till2.txt)..."
-	POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-till1.txt) bash scripts/e2e-retail-day.sh
-	POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-till2.txt) POS_DEVICE_TOKEN_2=$$(cat $(E2E_TMP)/pos-e2e-till1.txt) bash scripts/e2e-lunch-service.sh
+	@grep '| GRC / Till 1 ' $(E2E_TMP)/pos-seed-out.txt | sed -E 's/^\| *GRC \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-grc1.txt
+	@grep '| RST / Till 1 ' $(E2E_TMP)/pos-seed-out.txt | sed -E 's/^\| *RST \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-rst1.txt
+	@grep '| RST / Till 2 ' $(E2E_TMP)/pos-seed-out.txt | sed -E 's/^\| *RST \/ Till 2 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-rst2.txt
+	@test -s $(E2E_TMP)/pos-e2e-grc1.txt && test -s $(E2E_TMP)/pos-e2e-rst1.txt && test -s $(E2E_TMP)/pos-e2e-rst2.txt || { echo "could not extract GRC/RST device tokens — seeder's printed table format may have changed"; exit 1; }
+	@echo "extracted: GRC/Till1=$$(cut -c1-8 $(E2E_TMP)/pos-e2e-grc1.txt)... RST/Till1=$$(cut -c1-8 $(E2E_TMP)/pos-e2e-rst1.txt)... RST/Till2=$$(cut -c1-8 $(E2E_TMP)/pos-e2e-rst2.txt)..."
+	POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-grc1.txt) bash scripts/e2e-retail-day.sh
+	POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-rst2.txt) POS_DEVICE_TOKEN_2=$$(cat $(E2E_TMP)/pos-e2e-rst1.txt) bash scripts/e2e-lunch-service.sh
 	@# e2e-admin-day.sh's sales-report checks are location+date scoped, not shift-
 	@# scoped like the other two scripts' Z-reports, and it asserts an absolute
-	@# Downtown day-gross of exactly 510c — an assumption baked in when it was
-	@# authored/proven standalone in M6 (git 7d75dcf), against its OWN fresh seed.
-	@# Chaining it after the two scripts above (which also transact at Downtown,
+	@# Manila Grocery (GRC) day-gross of exactly 510c — an assumption baked in when
+	@# it was authored/proven standalone in M6 (git 7d75dcf), against its OWN fresh
+	@# seed. Chaining it after the two scripts above (which also transact at GRC,
 	@# same calendar day) makes that specific assertion false even though nothing
 	@# is actually broken — it's a test-isolation assumption the script carries,
 	@# not a stack bug. Re-seeding here restores the exact precondition the script
 	@# was written against, without editing the script itself. Reordering instead
-	@# (running admin-day first) was considered and rejected: admin-day flips
-	@# Till 1 to food mode and reissues its token, which e2e-lunch-service.sh
-	@# depends on still being retail-mode — so admin-day must stay last, and a
-	@# second reseed is the only fix that touches neither script nor ordering.
-	@$(MAKE) seed > $(E2E_TMP)/pos-seed-out2.txt 2>&1 || { cat $(E2E_TMP)/pos-seed-out2.txt; exit 1; }
+	@# (running admin-day first) was considered and rejected: admin-day flips GRC
+	@# Till 1 to food mode and reissues its token mid-script, so it must stay last;
+	@# the second reseed (grocery-only — that's all admin-day touches) restores its
+	@# fresh-seed precondition.
+	@$(MAKE) seed POS_SEED_CATALOGS=grocery > $(E2E_TMP)/pos-seed-out2.txt 2>&1 || { cat $(E2E_TMP)/pos-seed-out2.txt; exit 1; }
 	@cat $(E2E_TMP)/pos-seed-out2.txt
-	@grep '| DT / Till 1 ' $(E2E_TMP)/pos-seed-out2.txt | sed -E 's/^\| *DT \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-till1b.txt
-	@test -s $(E2E_TMP)/pos-e2e-till1b.txt || { echo "could not extract DT / Till 1 device token on the second reseed"; exit 1; }
-	POS_ADMIN_EMAIL=admin@pos.test POS_ADMIN_PASSWORD=admin-dev-password POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-till1b.txt) POS_E2E_PIN=9876 bash scripts/e2e-admin-day.sh
+	@grep '| GRC / Till 1 ' $(E2E_TMP)/pos-seed-out2.txt | sed -E 's/^\| *GRC \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-grc1b.txt
+	@test -s $(E2E_TMP)/pos-e2e-grc1b.txt || { echo "could not extract the GRC / Till 1 device token on the second reseed"; exit 1; }
+	POS_ADMIN_EMAIL=admin@pos.test POS_ADMIN_PASSWORD=admin-dev-password POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-grc1b.txt) POS_E2E_PIN=9876 bash scripts/e2e-admin-day.sh
 	@rm -rf $(E2E_TMP)
+
+manual: ## Build docs/user-manual/user-manual.pdf (host python3; pinned deps into a local venv)
+	@test -d docs/user-manual/.venv || python3 -m venv docs/user-manual/.venv
+	@docs/user-manual/.venv/bin/pip install -q markdown==3.7 pymdown-extensions==10.12 weasyprint==63.1
+	docs/user-manual/.venv/bin/python docs/user-manual/build_pdf.py
+
+manual-shots: ## Capture user-manual screenshots (needs `make dev` up + POS_SEED_CATALOGS=grocery,restaurant,cafe make seed)
+	cd docs/user-manual && npm install --no-fund --no-audit && npx playwright install chromium
+	node docs/user-manual/capture_screenshots.mjs
 
 test: test-backend test-web test-bo ## All suites, in containers
 

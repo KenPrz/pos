@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Register } from './Register'
 import { inShell } from '../lib/transport'
 import { ApiError, api } from '../lib/api'
+import { getCurrency, setCurrency } from '../lib/currency'
 
 // @testing-library/react's auto-cleanup never registers itself in this suite (see
 // ShiftScreens.test.tsx et al.) — do it by hand or DOM from one test leaks into the next.
@@ -122,5 +123,61 @@ describe('device revocation routing', () => {
 
     expect(await screen.findByText('Enter PIN')).toBeInTheDocument()
     expect(localStorage.getItem('pos.device_token')).toBe('live-token')
+  })
+})
+
+// Review fix (High): `api.catalog()` is the only thing that calls `setCurrency` (see
+// lib/currency.ts), but its two pre-fix callers — MenuGrid (food mode only) and
+// SaleScreen's discounts query (`enabled: can('order.discount.apply')`, supervisor-only)
+// — are both unreachable from a plain retail cashier's session: no food-mode floor, no
+// supervisor permission, so the till sat on the 'USD' placeholder all shift. The fix adds
+// an unconditional boot-time catalog fetch (Register.tsx, gated only on a device token
+// existing, not on mode or role). This test proves exactly the path that used to be
+// broken: a device-enrolled, not-yet-signed-in till (stage stays on 'pin' — neither
+// SaleScreen nor MenuGrid ever mounts) still ends up on the server's real currency.
+// `api.catalog` itself is left un-mocked (unlike `currentShift` above) so the real
+// `setCurrency` call inside it is what's under test; only the network underneath
+// (`../lib/transport`'s `send` -> `fetch`, since `inShell()` is mocked false) is stubbed.
+describe('boot-time catalog fetch (cashier/retail path learns the server currency)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('sets currency from the boot-time fetch even though the till never opens MenuGrid or the discounts query', async () => {
+    setCurrency('USD') // the module's pre-load placeholder — same starting point as a fresh boot
+    expect(getCurrency()).toBe('USD')
+
+    localStorage.setItem('pos.device_token', 'device-token-abc')
+    // Deliberately no staff token: stage resolves to 'pin' and stays there, so the sale
+    // screen (and its supervisor-gated discounts query) never mounts, and this isn't a
+    // food-mode register, so MenuGrid never mounts either.
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/catalog') && !url.includes('/catalog/lookup')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              categories: [],
+              products: [],
+              variants: [],
+              modifier_groups: [],
+              modifiers: [],
+              tax_rates: [],
+              discounts: [],
+              currency: 'PHP',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+      throw new Error(`unexpected fetch in this test: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderRegister()
+
+    expect(await screen.findByText('Enter PIN')).toBeInTheDocument()
+    await waitFor(() => expect(getCurrency()).toBe('PHP'))
   })
 })

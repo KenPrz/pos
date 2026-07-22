@@ -3,14 +3,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError, api, type Order, type OpenShiftRegister } from '../lib/api'
+import { getCurrency } from '../lib/currency'
 import { ActionZone } from '@/components/ActionZone'
 import { MoneyText } from '@/components/MoneyText'
 import { TileButton } from '@/components/TileButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
-
-const CURRENCY = 'USD'
 
 // Stable references for the "no data yet" case — `.data ?? []` would otherwise mint a
 // new array every render.
@@ -170,7 +169,7 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
                 meta={
                   <>
                     <span className="block">{o.opened_by_name ?? 'Unknown'} · {ageLabel(o.opened_at)}</span>
-                    <MoneyText cents={o.due_cents} currency={CURRENCY} size="line" className="block text-ink" />
+                    <MoneyText cents={o.due_cents} currency={getCurrency()} size="line" className="block text-ink" />
                   </>
                 }
               />

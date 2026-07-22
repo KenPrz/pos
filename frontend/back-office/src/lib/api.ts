@@ -7,6 +7,7 @@
  */
 
 import { isoDate } from './date'
+import { setCurrency } from './currency'
 
 /** Success is always `{ data: ... }`; errors are always `{ error: ... }`. Never both. */
 export type ApiSuccess<T> = { data: T }
@@ -146,7 +147,7 @@ function put<T>(path: string, body: unknown): Promise<T> {
 // ---------------------------------------------------------------------------
 
 export type AdminUser = { id: string; name: string; email: string | null; is_admin: boolean }
-export type AdminSession = { token: string; user: AdminUser }
+export type AdminSession = { token: string; user: AdminUser; currency: string }
 
 // ---------------------------------------------------------------------------
 // Catalog wire types — verified against app/Http/Resources/Admin/*.php (Task 9).
@@ -383,6 +384,10 @@ export const api = {
     const session = await post<AdminSession>('/admin/login', { email, password })
     adminToken.set(session.token)
     adminToken.setUser(session.user)
+    // The back office's entry point for the server's currency — it has no catalog fetch
+    // of its own (unlike the register). setCurrency also persists it, so a restored
+    // session (stored token, no fresh login) still knows it — see lib/currency.ts.
+    setCurrency(session.currency)
     return session
   },
   // Best-effort: the token is cleared locally regardless of whether the server round

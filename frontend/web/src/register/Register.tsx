@@ -154,6 +154,22 @@ export function Register() {
     enabled: stage.name === 'loading-shift',
   })
 
+  // Fire-and-forget catalog fetch, unconditional on food/retail mode or permissions:
+  // `api.catalog()` is the ONLY thing that calls `setCurrency` (see lib/currency.ts), but
+  // its two existing callers are MenuGrid (food mode only) and SaleScreen's discounts
+  // query (supervisor-only, `order.discount.apply`) — a retail cashier's session hits
+  // neither, so it never learned the server's currency and rendered the 'USD' placeholder
+  // all shift. Catalog is device-tier (backend/routes/api.php), not staff-tier — a
+  // terminal can show it before anyone clocks in — so this only needs a device token, not
+  // a signed-in staff user or an open shift. Keyed the same as MenuGrid's own `['catalog']`
+  // query so the two share one cache entry instead of double-fetching in food mode.
+  useQuery({
+    queryKey: ['catalog'],
+    queryFn: () => api.catalog(),
+    enabled: stage.name !== 'booting' && stage.name !== 'setup' && stage.name !== 'disabled',
+    staleTime: 5 * 60_000,
+  })
+
   useEffect(() => {
     if (stage.name !== 'loading-shift') return
     if (shiftQuery.data) {
