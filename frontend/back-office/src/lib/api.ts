@@ -224,6 +224,14 @@ export type Discount = {
  */
 export type RoleAssignment = { location_id: string; location_name: string; role: 'cashier' | 'supervisor' }
 
+/**
+ * A direct, per-location permission grant — independent of (and additive to) whatever
+ * a user's role already carries at that location. `location_name` rides along on read
+ * the same way `RoleAssignment.location_name` does (`PermissionAssignments::describe`);
+ * writes only ever need `{ location_id, permission }`.
+ */
+export type PermissionGrant = { location_id: string; location_name?: string; permission: string }
+
 // Deliberately not named `AdminUser` — that type already means "the signed-in admin"
 // (AdminSessionResource, no roles/is_active). This is a managed user row.
 export type ManagedUser = {
@@ -233,7 +241,17 @@ export type ManagedUser = {
   is_admin: boolean
   is_active: boolean
   roles: RoleAssignment[]
+  permissions: PermissionGrant[]
 }
+
+// ---------------------------------------------------------------------------
+// Role templates & the permission catalog (RBAC v2 Task 10) — verified against
+// AdminRoleResource.php and ListPermissionsController.php.
+// ---------------------------------------------------------------------------
+
+export type Role = { id: string; name: string; is_system: boolean; permissions: string[]; assigned_users: number }
+
+export type PermissionGroup = { label: string; permissions: string[] }
 
 export type Location = {
   id: string
@@ -414,6 +432,18 @@ export const api = {
     ),
 
   users: catalogEntity<ManagedUser>('users', 'user'),
+  roles: {
+    ...catalogEntity<Role>('roles', 'role'),
+    // Deletes a custom template outright (not an archive — `role_templates` has no
+    // `is_active` column). 422 `role_template_in_use` if it's still assigned anywhere;
+    // 422 `role_template_is_system` for `cashier`/`supervisor` (UI never offers this
+    // for a system template in the first place, but the server is the real gate).
+    deleteRole: (id: string): Promise<void> => post<void>(`/admin/roles/${id}/delete`, {}),
+    // Static catalog data grouped for the role editor and the user permission-grant
+    // picker alike — not a catalogEntity endpoint, there's nothing to create/update.
+    permissionGroups: (): Promise<PermissionGroup[]> =>
+      request<{ groups: PermissionGroup[] }>('/admin/permissions').then((r) => r.groups),
+  },
   locations: catalogEntity<Location>('locations', 'location'),
   registers: {
     ...catalogEntity<Register>('registers', 'register'),

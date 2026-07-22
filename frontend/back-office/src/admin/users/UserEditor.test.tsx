@@ -5,19 +5,29 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import { UserEditor } from './UserEditor'
-import { ApiError, api, type Location, type ManagedUser } from '../../lib/api'
+import { ApiError, api, type Location, type ManagedUser, type PermissionGroup } from '../../lib/api'
 
 afterEach(cleanup)
 
+const PERMISSION_GROUPS: PermissionGroup[] = [
+  { label: 'Reports', permissions: ['report.sales.view', 'report.stock.view'] },
+  { label: 'Orders', permissions: ['order.void'] },
+]
+
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(api.roles.permissionGroups).mockResolvedValue(PERMISSION_GROUPS)
 })
 
 vi.mock('../../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/api')>()
   return {
     ...actual,
-    api: { ...actual.api, users: { ...actual.api.users, update: vi.fn(), create: vi.fn() } },
+    api: {
+      ...actual.api,
+      users: { ...actual.api.users, update: vi.fn(), create: vi.fn() },
+      roles: { ...actual.api.roles, permissionGroups: vi.fn() },
+    },
   }
 })
 
@@ -33,6 +43,7 @@ const USER: ManagedUser = {
   is_admin: false,
   is_active: true,
   roles: [{ location_id: 'loc-1', location_name: 'Downtown', role: 'cashier' }],
+  permissions: [{ location_id: 'loc-1', location_name: 'Downtown', permission: 'report.sales.view' }],
 }
 
 function renderEditor(props: Partial<ComponentProps<typeof UserEditor>> = {}) {
@@ -139,5 +150,63 @@ describe('UserEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }))
 
     await waitFor(() => expect(api.users.update).toHaveBeenCalledWith('user-1', { is_active: false }))
+  })
+
+  // Task 10 (RBAC v2): direct, per-location permission grants alongside roles — a
+  // second full-set-replace block, same add/remove/diff discipline as the roles table
+  // above, just fed by api.roles.permissionGroups() instead of a fixed enum.
+  describe('direct permission grants', () => {
+    it('renders the existing grants (location_name + permission)', () => {
+      renderEditor()
+
+      expect(screen.getByText('report.sales.view')).toBeInTheDocument()
+      // "Downtown" appears once for the role row and once for the permission row.
+      expect(screen.getAllByText('Downtown')).toHaveLength(2)
+    })
+
+    it('sends the full replacement permission set when a grant is added', async () => {
+      vi.mocked(api.users.update).mockResolvedValue(USER)
+      renderEditor()
+
+      fireEvent.click(screen.getByLabelText(/grant location/i))
+      fireEvent.click(await screen.findByRole('option', { name: 'Uptown' }))
+      fireEvent.click(screen.getByLabelText(/grant permission/i))
+      fireEvent.click(await screen.findByRole('option', { name: 'report.stock.view' }))
+      fireEvent.click(screen.getByRole('button', { name: /^grant$/i }))
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+      await waitFor(() =>
+        expect(api.users.update).toHaveBeenCalledWith('user-1', {
+          permissions: [
+            { location_id: 'loc-1', permission: 'report.sales.view' },
+            { location_id: 'loc-2', permission: 'report.stock.view' },
+          ],
+        }),
+      )
+    })
+
+    it('leaves permissions out of the PATCH body when the grant set is unchanged', async () => {
+      vi.mocked(api.users.update).mockResolvedValue({ ...USER, name: 'Alexandra Cashier' })
+      renderEditor()
+
+      fireEvent.change(screen.getByLabelText(/^name$/i), { target: { value: 'Alexandra Cashier' } })
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+      await waitFor(() =>
+        expect(api.users.update).toHaveBeenCalledWith('user-1', { name: 'Alexandra Cashier' }),
+      )
+    })
+
+    it('removes a grant locally and sends the reduced set', async () => {
+      vi.mocked(api.users.update).mockResolvedValue(USER)
+      renderEditor()
+
+      // Index 1: the roles DataTable's own "Remove" (loc-1/cashier) renders first in DOM
+      // order, the permission grant's "Remove" (loc-1/report.sales.view) second.
+      fireEvent.click(screen.getAllByRole('button', { name: /^remove$/i })[1])
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+      await waitFor(() => expect(api.users.update).toHaveBeenCalledWith('user-1', { permissions: [] }))
+    })
   })
 })
