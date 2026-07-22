@@ -252,6 +252,73 @@ it("piecewise refunds sum exactly to the line's total — no lost penny", functi
         ->toBe(1099);
 });
 
+it('at a tax-inclusive location, a refund is the gross line total — never gross plus the tax already embedded in it', function (): void {
+    $location = provisionedLocation(['prices_include_tax' => true]);
+    $register = registerAt($location);
+    $cashier = staffWithRole($location, Roles::CASHIER);
+    $supervisor = staffWithRole($location, Roles::SUPERVISOR);
+    Shift::factory()->create(['register_id' => $register->id]);
+
+    $taxRate = TaxRate::factory()->create(['rate_micros' => 200_000]);   // 20% VAT
+    $variant = ProductVariant::factory()->create([
+        'price_cents' => 1000, 'track_inventory' => true, 'tax_rate_id' => $taxRate->id,
+    ]);
+    DB::transaction(fn () => app(StockLedger::class)->receive($variant->id, $location->id, Quantity::fromString('10')));
+
+    $order = Order::factory()->forRegister($register)
+        ->create(['opened_by' => $cashier->id, 'prices_include_tax' => true]);
+    $order = app(AddLineToOrder::class)->execute(new AddLineInput(
+        orderId: $order->id, variantId: $variant->id, qty: '3',
+        expectedVersion: Order::findOrFail($order->id)->version, actorId: $cashier->id, registerId: $register->id,
+    ))->order;
+    $line = $order->lines->first();
+
+    // gross line = 1000 x 3 = 3000; tax embedded = round(3000 x 0.2 / 1.2) = 500. The
+    // shelf price already contains the tax, so the order total is the gross subtotal —
+    // tax_cents is only the extracted portion, not an amount still owed on top.
+    expect($line->line_total_cents)->toBe(3000)
+        ->and($line->tax_cents)->toBe(500);
+
+    $order = app(TakePayment::class)->execute(new TakePaymentInput(
+        orderId: $order->id, registerId: $register->id, driver: 'cash',
+        amountCents: $order->total_cents, tenderedCents: $order->total_cents, reference: null,
+        expectedVersion: Order::findOrFail($order->id)->version, actorId: $cashier->id,
+    ))->order;
+    expect($order->total_cents)->toBe(3000);
+
+    $refund = app(RefundOrder::class)->execute(new RefundOrderInput(
+        originalOrderId: $order->id, registerId: $register->id, driver: 'cash',
+        reason: 'Customer return', lines: [new RefundLineInput($line->id, '3', restock: true)],
+        actorId: $supervisor->id,
+    ));
+
+    // The gross line total — not 3000 + 500, which would refund the VAT twice.
+    expect($refund->amount_cents)->toBe(3000);
+
+    // Same location, a fresh order, refunding only 1 of 3 units: the prorated fraction
+    // must be taken of the gross (3000), never of a re-inflated (gross + tax) figure.
+    $partialOrder = Order::factory()->forRegister($register)
+        ->create(['opened_by' => $cashier->id, 'prices_include_tax' => true]);
+    $partialOrder = app(AddLineToOrder::class)->execute(new AddLineInput(
+        orderId: $partialOrder->id, variantId: $variant->id, qty: '3',
+        expectedVersion: Order::findOrFail($partialOrder->id)->version, actorId: $cashier->id, registerId: $register->id,
+    ))->order;
+    $partialLine = $partialOrder->lines->first();
+    $partialOrder = app(TakePayment::class)->execute(new TakePaymentInput(
+        orderId: $partialOrder->id, registerId: $register->id, driver: 'cash',
+        amountCents: $partialOrder->total_cents, tenderedCents: $partialOrder->total_cents, reference: null,
+        expectedVersion: Order::findOrFail($partialOrder->id)->version, actorId: $cashier->id,
+    ))->order;
+
+    $partialRefund = app(RefundOrder::class)->execute(new RefundOrderInput(
+        originalOrderId: $partialOrder->id, registerId: $register->id, driver: 'cash',
+        reason: 'Customer return', lines: [new RefundLineInput($partialLine->id, '1', restock: true)],
+        actorId: $supervisor->id,
+    ));
+
+    expect($partialRefund->amount_cents)->toBe(1000);
+});
+
 it("a cash refund lowers the shift's expected cash by exactly the refund amount", function (): void {
     $before = app(ShiftTotals::class)->expectedCashCents($this->shift);
     expect($before)->toBe($this->shift->opening_float_cents + 2000);   // float + the sale

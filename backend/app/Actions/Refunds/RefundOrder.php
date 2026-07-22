@@ -70,7 +70,15 @@ final class RefundOrder
 
                 $qty = Quantity::fromString($lineInput->qty);
                 $origQty = Quantity::fromString($orderLine->qty);
-                $lineTotal = Money::fromCents($orderLine->line_total_cents + $orderLine->tax_cents);
+
+                // line_total_cents is the gross, tax-inclusive amount at a tax-inclusive
+                // location (tax_cents is only the portion of it already embedded) but the
+                // tax-exclusive net amount everywhere else (tax_cents is added on top at
+                // the till) — see OrderTotals. Adding tax_cents unconditionally would
+                // refund the embedded VAT a second time.
+                $lineTotal = $order->prices_include_tax
+                    ? Money::fromCents($orderLine->line_total_cents)
+                    : Money::fromCents($orderLine->line_total_cents + $orderLine->tax_cents);
 
                 if (! isset($seenQty[$orderLine->id])) {
                     // Sum of prior refund_lines for this original line, read inside THIS
