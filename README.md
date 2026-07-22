@@ -72,26 +72,3 @@ On first launch it asks for the API's address, then enrols like any other termin
   code follows them, and CI enforces the conventions mechanically (`tests/Arch`).
 - **[CLAUDE.md](CLAUDE.md)** — how to run and develop, including the gotchas that cost
   an afternoon each to learn.
-
-## Testing
-
-```bash
-make test     # backend (Pest, real Postgres — never SQLite), register, back office
-make e2e      # three end-to-end story proofs against the running stack:
-              # a retail bad day, a full lunch service, and an admin's day
-```
-
-Tests run against real Postgres because the system depends on partial unique indexes,
-`SELECT … FOR UPDATE`, and `jsonb` — a green SQLite suite would lie about the
-concurrency invariants that keep money correct.
-
-## Status
-
-Milestones M0–M7 complete: money primitives, full schema, the retail vertical slice,
-retail complete, food service, back office, and containerized deployment — each shipped
-end-to-end with live proofs. Since then: a UI rework onto one design language across both
-web surfaces, and the Tauri desktop shell. See [`docs/06-roadmap.md`](docs/06-roadmap.md)
-for what each milestone taught and what's deliberately deferred.
-
-Deferred by choice, not oversight: real printer drivers (network/USB/serial slot in
-behind the trait that already exists), offline-tolerant writes, and auto-update/signing.
