@@ -297,7 +297,7 @@ add-one/remove-one — so an untouched box you meant to keep still has to be
 ticked before you save.
 
 Categories and modifier groups themselves have no archive toggle — only
-the modifiers inside a group, and the variants inside a product, do. A group
+products, their variants, and the modifiers inside a group, do. A group
 with **Min select** at 1 or more shows up as *required* at the till: the
 cashier can't confirm an item until every required group has a pick.
 
@@ -510,7 +510,7 @@ threshold is highlighted and marked **— LOW**.
 back office alike — one row per change: **When**, **Action**, **Entity**,
 **User**, **Register**, **Payload**.
 
-![Figure 13.1 — The audit log, filtered to Manila Grocery](assets/screenshots/033-bo-audit.png)
+![Figure 13.1 — The audit log showing demo day activity at Manila Grocery](assets/screenshots/033-bo-audit.png)
 
 The figure above shows what a shift's worth of activity looks like end to
 end: a manager issuing an activation code (`admin.register.code_issue`) and
