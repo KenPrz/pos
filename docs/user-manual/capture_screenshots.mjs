@@ -26,12 +26,15 @@ const PIN_SUPERVISOR = '2222'; // Bob
 
 // ---- tiny admin-API client (device enrolment is API-driven where the flow
 //      isn't itself the thing being photographed) ----
-async function api(path, { method = 'GET', token, body } = {}) {
+async function api(path, { method = 'GET', token, staffToken, body } = {}) {
   const res = await fetch(`${API}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // Staff-tier writes (shift open, etc.) need both the device token and a staff
+      // session on top of it — see docs/03-api.md's Auth section.
+      ...(staffToken ? { 'X-Staff-Token': staffToken } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -76,7 +79,9 @@ async function registerLeg() {
   const page = await ctx.newPage();
 
   await page.goto(REGISTER);
-  await page.getByText('Activation code').waitFor();
+  // Locator fix: 'Activation code' matches both the intro paragraph and the input's
+  // label, so waitFor throws strict-mode-violation. The card title is unique.
+  await page.getByText('Activate this terminal').waitFor();
   await shot(page, '001-activation');
 
   const issued = await issueCode(admin, grcTill1.id);
@@ -88,7 +93,9 @@ async function registerLeg() {
   await page.getByPlaceholder('••••').fill(PIN_SUPERVISOR);
   await page.getByRole('button', { name: 'Clock in' }).click();
 
-  await page.getByText('Open shift').waitFor();
+  // Locator fix: 'Open shift' (case-insensitive substring match) also matches the nav
+  // breadcrumb/tab "Open Shift" elsewhere on the page — the heading is unique.
+  await page.getByRole('heading', { name: 'Open shift' }).waitFor();
   await shot(page, '003-open-shift');
   await page.getByLabel('Opening float').fill('200.00');
   await page.getByRole('button', { name: 'Open drawer' }).click();
@@ -130,7 +137,9 @@ async function registerLeg() {
   await issueCode(admin, grcTill1.id);
   await scan.fill('4809990000016');
   await scan.press('Enter'); // 401 -> stage 'disabled'
-  await page.getByText('Terminal disabled').waitFor();
+  // Locator fix: same ambiguity as 'Open shift' above — a nav breadcrumb reading
+  // "Terminal Disabled" also matches; the heading is the unique target.
+  await page.getByRole('heading', { name: 'Terminal disabled' }).waitFor();
   await shot(page, '020-disabled');
   await ctx.close();
 
@@ -139,6 +148,25 @@ async function registerLeg() {
   const rstTill1 = await findRegister(admin, 'RST', 'Till 1');
   const rstIssued = await issueCode(admin, rstTill1.id);
   const activated = await activate(rstIssued.activation_code);
+
+  // Stand up RST Till 2 headlessly (API only, never rendered): FloorScreen's Transfer
+  // button (016-transfer) only appears when there's another open-shift register at the
+  // same location to send the tab to (api.openShiftRegisters) — without this, "Transfer"
+  // never renders on Till 1's own tab and the capture hangs waiting for it.
+  const rstTill2 = await findRegister(admin, 'RST', 'Till 2');
+  const rstTill2Activated = await activate((await issueCode(admin, rstTill2.id)).activation_code);
+  const rstTill2Login = await api('/staff/login', {
+    method: 'POST',
+    token: rstTill2Activated.device_token,
+    body: { pin: PIN_SUPERVISOR },
+  });
+  await api('/shifts/open', {
+    method: 'POST',
+    token: rstTill2Activated.device_token,
+    staffToken: rstTill2Login.staff_token,
+    body: { opening_float_cents: 20000 },
+  });
+
   const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
   const page2 = await ctx2.newPage();
   await ctx2.addInitScript(([token, info]) => {
@@ -148,9 +176,12 @@ async function registerLeg() {
 
   await page2.goto(REGISTER);
   await page2.getByText('Enter PIN').waitFor();
-  await page2.getByPlaceholder('••••').fill(PIN_CASHIER);
+  // Logic fix: this leg later drives Transfer (016), which needs `order.transfer` —
+  // supervisor-only per docs/05-rbac.md. Alice (cashier) would never see the button.
+  await page2.getByPlaceholder('••••').fill(PIN_SUPERVISOR);
   await page2.getByRole('button', { name: 'Clock in' }).click();
-  await page2.getByText('Open shift').waitFor();
+  // Locator fix: same 'Open shift' ambiguity as the retail leg above.
+  await page2.getByRole('heading', { name: 'Open shift' }).waitFor();
   await page2.getByLabel('Opening float').fill('200.00');
   await page2.getByRole('button', { name: 'Open drawer' }).click();
   await page2.waitForTimeout(600);
@@ -165,16 +196,25 @@ async function registerLeg() {
   await page2.getByRole('button', { name: 'Open tab' }).click();
   await page2.waitForTimeout(400);
 
+  // Locator fix: MenuGrid defaults to the first category by sort_order (Appetizers) —
+  // Chicken Adobo lives in "Mains", so it's off-screen (behind the tab strip) until
+  // that category tab is selected.
+  await page2.getByRole('tab', { name: 'Mains' }).click();
   await page2.getByRole('button', { name: 'Chicken Adobo' }).click();
   await page2.getByRole('button', { name: 'Garlic Rice' }).click();
   await page2.getByRole('button', { name: 'Extra Egg' }).click();
   await shot(page2, '013-modifier-sheet');
   await page2.getByRole('button', { name: /^Add/ }).click();
   await page2.waitForTimeout(300);
-  await page2.getByRole('button', { name: 'Halo-Halo' }).click().catch(() => {});
+  // Same category-tab fix as above — Halo-Halo lives in "Desserts".
+  await page2.getByRole('tab', { name: 'Desserts' }).click();
+  await page2.getByRole('button', { name: 'Halo-Halo' }).click();
   await page2.waitForTimeout(300);
   await shot(page2, '014-tab-cart');
 
+  // Locator fix: 'Split bill' only renders once the sale is in the tender phase
+  // (SaleScreen.tsx), same as the retail leg's own Pay-then-tender-actions transition.
+  await page2.getByRole('button', { name: /^Pay — / }).click();
   await page2.getByRole('button', { name: 'Split bill' }).click();
   await page2.getByRole('group', { name: 'Number of checks' }).waitFor();
   await shot(page2, '015-split');
@@ -187,6 +227,16 @@ async function registerLeg() {
   await page2.keyboard.press('Escape');
 
   await page2.getByRole('button', { name: 'Register' }).click();
+  // Logic fix: the T1 tab opened above (013/014) was only ever demoed into the tender
+  // phase (015's Split-bill prompt was cancelled), never paid — and CloseShift refuses
+  // to close a register with any open order (`ShiftHasOpenOrders`, backend). Pay it off
+  // here on the still-mounted-hidden sale screen before the close-shift capture; no new
+  // screenshot needed, this is just clearing the precondition.
+  await page2.getByLabel(/^Cash tendered/).fill('1000.00');
+  await page2.getByRole('button', { name: 'Take payment' }).click();
+  await page2.getByText('Payment complete').waitFor();
+  await page2.getByRole('button', { name: 'New sale' }).click();
+
   await page2.getByRole('button', { name: 'Close shift' }).click();
   await page2.getByText('Close shift — count the drawer').waitFor();
   await shot(page2, '017-close-shift');
@@ -236,7 +286,9 @@ async function boLeg() {
   await page.waitForTimeout(400);
   await shot(page, '028-bo-registers');
 
-  // RST Till 2 is not used by the register leg, so revoking its token is harmless.
+  // RST Till 2 only ever gets a headless shift opened by the register leg (to give
+  // Transfer a target) — no UI capture of its own — so reissuing its code here and
+  // revoking that token is harmless; the register leg has already finished by now.
   // (Locator fix: the register table has no row-level click handler — only its "Edit"
   // button opens the editor — and every location has its own "Till 2", so the row must
   // be disambiguated by location name too, not just Till 2 .last().)
@@ -251,6 +303,14 @@ async function boLeg() {
   await page.getByRole('button', { name: 'Issue code' }).click();
   await page.getByText('Activation code — single use').waitFor();
   await shot(page, '030-bo-activation-code');
+
+  // Logic fix: Reports is scoped to the sidebar's selected location, which defaults to
+  // whatever the locations list returns first (Manila Cafe — no register-leg activity).
+  // Switch to Manila Grocery, where the retail sale (GRC Till 1) actually happened, so
+  // 031/032 show real rows instead of the "no activity" empty state.
+  await page.getByRole('combobox', { name: 'Location' }).click();
+  await page.getByRole('option', { name: /Manila Grocery/ }).click();
+  await page.waitForTimeout(400);
 
   await nav('Reports').click();
   await page.waitForTimeout(800);
