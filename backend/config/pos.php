@@ -25,7 +25,7 @@ return [
     // Which demo catalogs `php artisan migrate:fresh --seed` builds, comma-separated:
     // any of grocery, restaurant, cafe. Dev-only — the seeder is never run anywhere
     // real. Each enabled catalog brings its own Manila location, registers, and stock.
-    'seed_catalogs' => env('POS_SEED_CATALOGS', 'grocery'),
+    'seed_catalogs' => env('POS_SEED_CATALOGS', 'restaurant'),
 
     'business' => [
         'name'    => env('POS_BUSINESS_NAME'),

@@ -76,7 +76,7 @@ class DatabaseSeeder extends Seeder
 
         $this->command?->newLine();
         $this->command?->info('Back-office login (POST /api/v1/admin/login):');
-        $this->command?->table(['Email', 'Password'], [['admin@pos.test', 'admin-dev-password']]);
+        $this->command?->table(['Email', 'Password'], [['admin@pos.test', 'password']]);
     }
 
     /** @param array<Location> $locations */
@@ -98,7 +98,7 @@ class DatabaseSeeder extends Seeder
         User::factory()->admin()->withPin('4444')->create([
             'name' => 'Priya Admin',
             'email' => 'admin@pos.test',
-            'password_hash' => Hash::make('admin-dev-password'),
+            'password_hash' => Hash::make('password'),
         ]);
 
         // Role assignment is per team, so the team context is set before each one.
