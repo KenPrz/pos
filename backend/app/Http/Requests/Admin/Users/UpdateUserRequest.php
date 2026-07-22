@@ -10,6 +10,7 @@ use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 final class UpdateUserRequest extends FormRequest
 {
@@ -29,7 +30,7 @@ final class UpdateUserRequest extends FormRequest
             'is_active' => ['sometimes', 'boolean'],
             'roles' => ['sometimes', 'array'],
             'roles.*.location_id' => ['required', 'uuid', 'exists:locations,id'],
-            'roles.*.role' => ['required', 'string', 'in:cashier,supervisor'],
+            'roles.*.role' => ['required', 'string', Rule::exists('role_templates', 'name')],
         ];
     }
 
