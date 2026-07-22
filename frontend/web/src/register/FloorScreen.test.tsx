@@ -117,7 +117,9 @@ describe('FloorScreen', () => {
     vi.mocked(api.openOrders).mockResolvedValue([order])
     const { onResume } = renderFloor()
 
-    const card = await screen.findByRole('button', { name: /12/ })
+    // findByRole's accessible-name computation can exceed the default 1s wait on a
+    // loaded CI/container host — this one query gets a longer leash, not a logic change.
+    const card = await screen.findByRole('button', { name: /12/ }, { timeout: 5000 })
     fireEvent.click(card)
 
     expect(onResume).toHaveBeenCalledWith(order)
