@@ -41,6 +41,8 @@ use App\Http\Controllers\Admin\Roles\DeleteRoleController;
 use App\Http\Controllers\Admin\Roles\ListPermissionsController;
 use App\Http\Controllers\Admin\Roles\ListRolesController;
 use App\Http\Controllers\Admin\Roles\UpdateRoleController;
+use App\Http\Controllers\Admin\Settings\GetSettingsController;
+use App\Http\Controllers\Admin\Settings\UpdateSettingsController;
 use App\Http\Controllers\Admin\Users\CreateUserController;
 use App\Http\Controllers\Admin\Users\ListUsersController;
 use App\Http\Controllers\Admin\Users\UpdateUserController;
@@ -183,6 +185,11 @@ Route::prefix('v1')->group(function (): void {
         // the new code is typed at the terminal. See ActivateRegister.
         Route::post('/registers/{register}/activation-code', IssueActivationCodeController::class)
             ->name('admin.registers.activation_code');
+
+        // Business identity settings (RBAC-v2 task 7): database-backed, config fallback
+        // until an admin sets a value. See App\Domain\Settings\Settings.
+        Route::get('/settings', GetSettingsController::class)->name('admin.settings.get');
+        Route::patch('/settings', UpdateSettingsController::class)->name('admin.settings.update');
 
         // Reports (M6 task 6). Reads only — no audit. day/user are ledger-basis (from
         // payments + refunds); category is line-basis (non-voided lines of closed
