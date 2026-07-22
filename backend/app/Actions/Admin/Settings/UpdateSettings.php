@@ -19,12 +19,22 @@ final class UpdateSettings
     public function execute(UpdateSettingsInput $in): array
     {
         return DB::transaction(function () use ($in): array {
+            $cleared = [];
+
             foreach ($in->changes as $key => $value) {
+                if ($value === null) {
+                    $this->settings->clear($key);
+                    $cleared[] = $key;
+
+                    continue;
+                }
+
                 $this->settings->set($key, $value);
             }
 
             $this->audit->record('admin.settings.update', 'Settings', $in->actorId, [
                 'changed' => array_keys($in->changes),
+                'cleared' => $cleared,
             ]);
 
             return $this->settings->all();

@@ -37,6 +37,46 @@ it('rejects unregistered keys', function (): void {
         ->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
 
+it('rejects a non-array settings payload instead of 500ing', function (): void {
+    $admin = User::factory()->admin()->create();
+    $headers = ['Authorization' => 'Bearer '.$admin->createToken('t')->plainTextToken];
+    $this->patchJson('/api/v1/admin/settings', ['settings' => 'not-an-array'], $headers)
+        ->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
+});
+
+it('a submitted null clears the override and falls back to config again', function (): void {
+    config(['pos.business.name' => 'Env Trading Co']);
+    $location = provisionedLocation([
+        'receipt_header' => 'Downtown Store', 'receipt_footer' => 'Thanks!', 'prices_include_tax' => false,
+    ]);
+    $register = registerAt($location);
+    $cashier = staffWithRole($location, Roles::CASHIER);
+    $order = Order::factory()->forRegister($register)->create(['opened_by' => $cashier->id]);
+    $variant = ProductVariant::factory()->untracked()->create(['price_cents' => 1999]);
+
+    app(AddLineToOrder::class)->execute(new AddLineInput(
+        orderId: $order->id, registerId: $register->id, variantId: $variant->id, qty: '1',
+        expectedVersion: 0, actorId: $cashier->id,
+    ));
+
+    $admin = User::factory()->admin()->create();
+    $headers = ['Authorization' => 'Bearer '.$admin->createToken('t')->plainTextToken];
+
+    $this->patchJson('/api/v1/admin/settings', ['settings' => ['business.name' => 'Manila Trading']], $headers)->assertOk();
+    $set = $this->getJson('/api/v1/admin/settings', $headers)->json('data.settings');
+    expect(collect($set)->firstWhere('key', 'business.name'))->toMatchArray(['value' => 'Manila Trading', 'source' => 'db']);
+
+    $receiptAfterSet = $this->getJson("/api/v1/orders/{$order->id}/receipt", staffHeaders($register, $cashier))->assertOk()->json();
+    expect($receiptAfterSet['data']['business']['name'])->toBe('Manila Trading');
+
+    $this->patchJson('/api/v1/admin/settings', ['settings' => ['business.name' => null]], $headers)->assertOk();
+    $cleared = $this->getJson('/api/v1/admin/settings', $headers)->json('data.settings');
+    expect(collect($cleared)->firstWhere('key', 'business.name'))->toMatchArray(['value' => 'Env Trading Co', 'source' => 'config']);
+
+    $receiptAfterClear = $this->getJson("/api/v1/orders/{$order->id}/receipt", staffHeaders($register, $cashier))->assertOk()->json();
+    expect($receiptAfterClear['data']['business']['name'])->toBe('Env Trading Co');
+});
+
 it('a non-admin token gets 403 on settings routes', function (): void {
     $staff = User::factory()->create(['email' => 's2@pos.test', 'password_hash' => 'pw', 'is_admin' => false]);
     $headers = ['Authorization' => 'Bearer '.$staff->createToken('t')->plainTextToken];

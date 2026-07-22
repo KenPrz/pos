@@ -35,6 +35,10 @@ final class UpdateSettingsRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            if (! is_array($this->input('settings'))) {
+                return;
+            }
+
             foreach ($this->input('settings', []) as $key => $value) {
                 if (! in_array($key, array_keys(Settings::REGISTRY), true)) {
                     $validator->errors()->add("settings.{$key}", "Unregistered setting key: {$key}.");

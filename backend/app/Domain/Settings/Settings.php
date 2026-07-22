@@ -15,6 +15,10 @@ use Illuminate\Support\Facades\DB;
  * it. Deliberately not an Eloquent model, same reasoning as AuditLogger — there is no
  * relation to load and no reason to invite mass-assignment or timestamps-as-magic here,
  * just a key/value row read and written directly.
+ *
+ * Contract: set a value to override config; set null to fall back to config again. `set()`
+ * writes an override, `clear()` deletes it — there is no way to store an explicit null,
+ * because a stored null would pin `source: 'db'` forever with no path back to config.
  */
 final class Settings
 {
@@ -57,18 +61,21 @@ final class Settings
 
     public function set(string $key, mixed $value): void
     {
-        $updated = DB::table('settings')->where('key', $key)->update([
-            'value' => json_encode($value),
-            'updated_at' => now(),
-        ]);
-
-        if ($updated === 0) {
-            DB::table('settings')->insert([
+        DB::table('settings')->upsert(
+            [[
                 'key' => $key,
                 'value' => json_encode($value),
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
-        }
+            ]],
+            ['key'],
+            ['value', 'updated_at'],
+        );
+    }
+
+    /** Delete the override, if any — the key falls back to config again. */
+    public function clear(string $key): void
+    {
+        DB::table('settings')->where('key', $key)->delete();
     }
 }
