@@ -13,7 +13,7 @@ COMPOSE_VAR := $(if $(filter prod,$(COMPOSE)),$(COMPOSE_PROD),$(COMPOSE_DEV))
 
 # Which demo catalogs `make seed` builds — comma-separated subset of
 # grocery,restaurant,cafe. Mirrors config/pos.php's default.
-POS_SEED_CATALOGS ?= grocery
+POS_SEED_CATALOGS ?= restaurant
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -140,7 +140,7 @@ e2e: ## Reseed (twice — see comment above), run all three committed e2e proofs
 	@cat $(E2E_TMP)/pos-seed-out2.txt
 	@grep '| GRC / Till 1 ' $(E2E_TMP)/pos-seed-out2.txt | sed -E 's/^\| *GRC \/ Till 1 *\| *(.*) *\|$$/\1/' | sed -E 's/ +$$//' > $(E2E_TMP)/pos-e2e-grc1b.txt
 	@test -s $(E2E_TMP)/pos-e2e-grc1b.txt || { echo "could not extract the GRC / Till 1 device token on the second reseed"; exit 1; }
-	POS_ADMIN_EMAIL=admin@pos.test POS_ADMIN_PASSWORD=admin-dev-password POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-grc1b.txt) POS_E2E_PIN=9876 bash scripts/e2e-admin-day.sh
+	POS_ADMIN_EMAIL=admin@pos.test POS_ADMIN_PASSWORD=password POS_DEVICE_TOKEN=$$(cat $(E2E_TMP)/pos-e2e-grc1b.txt) POS_E2E_PIN=9876 bash scripts/e2e-admin-day.sh
 	@rm -rf $(E2E_TMP)
 
 manual: ## Build docs/user-manual/user-manual.pdf (host python3; pinned deps into a local venv)

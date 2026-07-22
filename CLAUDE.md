@@ -43,8 +43,8 @@ make seed                      # fresh migrate + seed — prints dev PINs and de
 ```
 
 `POS_SEED_CATALOGS` picks which Manila catalog(s) `make seed` builds — a
-comma-separated subset of `grocery`, `restaurant`, `cafe` (default: `grocery` only, one
-location, `GRC`). `POS_SEED_CATALOGS=grocery,restaurant,cafe make seed` seeds all three.
+comma-separated subset of `grocery`, `restaurant`, `cafe` (default: `restaurant` only, one
+location, `RST`). `POS_SEED_CATALOGS=grocery,restaurant,cafe make seed` seeds all three.
 
 http://127.0.0.1:8000 (API) · http://127.0.0.1:5174 (register) · http://127.0.0.1:5175
 (back office). `make help` lists every target; the ones you'll reach for most:
@@ -248,7 +248,7 @@ place of the old raw-token reissue it used to exercise. Suites: 476 backend / 11
 register / 133 back-office.
 
 **Manila catalog seeders complete** — the Downtown/London demo seed is gone.
-`POS_SEED_CATALOGS` (default `grocery`) picks which Manila catalogs to seed — grocery
+`POS_SEED_CATALOGS` (default `restaurant`) picks which Manila catalogs to seed — grocery
 (200 real PH items, Open Food Facts barcodes), restaurant (30 dishes, rice/size/spice/
 add-on modifiers), cafe (20 drinks & pastries) — each with its own location (GRC/RST/
 CAF, Asia/Manila, VAT-inclusive, `POS_CURRENCY=PHP`). Data is committed JSON under

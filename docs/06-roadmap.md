@@ -536,7 +536,7 @@ tests. All three e2e scripts green via `make e2e`.
 The Downtown/London demo seed — invented SKUs, invented prices, no real geography — is
 gone. Seeding now builds a believable Manila business instead.
 
-- **`POS_SEED_CATALOGS`** (env, default `grocery`) picks a comma-separated subset of
+- **`POS_SEED_CATALOGS`** (env, default `restaurant`) picks a comma-separated subset of
   three catalogs, each with its own location, all `Asia/Manila`,
   `prices_include_tax=true`, 12% VAT with fresh produce VAT-exempt:
   - **grocery** (`GRC`) — 200 real Philippine retail items sourced from Open Food
