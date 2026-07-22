@@ -40,10 +40,23 @@ export function AdminApp() {
     // response, so pull it back from localStorage rather than defaulting to 'USD'.
     initCurrencyFromStorage()
     if (adminToken.get()) {
-      setUser(adminToken.user())
-      setSections(adminToken.sections())
-      setReportLocationIds(adminToken.reportLocationIds())
-      setStage({ name: 'shell' })
+      // Detect and reject pre-sections stored shape (stale session from before the
+      // sections/report_location_ids fields were added) — a reload with stale stored
+      // data must clear it and land on the login screen instead of silently rendering
+      // an empty shell.
+      if (adminToken.isUserStale()) {
+        adminToken.clear()
+        adminToken.clearUser()
+        setUser(null)
+        setSections([])
+        setReportLocationIds(null)
+        setStage({ name: 'login' })
+      } else {
+        setUser(adminToken.user())
+        setSections(adminToken.sections())
+        setReportLocationIds(adminToken.reportLocationIds())
+        setStage({ name: 'shell' })
+      }
     } else {
       setStage({ name: 'login' })
     }

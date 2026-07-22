@@ -103,6 +103,19 @@ export const adminToken = {
     if (value === null) return null
     return Array.isArray(value) ? value : []
   },
+  // Detects stored admin user objects from before `sections` was added (pre-sections
+  // stored shape) — if a token exists but the stored user lacks the `sections` key,
+  // the session is stale and must be cleared to force re-login.
+  isUserStale: (): boolean => {
+    const raw = localStorage.getItem(ADMIN_USER_KEY)
+    if (!raw) return false
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      return !('sections' in parsed)
+    } catch {
+      return false
+    }
+  },
   clearUser: () => localStorage.removeItem(ADMIN_USER_KEY),
 }
 
