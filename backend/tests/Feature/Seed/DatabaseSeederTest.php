@@ -18,8 +18,9 @@ function rolesAt(User $user, Location $location): array
         ->pluck('roles.name')->all();
 }
 
-it('seeds only the grocery catalog by default', function (): void {
-    $this->seed();   // pos.seed_catalogs defaults to 'grocery'
+it('seeds a single catalog when configured', function (): void {
+    config(['pos.seed_catalogs' => 'grocery']);
+    $this->seed();
 
     expect(Location::query()->pluck('code')->all())->toBe(['GRC']);
 
