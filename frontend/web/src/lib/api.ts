@@ -434,9 +434,11 @@ export const api = {
     post<{ shift: Shift }>(`/shifts/${shiftId}/approve-variance`, {}).then((r) => r.shift),
 
   lookupBarcode: (barcode: string) => request<LookedUpVariant>(`/catalog/lookup?barcode=${encodeURIComponent(barcode)}`),
-  // The register's source for the server's currency (config('pos.currency')) — this
-  // fires at boot (see MenuGrid/SaleScreen), so setCurrency runs well before any screen
-  // that formats money renders for real.
+  // The register's source for the server's currency (config('pos.currency')) — Register.tsx
+  // fires this unconditionally at boot (device token present, regardless of mode or role),
+  // so setCurrency runs well before any screen that formats money renders for real.
+  // MenuGrid and SaleScreen's discounts query also call it for their own catalog needs,
+  // sharing the same cache entry rather than re-fetching.
   catalog: () =>
     request<Catalog>('/catalog').then((catalog) => {
       setCurrency(catalog.currency)

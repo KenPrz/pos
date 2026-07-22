@@ -21,7 +21,6 @@ mkdirSync(OUT, { recursive: true });
 
 // ---- seeded credentials (dev-only, printed by the seeder; never real) ----
 const ADMIN = { email: 'admin@pos.test', password: 'admin-dev-password' };
-const PIN_CASHIER = '1111';    // Alice
 const PIN_SUPERVISOR = '2222'; // Bob
 
 // ---- tiny admin-API client (device enrolment is API-driven where the flow

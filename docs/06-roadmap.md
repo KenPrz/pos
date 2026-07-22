@@ -585,7 +585,7 @@ back-office side), and a WeasyPrint build turning both into a single 49-page PDF
 `make manual` builds the PDF (pinned deps into a local venv, no system Python
 pollution); `make manual-shots` drives Playwright against a running `make dev` +
 seeded stack to (re)capture the screenshots. `.github/workflows/manual.yml` rebuilds
-the PDF on every push to `docs/user-manual/**` and commits it back, mirroring
+the PDF on every push to `main` touching `docs/user-manual/**` and commits it back, mirroring
 `wiki.yml`'s shape — the paths filter excludes the PDF and rendered diagrams
 themselves so the bot's own commit doesn't retrigger the workflow. The pipeline itself
 was ported from a sibling project's proven implementation rather than built from

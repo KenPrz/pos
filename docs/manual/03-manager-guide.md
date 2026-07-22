@@ -71,9 +71,9 @@ at least one variant before it's sellable.
    (optional), **Price**, **Cost** (optional), **Tax rate**, and **Track inventory**.
 6. Tap **Save**.
 
-> Note: **Price** and **Cost** are typed as dollars (e.g. `4.25`) but travel the wire as
-> cents — a blank or unparseable price is refused before it ever reaches the server
-> ("Enter a valid price (e.g. 4.25).").
+> Note: **Price** and **Cost** are typed as a decimal amount in the store's currency
+> (e.g. `4.25`) but travel the wire as cents — a blank or unparseable price is refused
+> before it ever reaches the server ("Enter a valid price (e.g. 4.25).").
 
 To attach modifier groups (a latte's milk, a burger's extras) to a product, open the
 product again — the **Modifier groups** panel at the bottom lists every group as a
