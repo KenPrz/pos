@@ -202,19 +202,335 @@ to probe which email addresses exist in the system.
 
 # 4. The register
 
-*Written in the next revision pass.*
+A till moves through the same four stages every day, and each stage is just
+whichever precondition isn't met yet — none of it is a setting:
+
+1. **Activate this terminal** — until an activation code makes this terminal
+   a register at all (Chapter 3).
+2. **Enter PIN** — until somebody's clocked in (Chapter 3).
+3. **Open shift** — until somebody's counted a float (Chapter 7).
+4. A sale screen — the stage this chapter, and the next three, cover.
+
+## Retail or food
+
+What that sale screen looks like is one setting a manager makes in the back
+office, not anything the till itself remembers — Chapter 11's
+[Register mode](#register-mode) section covers changing it.
+
+- **Retail** mode opens straight onto a scan field: **New sale**, an empty
+  cart, and **Scan or type a barcode…** waiting for input. Nothing to tap
+  before the first item goes in — Chapter 5 covers this mode start to
+  finish.
+
+![Figure 4.1 — Manila Grocery, Till 1, retail mode: an empty New sale screen](assets/screenshots/004-retail-empty.png)
+
+- **Food** mode opens onto a category rail and a grid of item tiles instead,
+  and adds one more link — **Tabs** — next to **Register** and **Refunds**
+  (the next section covers the rest of the top bar). Chapter 6 covers the
+  floor and the menu grid start to finish.
+
+![Figure 4.2 — Manila Restaurant, Till 1, food mode: the menu grid, with Tabs alongside Register and Refunds](assets/screenshots/012-menu-grid.png)
+
+There's no in-between and no per-shift toggle: a register is one mode or the
+other, every shift, until a manager changes it.
+
+## The top bar
+
+Both figures above show the same header shape. On the left: **Register**
+and **Refunds** (visible only if you can refund — Chapter 5), plus **Tabs**
+on a food-mode till. On the right: the signed-in staff member's name and
+**Clock out** — which ends only that PIN session, not the shift; the drawer
+stays open for whoever clocks in next (Chapter 7). Just below that, the
+screen's own heading row carries **Close shift** on the right — a different
+button from **Clock out** above it, and available to whoever's clocked in
+right now, cashier or supervisor alike.
 
 # 5. Retail selling
 
-*Written in the next revision pass.*
+Retail mode collapses the whole order lifecycle into one screen: scan,
+**Pay**, tender, done. This chapter walks that path in order, using the same
+sale — rung up at Manila Grocery, Till 1 — that every figure below comes
+from.
+
+## Scan or type a barcode
+
+![Figure 5.1 — New sale, ready for the first scan](assets/screenshots/004-retail-empty.png)
+
+1. Scan the item, or type its barcode into **Scan or type a barcode…** and
+   press enter. The first scan opens the order for you — there's nothing to
+   tap first.
+2. Keep scanning. Each item lands in the cart below with its name and
+   price; subtotal, tax, and total update as you go.
+
+![Figure 5.2 — Three lines scanned: Nescafé Classic, Lucky Me! Pancit Canton, and Century Tuna Flakes](assets/screenshots/005-retail-cart.png)
+
+The catalog's Fresh Market category (Figure 4.2) prices several items **per
+kilogram** — Bangus, Dinorado Rice, Pork Liempo, Tilapia, Whole Chicken. A
+scan or a tap always adds exactly one unit of whatever's scanned, though —
+this version has no on-screen way for a cashier to type a weight in, so
+"Bangus (per kg)" rings up as 1 kg at ₱220.00 unless the quantity is
+corrected afterward, and there's no till button for that either (the same
+documented gap Chapter 6 covers for a fired food line's quantity). A cart
+line's quantity only shows on screen at all once it isn't a whole `1` — you
+see that happen in practice on a split check, in Chapter 6.
+
+## Void a line
+
+Tap **Void** on any cart row to remove it, or **Void order** below the cart
+to remove every line at once. Both only appear for a supervisor's PIN
+session ([Roles](#roles), Chapter 2) — a cashier's own screen doesn't show
+either button at all.
+
+## Apply a discount
+
+1. Tap **Discount**.
+2. Type why into **Reason (required)…** — every discount stays disabled
+   until you do.
+3. Tap the discount by name to apply it to the whole order.
+
+![Figure 5.3 — The discount panel open: 10% off and ₱50 off, reason not yet typed](assets/screenshots/006-retail-discount.png)
+
+![Figure 5.4 — 10% off applied: subtotal ₱405.00, discount -₱45.00, tax recalculated on the discounted total](assets/screenshots/007-retail-discounted.png)
+
+To remove one, tap the **✕** next to it in the cart. Like voiding,
+**Discount** only appears for a supervisor. The back office's Discounts tab
+(Chapter 9) carries its own **Requires supervisor** flag per discount, but
+every discount already needs one today regardless of that flag, since only
+the supervisor role holds the permission to open the panel at all.
+
+## Pay, tender, and print
+
+Tap **Pay — [amount]** (the button shows exactly what's owed).
+
+- **Cash:** type what the customer handed you into **Cash tendered (owed:
+  …)**, then tap **Take payment**. The next screen works out **Change** for
+  you — never do that math yourself.
+
+![Figure 5.5 — Cash tender: ₱500.00 tendered against ₱405.00 owed](assets/screenshots/008-retail-tender.png)
+
+![Figure 5.6 — Payment complete: ₱95.00 change, receipt ready to print](assets/screenshots/009-retail-receipt.png)
+
+- **Card:** type the terminal's own authorization into **Card terminal
+  reference (owed: …)** instead, then tap **Take payment**. This till only
+  *records* what the card terminal already did — it doesn't talk to a card
+  terminal itself.
+
+Tap **Print** for a paper receipt, or **New sale** to move on. In the
+desktop shell, **Print** sends the receipt to the till's receipt printer; in
+an ordinary browser tab, it opens the browser's own print dialog — Chapter
+14 covers both.
+
+## Refund a closed sale
+
+Tap **Refunds** in the top bar (only visible if you can refund).
+
+1. Type the receipt number into **Receipt number** and tap **Find order**.
+
+![Figure 5.7 — Refund a sale, ready for a receipt number](assets/screenshots/010-refunds.png)
+
+2. For each line being returned, type the quantity to refund. Leave
+   **Restock** checked to put that stock back, or clear it if the goods are
+   damaged.
+3. Type a **Reason** and tap **Refund cash**.
+
+The refund always comes out of *this* drawer as cash, whatever the sale was
+originally paid with. Only a **closed** order can be refunded.
+
+### Common issues
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| "The requested resource does not exist." on a scan | The barcode doesn't match any active variant | Check the barcode, or find the item by its product/variant in the back office (Chapter 9) |
+| No **Discount** or **Void** button on screen | You're signed in as a cashier — both only render for a supervisor | Ask a supervisor, or have them clock in to do it themselves ([Roles](#roles), Chapter 2) |
+| "This refund would return more than was sold on this line." | The typed quantity is more than what's left on that line, net of any earlier refund | Refund no more than what's left on the line |
 
 # 6. Food service
 
-*Written in the next revision pass.*
+A food-mode till trades the scan-first screen for a floor of open tabs and a
+menu grid, because a table lingers in the open phase for an hour or more
+instead of closing in under a minute. Every figure below comes from Manila
+Restaurant, Till 1.
+
+## The floor and opening a tab
+
+Tap **Tabs** to see every open tab at this location — the **Floor**. Tap
+**Register** to come back to the sale screen.
+
+![Figure 6.1 — The Floor, no tabs open yet](assets/screenshots/011-floor.png)
+
+1. Tap **New tab**.
+2. Optionally type the table into **Table (optional)…** — leave it blank
+   for a walk-in or a bar tab.
+3. Tap **Open tab**.
+
+You land on the sale screen with an empty order already seated at that
+table.
+
+## The menu grid and modifiers
+
+Food-mode tills show a category rail and a grid of tiles instead of relying
+only on the scanner. Tap a category, then tap an item's tile to add it.
+
+![Figure 6.2 — The menu grid: Fresh Market category, including several per-kilogram items](assets/screenshots/012-menu-grid.png)
+
+If an item has no modifiers, it goes straight into the cart. If it has any,
+a sheet pops up named after the item:
+
+1. A group marked **required** needs a pick before **Add** goes live —
+   **Rice** is required on Chicken Adobo, so **Add** stays disabled until
+   one of **Plain Rice**, **Garlic Rice**, or **No Rice** is picked.
+2. Tap a choice to select it; tap a repeat-legal one again to add a second
+   (the chip would show `×2`).
+3. Tap **Add**, or **Cancel** to back out.
+
+![Figure 6.3 — Chicken Adobo's modifier sheet: Garlic Rice (+₱20.00) and Extra Egg (+₱25.00) picked, No Rice showing as -₱15.00](assets/screenshots/013-modifier-sheet.png)
+
+A modifier's price is a **signed delta** on top of the item, not always an
+extra charge — most add to the price (**Garlic Rice** +₱20.00, **Extra Egg**
++₱25.00 above), but **No Rice** *subtracts* ₱15.00 instead, because leaving
+the rice off costs the kitchen less to make. Figure 6.3's picks land in the
+cart as ₱265.00 for the Chicken Adobo (its own price, plus the two
+modifiers), right alongside a plain Halo-Halo:
+
+![Figure 6.4 — The tab's cart: Chicken Adobo with its two modifiers indented beneath it, and a plain Halo-Halo](assets/screenshots/014-tab-cart.png)
+
+## Courses and firing
+
+Every line the kitchen tracks carries a chip reading **Pending**,
+**Cooking**, or **Ready**. Tap it to move the course forward: **Pending** →
+**Cooking** (fires it to the kitchen) → **Ready** (on the pass) → back to
+**Pending**. Sending a **Ready** or **Cooking** course back a step, or
+shrinking its quantity once it's fired, needs the same authority as voiding
+it outright — downgrading a course the kitchen already started is the same
+fraud surface as removing it. A cashier's own tap on the chip only ever
+moves it forward.
+
+> Note: this version's till has no on-screen field to *change* an existing
+> line's quantity at all — only **Void** (remove it entirely) and the prep
+> chip (move it through **Pending** / **Cooking** / **Ready**) are exposed
+> here. A genuine quantity correction on a fired line, or increasing a
+> plain line's count, currently goes through the API directly rather than a
+> till button.
+
+## Transfer a tab to another register
+
+On the Floor screen, a tab carries a **Transfer** chip (only if you can
+transfer, and only when another till is available to receive it).
+
+1. Tap **Transfer** under the tab.
+2. Under **Send to**, tap the destination till.
+
+![Figure 6.5 — Transferring T1 (₱415.00) from Till 1 to Till 2](assets/screenshots/016-transfer.png)
+
+Only a register with an **open shift right now** shows up as a destination
+— the transfer moves the tab's money onto *that* shift's ledger the instant
+it lands, so the receiving till's drawer owns the sale from that point on,
+not the one that rang it up.
+
+## Split the check
+
+Once you tap **Pay**, and only on an order that hasn't taken any payment
+yet, a **Split bill** button appears alongside the tender form.
+
+1. Tap **Split bill**.
+2. Use the stepper's **−** / **+** to choose how many checks (2 to 10).
+
+![Figure 6.6 — Splitting the RST-20260722-0001 tab into 2 checks, ₱207.50 each](assets/screenshots/015-split.png)
+
+3. Tap **GO**. You're now looking at the first check, with a strip along
+   the top showing **Check 1**, **Check 2**, and so on — take payment on
+   each exactly like any other sale, and the next unpaid one opens
+   automatically as soon as one closes.
+
+Two even checks, like Figure 6.6's ₱207.50 and ₱207.50, split cleanly. A
+three-way split rarely does — the totals still always sum back exactly to
+the original, so a line's quantity on a split check can come out as a
+fraction (`0.334`, say) rather than a whole number. That's the split
+dividing everything exactly, not a mistake — the same fractional-quantity
+field every order line carries, on show here instead of sitting at `1`.
 
 # 7. Shifts and cash
 
-*Written in the next revision pass.*
+A till's shift is the drawer's own accountability loop, one level above a
+single sale: open with a counted float, run the day's sales and cash
+movements, then close by counting again.
+
+## Open with a counted float
+
+If nobody's opened the drawer on this till yet, you land on **Open shift**
+instead of a sale screen.
+
+![Figure 7.1 — Open shift: opening float defaulted to ₱200.00](assets/screenshots/003-open-shift.png)
+
+Check or edit the **Opening float**, then tap **Open drawer** — you're
+dropped straight into a new sale. If a shift's already open on this till,
+you skip this screen entirely.
+
+## Cash movements
+
+A payout, a deposit, a paid-in — any cash that moves in or out of the
+drawer without a sale attached — is a real, audited action, and a reason is
+required for all of them. This version's till has no on-screen form to
+*record* one; the drawer only ever *displays* what's already been recorded
+against it, in the Z-report below. Recording a movement currently goes
+through the API directly rather than a till button.
+
+## The Z-report — fetched before you close
+
+The Z-report shows up as part of the *same* screen as closing itself, not a
+separate report you pull up first and close afterward — and that's not
+just a matter of button order. **Closing a shift revokes every staff
+session bound to that register the instant it closes**, so the only moment
+this till can ever show its own Z-report is right there on the close-shift
+result, before the very session showing it goes dead. There's no
+"check the Z-report, then close" sequence available on this till at all —
+the numbers arrive together with the close.
+
+## Close and count
+
+1. Tap **Close shift**, in the sale screen's own header row — not the top
+   bar, which just holds your name and **Clock out**.
+2. Physically count the drawer *before* looking at anything on screen — the
+   expected figure stays masked (`•••••`) until after you submit your
+   count.
+
+![Figure 7.2 — Close shift: Counted cash blank, Expected cash masked](assets/screenshots/017-close-shift.png)
+
+3. Type what you counted into **Counted cash** and tap **Close**.
+
+The masking is deliberate: seeing the expected total first turns counting
+into just typing the number back, and a real drawer problem never surfaces.
+Count first, then look.
+
+## Variance and approval
+
+The result — **Drawer reconciled** — reveals **Expected**, **Counted**, and
+**Variance**, plus the Z-report itself: sales and refunds by tender, **Paid
+in**, **Payouts**, **Drops**, and **Orders closed** / **Orders voided** /
+**Orders split**.
+
+![Figure 7.3 — Drawer reconciled: Expected ₱615.00, Counted ₱150.00, Variance -₱465.00, over the threshold](assets/screenshots/018-z-report.png)
+
+A variance inside the store's threshold reconciles clean, no extra step.
+Figure 7.3's -₱465.00 is well outside it, so the screen shows **Variance
+exceeds the threshold — needs supervisor approval.** with an **Approve
+variance** button — one that always fails if tapped right here. Closing
+this shift already revoked this register's own sessions the instant it
+closed (above), so the very screen offering that button is already running
+on a dead one; tapping it just signs you back out to **Enter PIN**.
+
+The rule behind it is real, and correctly scoped to the *location*, not one
+specific terminal: a supervisor approves it from a **different, still-open**
+register at the same location — never the till that just closed, because
+that till's sessions are already gone. Approving today means calling the
+API directly from that other till's session, the same way
+`scripts/e2e-lunch-service.sh` proves it end to end — no register screen
+anywhere renders a working **Approve variance** button for a shift other
+than its own, so this is done outside any till's screen entirely, on
+purpose, not a bug waiting to be routed around.
+
+Tap **Print** for a paper copy of the Z-report, then **Done**. Closing signs
+you out of this till completely — you land back at **Enter PIN**.
 
 # 8. The back office
 
@@ -540,4 +856,45 @@ entity.
 
 # 14. The desktop shell and printing
 
-*Written in the next revision pass.*
+The register also ships as a desktop app — a Tauri v2 shell that hosts the
+very same SPA covered in Chapters 4–7, not a third frontend with its own
+code. What the shell adds on top is a hardware bridge for the two things a
+browser tab can't do on its own: drive a receipt printer and kick open a
+cash drawer. The server still decides *what* happens — a sale closes, a
+receipt is owed — the shell only decides *how* that reaches the hardware in
+front of it.
+
+## Printing
+
+Tap **Print** on a completed sale (Chapter 5) or a closed shift's Z-report
+(Chapter 7) exactly as you would in a browser tab. What happens next
+depends on where the till is running:
+
+- In an ordinary browser tab, **Print** opens the browser's own print
+  dialog — nothing about the shell is involved.
+- In the desktop shell, **Print** is meant to send the receipt straight to
+  the till's thermal printer instead.
+
+> Note: today, only a **mock** printer driver ships — `frontend/native`'s
+> own README says so plainly. It writes the receipt out to a file rather
+> than actually driving hardware, so **Print** in the shell doesn't yet put
+> paper through a real printer. A browser tab's print dialog is the one
+> path here that already produces real paper, because it was never the
+> shell's job to begin with.
+
+## No-sale drawer opens
+
+The top bar carries a **No sale** button, visible only in the desktop shell
+(a browser tab has no drawer to pop, so it doesn't show one there) and only
+if you can open the drawer this way. It's for opening the drawer with
+nothing being sold — making change for another till, say.
+
+1. Tap **No sale** in the top bar.
+2. Type why in **Reason for opening the drawer…** (required).
+3. Tap **Open drawer** to confirm — the No-sale form's own confirm button,
+   not the one that starts a shift (Chapter 7); this one only pops the
+   drawer.
+
+The server records who opened it, at which register, and when, before the
+drawer actually pops — that entry shows up in the back office's audit log
+(Chapter 13) exactly like a void or a discount does.
