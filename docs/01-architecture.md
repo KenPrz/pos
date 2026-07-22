@@ -230,34 +230,42 @@ a real email and password; they do not get PINs.
 3. **Back-office authentication.** A third, independent tier, added in M6: `POST
    /admin/login` takes an email and password and returns a Sanctum token with no device
    and no location behind it at all — there is no terminal to trust and no register to
-   read a team id from. This is why the back office is **admin-only** in v1 rather than
-   role-gated like the register: every other permission check in this system gets its
-   location from the physical till that made the request, and a login endpoint with
-   neither a device nor a register has nothing to hang a team-scoped role on. `05-rbac.md`
-   has the full rationale and the named deferral (a read-only bookkeeper role) that
-   revives this decision once there's a real accountant to build it for.
+   read a team id from. Because of that, back-office access can't be scoped by team
+   context the way the register is; instead it's **permission-based**: any active user
+   holding at least one admin-tier permission at any location — via a role or a direct
+   grant — gets in, and the token itself carries a distinct `admin` Sanctum ability so a
+   register staff session can never pass as one. `users.is_admin` remains the one
+   all-access flag, bypassing every check regardless of location. `05-rbac.md` has the
+   full mechanism: the admin-tier permission set, the two-check gate, and why reports
+   stay location-scoped even though login itself isn't.
 
 ### Roles
 
-Coarse and boring on purpose:
+Roles are **admin-editable templates**, not a fixed set — a template (name plus
+permission set) is materialized into a per-location role at every location, and an admin
+can add, edit, rename, or delete one at runtime. Two are seeded as **system templates**
+and cover the common cases out of the box:
 
 - `cashier` — open/modify/close own orders, take payments, open/close own shift.
 - `supervisor` — cashier, plus: void lines, apply manual discounts, no-sale drawer open,
   reopen an order, approve variance, stock adjustments/receiving/counting.
-- `admin` — not a role. `users.is_admin` plus a `Gate::before` bypass, because spatie's
-  teams cannot express a role assignment that spans locations. Full rationale in
-  `05-rbac.md`.
 
-The actions gated at `supervisor` are exactly the ones that let someone take value out of
-the business without a customer noticing — cash out of the drawer or sellable stock out
-of the count. That's the whole design rationale: the permission boundary follows the
-fraud surface, not an org chart.
+Their permission sets can be edited; their names can't (renaming or deleting either would
+strand seeds, scripts, and docs that assume both exist). A user can also hold a
+permission directly at one location without a template to carry it. `admin` is still not
+a role at all — `users.is_admin` plus a `Gate::before` bypass, because spatie's teams
+cannot express a role assignment that spans locations. Full rationale in `05-rbac.md`.
 
-Implemented with `spatie/laravel-permission`, and **roles are scoped per location** — a
-supervisor at one store is not a supervisor at another. Call sites ask
-`can('order.discount.apply')`, never `role === 'supervisor'`. The permission catalog, the
-teams configuration, and the split between permissions (capability) and policies (record
-access) are in `05-rbac.md`.
+The actions gated at `supervisor`'s default permission set are exactly the ones that let
+someone take value out of the business without a customer noticing — cash out of the
+drawer or sellable stock out of the count. That's the whole design rationale: the
+permission boundary follows the fraud surface, not an org chart.
+
+Implemented with `spatie/laravel-permission`, and **role assignments are scoped per
+location** — a supervisor at one store is not a supervisor at another. Call sites ask
+`can('order.discount.apply')`, never `role === 'supervisor'`. The permission catalog,
+role-template mechanics, direct per-location grants, and the split between permissions
+(capability) and policies (record access) are all in `05-rbac.md`.
 
 ## Idempotency
 
