@@ -13,7 +13,10 @@ import { Checkbox } from '../../components/ui/checkbox'
 import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 
-type RoleRow = { location_id: string; role: 'cashier' | 'supervisor' }
+// `role` is a role template NAME, not a fixed pair — see `RoleAssignment`'s comment in
+// lib/api.ts. The add-row Select below lists every template `api.roles.list()` returns
+// (system and custom alike), not a hardcoded cashier/supervisor option set.
+type RoleRow = { location_id: string; role: string }
 
 /** `{location_id, location_name, role}[]` -> `{location_id, role}[]`, sorted by location
  * so an unrelated field's edit never reorders this array into a spurious diff. */
@@ -52,6 +55,10 @@ const NONE_LOCATION = '__none__'
 // permission list loads asynchronously (api.roles.permissionGroups()), so "nothing
 // chosen yet" needs a placeholder value the same way the location select does.
 const NONE_PERMISSION = '__none__'
+// Same sentinel again, for the role-add Select — the template list now loads
+// asynchronously too (api.roles.list()), so it starts unselected rather than
+// defaulting to "cashier".
+const NONE_ROLE = '__none__'
 
 /**
  * Name/email/password/PIN + per-location roles + is_admin/is_active. PIN and password
@@ -89,7 +96,7 @@ export function UserEditor({
   const initialRoles = user ? toRoleRows(user.roles) : []
   const [roles, setRoles] = useState<RoleRow[]>(initialRoles)
   const [newRoleLocationId, setNewRoleLocationId] = useState('')
-  const [newRoleRole, setNewRoleRole] = useState<'cashier' | 'supervisor'>('cashier')
+  const [newRoleRole, setNewRoleRole] = useState('')
   const initialPermissions = user ? toPermissionRows(user.permissions) : []
   const [permissions, setPermissions] = useState<PermissionRow[]>(initialPermissions)
   const [newGrantLocationId, setNewGrantLocationId] = useState('')
@@ -117,11 +124,17 @@ export function UserEditor({
   const locationName = (id: string) => locations.find((l) => l.id === id)?.name ?? '—'
   const availableLocations = locations.filter((l) => !roles.some((r) => r.location_id === l.id))
 
+  // Role templates for the add-row's role Select — every template (system and custom
+  // alike), not a hardcoded cashier/supervisor pair; see RoleAssignment's comment in
+  // lib/api.ts. Same list `RolesPanel` uses, so this shares its cache.
+  const roleTemplates = useQuery({ queryKey: ['admin', 'roles'], queryFn: api.roles.list })
+  const roleNames = roleTemplates.data?.map((r) => r.name) ?? []
+
   const addRole = () => {
-    if (newRoleLocationId === '') return
+    if (newRoleLocationId === '' || newRoleRole === '') return
     setRoles((rs) => [...rs, { location_id: newRoleLocationId, role: newRoleRole }].sort((a, b) => a.location_id.localeCompare(b.location_id)))
     setNewRoleLocationId('')
-    setNewRoleRole('cashier')
+    setNewRoleRole('')
   }
 
   const removeRole = (locationId: string) => {
@@ -274,17 +287,26 @@ export function UserEditor({
             </Select>
           </FieldRow>
           <FieldRow label="Add role">
-            <Select value={newRoleRole} onValueChange={(v) => setNewRoleRole(v as 'cashier' | 'supervisor')}>
+            <Select value={newRoleRole || NONE_ROLE} onValueChange={(v) => setNewRoleRole(v === NONE_ROLE ? '' : v)}>
               <SelectTrigger id="user-add-role-role">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="cashier">Cashier</SelectItem>
-                <SelectItem value="supervisor">Supervisor</SelectItem>
+                <SelectItem value={NONE_ROLE}>—</SelectItem>
+                {roleNames.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </FieldRow>
-          <Button type="button" variant="tertiary" onClick={addRole} disabled={newRoleLocationId === ''}>
+          <Button
+            type="button"
+            variant="tertiary"
+            onClick={addRole}
+            disabled={newRoleLocationId === '' || newRoleRole === ''}
+          >
             Add
           </Button>
         </div>

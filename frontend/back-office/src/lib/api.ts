@@ -222,7 +222,14 @@ export type Discount = {
  * ever sends `{ location_id, role }` back (RoleAssignments::sync ignores anything else),
  * so `location_name` is optional on the way out and simply dropped by the caller.
  */
-export type RoleAssignment = { location_id: string; location_name: string; role: 'cashier' | 'supervisor' }
+/**
+ * `role` is a role template NAME (`role_templates.name`), not a fixed pair — RBAC v2
+ * (Task 4) lets admins create arbitrary custom templates (e.g. "shift-lead") alongside
+ * the two system ones, and `UpdateUserRequest`/`CreateUserRequest` validate this field
+ * against `role_templates.name`, not an enum. `cashier`/`supervisor` are simply the two
+ * templates that always exist (`is_system: true`), never the only ones on offer.
+ */
+export type RoleAssignment = { location_id: string; location_name: string; role: string }
 
 /**
  * A direct, per-location permission grant — independent of (and additive to) whatever

@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import { UserEditor } from './UserEditor'
-import { ApiError, api, type Location, type ManagedUser, type PermissionGroup } from '../../lib/api'
+import { ApiError, api, type Location, type ManagedUser, type PermissionGroup, type Role } from '../../lib/api'
 
 afterEach(cleanup)
 
@@ -14,9 +14,20 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
   { label: 'Orders', permissions: ['order.void'] },
 ]
 
+// Includes a custom template (shift-lead) alongside the two system ones — the add-row
+// Select must offer every role template api.roles.list() returns, not a hardcoded
+// cashier/supervisor pair (RoleAssignment.role is a plain string now — see its comment
+// in lib/api.ts).
+const ROLE_TEMPLATES: Role[] = [
+  { id: 'role-1', name: 'cashier', is_system: true, permissions: [], assigned_users: 1 },
+  { id: 'role-2', name: 'supervisor', is_system: true, permissions: [], assigned_users: 1 },
+  { id: 'role-3', name: 'shift-lead', is_system: false, permissions: [], assigned_users: 0 },
+]
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(api.roles.permissionGroups).mockResolvedValue(PERMISSION_GROUPS)
+  vi.mocked(api.roles.list).mockResolvedValue(ROLE_TEMPLATES)
 })
 
 vi.mock('../../lib/api', async (importOriginal) => {
@@ -26,7 +37,7 @@ vi.mock('../../lib/api', async (importOriginal) => {
     api: {
       ...actual.api,
       users: { ...actual.api.users, update: vi.fn(), create: vi.fn() },
-      roles: { ...actual.api.roles, permissionGroups: vi.fn() },
+      roles: { ...actual.api.roles, list: vi.fn(), permissionGroups: vi.fn() },
     },
   }
 })
@@ -92,6 +103,10 @@ describe('UserEditor', () => {
   // and choosing an option replaces the old `fireEvent.change` with the
   // open-trigger/click-option interaction Radix Select needs. Behavior/label assertions
   // are unchanged: same full replacement role set, same "Add" button.
+  //
+  // Follow-up (spec-gap fix): the role option now renders the template's raw name
+  // (`api.roles.list()`, not a hardcoded Cashier/Supervisor label pair) — 'supervisor'
+  // lowercase, matching ROLE_TEMPLATES, is the option text now.
   it('sends the full replacement role set when a role row is added', async () => {
     vi.mocked(api.users.update).mockResolvedValue(USER)
     renderEditor()
@@ -99,7 +114,7 @@ describe('UserEditor', () => {
     fireEvent.click(screen.getByLabelText(/add location/i))
     fireEvent.click(await screen.findByRole('option', { name: 'Uptown' }))
     fireEvent.click(screen.getByLabelText(/add role/i))
-    fireEvent.click(await screen.findByRole('option', { name: 'Supervisor' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'supervisor' }))
     fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
@@ -108,6 +123,30 @@ describe('UserEditor', () => {
         roles: [
           { location_id: 'loc-1', role: 'cashier' },
           { location_id: 'loc-2', role: 'supervisor' },
+        ],
+      }),
+    )
+  })
+
+  // Follow-up (spec-gap fix): the design's success criteria require assigning a custom
+  // role template ("shift-lead") end-to-end through this screen — this was impossible
+  // before the fix (the Select only ever offered the hardcoded cashier/supervisor pair).
+  it('offers a custom role template and assigns it like any other', async () => {
+    vi.mocked(api.users.update).mockResolvedValue(USER)
+    renderEditor()
+
+    fireEvent.click(screen.getByLabelText(/add location/i))
+    fireEvent.click(await screen.findByRole('option', { name: 'Uptown' }))
+    fireEvent.click(screen.getByLabelText(/add role/i))
+    fireEvent.click(await screen.findByRole('option', { name: 'shift-lead' }))
+    fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() =>
+      expect(api.users.update).toHaveBeenCalledWith('user-1', {
+        roles: [
+          { location_id: 'loc-1', role: 'cashier' },
+          { location_id: 'loc-2', role: 'shift-lead' },
         ],
       }),
     )
