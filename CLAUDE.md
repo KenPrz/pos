@@ -57,6 +57,8 @@ http://127.0.0.1:8000 (API) · http://127.0.0.1:5174 (register) · http://127.0.
 | `make e2e` | The three committed end-to-end proofs against the running stack |
 | `make build` | Build all three production images |
 | `make backup` / `make restore` / `make restore-drill` | Dump the db, restore a dump, prove the dump actually restores |
+| `make manual` | Build `docs/user-manual/user-manual.pdf` from its Markdown sources |
+| `make manual-shots` | Recapture the manual's screenshots (needs `make dev` up + a seeded stack) |
 | `make clean` | Stack down **and volumes destroyed** — asks first |
 
 Full recipes: `Makefile` at the repo root. Compose files: `compose.dev.yml` /
@@ -257,6 +259,12 @@ retail's refund flow onto a tax-inclusive location (GRC) exposed a latent M4 bug
 `RefundOrder` double-counted VAT already embedded in a gross line total at
 tax-inclusive locations, over-paying refunds — fixed with regression tests at both tax
 modes (commit `7a0c0e0`). Suites: 490 backend / 112 register / 133 back-office.
+
+**User manual complete** — a screenshot-rich PDF for store staff and admins lives in
+`docs/user-manual/` (`make manual` builds it, `make manual-shots` recaptures its
+screenshots against a seeded stack); `.github/workflows/manual.yml` rebuilds and
+commits it back on every push under `docs/user-manual/**`. Full story in
+`docs/06-roadmap.md`.
 
 Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
 trigger that would revive each (monitoring, load test, runbook, registry/CD, and more).

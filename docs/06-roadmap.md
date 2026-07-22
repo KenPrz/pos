@@ -574,6 +574,35 @@ tests. All three e2e scripts green via `make e2e`.
 
 ---
 
+## User manual
+
+A screenshot-rich manual for the people actually running a store, not the people
+building it — `docs/user-manual/`: four Markdown sources (overview and back-office
+chapters, register chapters covering selling/food-service/shifts/shell, an FAQ, a
+troubleshooting guide, a glossary), 31 staged Playwright screenshots of the Manila seed
+(activation through Z-report on the register side, login through audit on the
+back-office side), and a WeasyPrint build turning both into a single 49-page PDF.
+`make manual` builds the PDF (pinned deps into a local venv, no system Python
+pollution); `make manual-shots` drives Playwright against a running `make dev` +
+seeded stack to (re)capture the screenshots. `.github/workflows/manual.yml` rebuilds
+the PDF on every push to `docs/user-manual/**` and commits it back, mirroring
+`wiki.yml`'s shape — the paths filter excludes the PDF and rendered diagrams
+themselves so the bot's own commit doesn't retrigger the workflow. The pipeline itself
+was ported from a sibling project's proven implementation rather than built from
+scratch.
+
+Capturing the screenshots against a real seeded stack surfaced a real bug, not just a
+fixture mismatch: both frontends hardcoded a display-only USD const, so a Manila store
+priced in PHP still showed dollar signs on every screen. The server has always known
+its own currency; the catalog response and the admin-login response now carry it too,
+and each frontend reads it at boot instead of closing over a stale constant (commit
+`c761424`). The manual's screenshots were recaptured afterward, in pesos.
+
+**Status: complete.** `docs/user-manual/user-manual.pdf`, 49 pages, builds clean via
+`make manual`; CI rebuild wired via `manual.yml`.
+
+---
+
 ## Sequencing rationale
 
 - **Money before schema** — everything computes on it.
