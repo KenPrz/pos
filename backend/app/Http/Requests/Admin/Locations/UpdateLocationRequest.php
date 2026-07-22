@@ -6,14 +6,17 @@ namespace App\Http\Requests\Admin\Locations;
 
 use App\Actions\Admin\Locations\UpdateLocationInput;
 use App\Domain\Rbac\Permissions;
+use App\Http\Requests\Concerns\AuthorizesBackOffice;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 final class UpdateLocationRequest extends FormRequest
 {
+    use AuthorizesBackOffice;
+
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::LOCATION_MANAGE);
+        return $this->allowsBackOffice(Permissions::LOCATION_MANAGE);
     }
 
     public function rules(): array

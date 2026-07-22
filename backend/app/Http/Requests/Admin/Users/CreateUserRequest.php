@@ -6,6 +6,7 @@ namespace App\Http\Requests\Admin\Users;
 
 use App\Actions\Admin\Users\CreateUserInput;
 use App\Domain\Rbac\Permissions;
+use App\Http\Requests\Concerns\AuthorizesBackOffice;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
@@ -14,9 +15,11 @@ use Illuminate\Validation\Rule;
 
 final class CreateUserRequest extends FormRequest
 {
+    use AuthorizesBackOffice;
+
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::USER_MANAGE);
+        return $this->allowsBackOffice(Permissions::USER_MANAGE);
     }
 
     public function rules(): array

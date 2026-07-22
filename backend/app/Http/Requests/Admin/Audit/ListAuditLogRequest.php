@@ -6,13 +6,16 @@ namespace App\Http\Requests\Admin\Audit;
 
 use App\Actions\Admin\Audit\ListAuditLogInput;
 use App\Domain\Rbac\Permissions;
+use App\Http\Requests\Concerns\AuthorizesBackOffice;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class ListAuditLogRequest extends FormRequest
 {
+    use AuthorizesBackOffice;
+
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::AUDIT_VIEW);
+        return $this->allowsBackOffice(Permissions::AUDIT_VIEW);
     }
 
     /** @return array<string, array<int, string>> */

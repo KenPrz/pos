@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace App\Http\Requests\Admin\Reports;
 
 use App\Actions\Admin\Reports\StockReportInput;
+use App\Domain\Rbac\AdminAccess;
 use App\Domain\Rbac\Permissions;
+use App\Http\Requests\Concerns\AuthorizesBackOffice;
+use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class StockReportRequest extends FormRequest
 {
+    use AuthorizesBackOffice;
+
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::REPORT_STOCK_VIEW);
+        return $this->allowsBackOffice(Permissions::REPORT_STOCK_VIEW);
     }
 
     public function rules(): array
@@ -25,6 +32,25 @@ final class StockReportRequest extends FormRequest
             // accepts it.
             'low_only' => ['sometimes', 'string'],
         ];
+    }
+
+    /**
+     * Report permissions are location-scoped even though the back-office login gate
+     * (AdminAccess::holdsAnywhere) is "anywhere" — a stock-only grant at location A must
+     * not read location B's stock report. Admins skip this: their locationIdsWhere() is
+     * null (all locations), by definition.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (): void {
+            $user = $this->user();
+            if ($user instanceof User && ! $user->is_admin) {
+                $allowed = app(AdminAccess::class)->locationIdsWhere($user, Permissions::REPORT_STOCK_VIEW) ?? [];
+                if (! in_array($this->input('location_id'), $allowed, true)) {
+                    throw new AuthorizationException;
+                }
+            }
+        });
     }
 
     public function toInput(): StockReportInput

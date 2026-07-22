@@ -6,15 +6,18 @@ namespace App\Http\Requests\Admin\Registers;
 
 use App\Actions\Admin\Registers\UpdateRegisterInput;
 use App\Domain\Rbac\Permissions;
+use App\Http\Requests\Concerns\AuthorizesBackOffice;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 final class UpdateRegisterRequest extends FormRequest
 {
+    use AuthorizesBackOffice;
+
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::REGISTER_ENROLL);
+        return $this->allowsBackOffice(Permissions::REGISTER_ENROLL);
     }
 
     public function rules(): array

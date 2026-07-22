@@ -5,19 +5,25 @@ declare(strict_types=1);
 namespace App\Http\Requests\Admin\Reports;
 
 use App\Actions\Admin\Reports\SalesReportInput;
+use App\Domain\Rbac\AdminAccess;
 use App\Domain\Rbac\Permissions;
+use App\Http\Requests\Concerns\AuthorizesBackOffice;
+use App\Models\User;
 use DateTimeImmutable;
 use Exception;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class SalesReportRequest extends FormRequest
 {
+    use AuthorizesBackOffice;
+
     private const int MAX_RANGE_DAYS = 366;
 
     public function authorize(): bool
     {
-        return $this->user()->can(Permissions::REPORT_SALES_VIEW);
+        return $this->allowsBackOffice(Permissions::REPORT_SALES_VIEW);
     }
 
     public function rules(): array
@@ -60,6 +66,20 @@ final class SalesReportRequest extends FormRequest
             $days = (int) $fromDate->diff($toDate)->days;
             if ($days > self::MAX_RANGE_DAYS) {
                 $validator->errors()->add('to', 'The date range must not exceed '.self::MAX_RANGE_DAYS.' days.');
+            }
+        });
+
+        // Report permissions are location-scoped even though the back-office login gate
+        // (AdminAccess::holdsAnywhere) is "anywhere" — a report-only grant at location A
+        // must not read location B's report. Admins skip this: their locationIdsWhere()
+        // is null (all locations), by definition.
+        $validator->after(function (): void {
+            $user = $this->user();
+            if ($user instanceof User && ! $user->is_admin) {
+                $allowed = app(AdminAccess::class)->locationIdsWhere($user, Permissions::REPORT_SALES_VIEW) ?? [];
+                if (! in_array($this->input('location_id'), $allowed, true)) {
+                    throw new AuthorizationException;
+                }
             }
         });
     }
