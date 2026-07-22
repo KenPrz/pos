@@ -71,5 +71,21 @@ it('accepts, persists, and returns the two fields through the admin API', functi
     ], $headers)->assertStatus(201)->json('data.location');
     expect($loc['variance_approval_threshold_cents'])->toBe(10000);
 
-    $this->patchJson("/api/v1/admin/locations/{$loc['id']}", ['variance_approval_threshold_cents' => null], $headers)->assertOk();
+    $patched = $this->patchJson("/api/v1/admin/locations/{$loc['id']}", ['variance_approval_threshold_cents' => null], $headers)
+        ->assertOk()->json('data.location');
+    expect($patched['variance_approval_threshold_cents'])->toBeNull();
+});
+
+it('creates a location with both thresholds explicitly null', function (): void {
+    // Regression: an explicit JSON null for low_stock_threshold must pass through as
+    // null, not get cast to the empty string and hit the numeric(12,3) column as "".
+    $admin = User::factory()->admin()->create();
+    $headers = ['Authorization' => 'Bearer '.$admin->createToken('t')->plainTextToken];
+    $loc = $this->postJson('/api/v1/admin/locations', [
+        'name' => 'T2', 'code' => 'TH2', 'timezone' => 'Asia/Manila', 'prices_include_tax' => true,
+        'variance_approval_threshold_cents' => null, 'low_stock_threshold' => null,
+    ], $headers)->assertStatus(201)->json('data.location');
+
+    expect($loc['variance_approval_threshold_cents'])->toBeNull()
+        ->and($loc['low_stock_threshold'])->toBeNull();
 });

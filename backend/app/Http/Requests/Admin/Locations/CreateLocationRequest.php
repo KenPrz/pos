@@ -45,7 +45,7 @@ final class CreateLocationRequest extends FormRequest
             receiptHeader: $this->input('receipt_header'),
             receiptFooter: $this->input('receipt_footer'),
             varianceApprovalThresholdCents: $this->input('variance_approval_threshold_cents'),
-            lowStockThreshold: $this->has('low_stock_threshold') ? (string) $this->input('low_stock_threshold') : null,
+            lowStockThreshold: $this->input('low_stock_threshold') === null ? null : (string) $this->input('low_stock_threshold'),
             actorId: $this->user()->id,
         );
     }
