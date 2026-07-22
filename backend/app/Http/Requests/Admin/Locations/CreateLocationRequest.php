@@ -30,6 +30,8 @@ final class CreateLocationRequest extends FormRequest
             'prices_include_tax' => ['sometimes', 'boolean'],
             'receipt_header' => ['nullable', 'string'],
             'receipt_footer' => ['nullable', 'string'],
+            'variance_approval_threshold_cents' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'low_stock_threshold' => ['sometimes', 'nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -42,6 +44,8 @@ final class CreateLocationRequest extends FormRequest
             pricesIncludeTax: $this->boolean('prices_include_tax', false),
             receiptHeader: $this->input('receipt_header'),
             receiptFooter: $this->input('receipt_footer'),
+            varianceApprovalThresholdCents: $this->input('variance_approval_threshold_cents'),
+            lowStockThreshold: $this->has('low_stock_threshold') ? (string) $this->input('low_stock_threshold') : null,
             actorId: $this->user()->id,
         );
     }

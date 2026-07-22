@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Admin\Reports;
 
 use App\Domain\Money\Quantity;
+use App\Models\Location;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -12,15 +13,17 @@ use Illuminate\Support\Facades\DB;
  * name. Reporting is allowed to read the live catalog for this the same way the sales
  * report's `category` grouping is — nothing here is printed on a receipt.
  *
- * `low` compares against the deployed `pos.stock.low_threshold` in whole milli-units
- * (Quantity's own scale), never as a float, so a fractional on-hand quantity can't
- * miscompare at the boundary. Read-only: no transaction, no audit entry.
+ * `low` compares against the location's `low_stock_threshold` override, falling back to
+ * the deployed `pos.stock.low_threshold` when unset, in whole milli-units (Quantity's
+ * own scale), never as a float, so a fractional on-hand quantity can't miscompare at the
+ * boundary. Read-only: no transaction, no audit entry.
  */
 final class StockReport
 {
     public function execute(StockReportInput $in): object
     {
-        $threshold = Quantity::fromString((string) config('pos.stock.low_threshold'));
+        $location = Location::query()->findOrFail($in->locationId);
+        $threshold = Quantity::fromString((string) ($location->low_stock_threshold ?? config('pos.stock.low_threshold')));
 
         $rows = DB::table('stock_levels as sl')
             ->join('product_variants as pv', 'pv.id', '=', 'sl.variant_id')

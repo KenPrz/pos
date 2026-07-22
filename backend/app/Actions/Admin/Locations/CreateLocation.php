@@ -27,6 +27,8 @@ final class CreateLocation
                 'prices_include_tax' => $in->pricesIncludeTax,
                 'receipt_header' => $in->receiptHeader,
                 'receipt_footer' => $in->receiptFooter,
+                'variance_approval_threshold_cents' => $in->varianceApprovalThresholdCents,
+                'low_stock_threshold' => $in->lowStockThreshold,
             ]);
 
             $this->provisioner->provisionForLocation($location);

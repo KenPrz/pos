@@ -29,6 +29,8 @@ final class UpdateLocationRequest extends FormRequest
             'receipt_header' => ['sometimes', 'nullable', 'string'],
             'receipt_footer' => ['sometimes', 'nullable', 'string'],
             'is_active' => ['sometimes', 'boolean'],
+            'variance_approval_threshold_cents' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'low_stock_threshold' => ['sometimes', 'nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -39,6 +41,7 @@ final class UpdateLocationRequest extends FormRequest
             changes: $this->safe()->only([
                 'name', 'code', 'timezone', 'prices_include_tax',
                 'receipt_header', 'receipt_footer', 'is_active',
+                'variance_approval_threshold_cents', 'low_stock_threshold',
             ]),
             actorId: $this->user()->id,
         );

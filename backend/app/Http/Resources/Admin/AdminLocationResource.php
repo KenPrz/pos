@@ -23,6 +23,8 @@ final class AdminLocationResource extends JsonResource
             'receipt_header' => $this->receipt_header,
             'receipt_footer' => $this->receipt_footer,
             'is_active' => $this->is_active,
+            'variance_approval_threshold_cents' => $this->variance_approval_threshold_cents,
+            'low_stock_threshold' => $this->low_stock_threshold,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
