@@ -439,8 +439,8 @@ export type Setting = { key: string; value: string | null; source: 'db' | 'confi
 
 export type DayChecklist = {
   cash_drop_confirmed?: boolean
-  spoilage_note?: string
-  next_day_note?: string
+  spoilage_note?: string | null
+  next_day_note?: string | null
 }
 
 export type BusinessDayTotals = {
