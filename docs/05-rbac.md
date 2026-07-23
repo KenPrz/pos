@@ -192,6 +192,7 @@ resolved in the action rather than a policy class.
 | `shift.cash_movement` | Payout / paid-in / drop — **money leaves** |
 | `shift.approve_variance` | Approve a variance over threshold |
 | `drawer.no_sale` | Open the drawer with no sale — **money leaves** |
+| `day.close` | Read and close a location's business day (End Of Day) |
 
 **Catalog and admin**
 
@@ -204,7 +205,6 @@ resolved in the action rather than a policy class.
 | `register.enroll` | Enroll a terminal |
 | `settings.manage` | Business identity + per-location thresholds (RBAC v2) |
 | `role.manage` | Role-template CRUD (RBAC v2) |
-| `day.close` | Read and close a location's business day (End Of Day) |
 
 **Stock**
 
