@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Shifts;
 
 use App\Domain\Audit\AuditLogger;
+use App\Exceptions\Domain\DayClosed;
 use App\Exceptions\Domain\ShiftAlreadyOpen;
+use App\Models\Register;
 use App\Models\Shift;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +25,18 @@ final class OpenShift
     {
         try {
             return DB::transaction(function () use ($in): Shift {
+                $register = Register::query()->findOrFail($in->registerId);
+                $businessDate = now($register->location->timezone)->toDateString();
+
+                $dayClosed = DB::table('business_days')
+                    ->where('location_id', $register->location_id)
+                    ->where('business_date', $businessDate)
+                    ->whereNull('reopened_at')
+                    ->exists();
+                if ($dayClosed) {
+                    throw new DayClosed($register->location_id, $businessDate);
+                }
+
                 $shift = Shift::create([
                     'register_id' => $in->registerId,
                     'opened_by' => $in->actorId,
