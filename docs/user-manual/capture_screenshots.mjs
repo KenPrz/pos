@@ -321,6 +321,14 @@ async function boLeg() {
   await nav('Audit').click();
   await page.waitForTimeout(600);
   await shot(page, '033-bo-audit');
+
+  // End of Day reads the same sidebar location as Reports — still Manila Grocery from
+  // the switch above, which is where the retail sale happened, so the consolidated
+  // totals show real figures rather than an all-zero day.
+  await nav('End of Day').click();
+  await page.getByText('Consolidated totals').waitFor();
+  await page.waitForTimeout(600);
+  await shot(page, '034-bo-end-of-day');
   await ctx.close();
 }
 

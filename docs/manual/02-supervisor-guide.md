@@ -178,6 +178,26 @@ app yet.
 > M5 notes); it's the register screen for reaching the approval from elsewhere that
 > doesn't exist yet.
 
+## When the business day is closed
+
+Once a manager closes the store's business day in the back office, **Open drawer** at any
+till in that location is refused for that date with **"The business day is closed. Reopen
+it before opening a shift."** Nothing at the till can lift that — reopening is **Admin
+only**, so a supervisor's override PIN doesn't apply here the way it does to a void or a
+discount. Get an admin to reopen the day (Manager Guide's
+[End of Day](03-manager-guide.md#end-of-day)); shifts open again the moment they do.
+
+Two things worth knowing before the day gets closed on you:
+
+- **Every shift has to be closed first.** A manager can't close the day while any drawer
+  at the location is still open, so an abandoned open till is what's holding up their
+  close — not a system fault.
+- **Your unapproved variances show up on their screen.** A drawer that came up over or
+  short past the threshold and hasn't been signed off is counted on the End of Day screen
+  as an **unapproved variance**. It doesn't block the close — but it is visible, and it
+  stays attached to that day. Approving it before the day closes is the tidy path, with
+  the caveat in the section above about *where* you can approve from.
+
 ## See also
 
 - [Cashier Guide](01-cashier-guide.md) — the sale, tab, and close-shift flows this

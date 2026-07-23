@@ -30,6 +30,12 @@ a sale screen.
 You're dropped straight into a new sale. If a shift is already open on this till (someone
 else started it, or you're resuming your own), you skip this screen entirely.
 
+> Note: if **Open drawer** comes back with **"The business day is closed. Reopen it
+> before opening a shift."**, a manager has already closed out this store's day — it
+> isn't a fault with your till or your PIN, and retyping the float won't help. Only an
+> admin can reopen the day; ask for one, and you'll be able to open the drawer the moment
+> they do.
+
 ## Ring up a retail sale
 
 What you see: a **New sale** panel with a scan field at the top and an empty cart below.

@@ -126,5 +126,5 @@ Only admins can sign in to the back office in this version — see the Manager G
 | --- | --- |
 | A cashier ringing up sales | [Cashier Guide](01-cashier-guide.md) |
 | A supervisor handling voids, discounts, refunds, or variance | [Supervisor Guide](02-supervisor-guide.md) |
-| A manager running catalog, staff, locations, or reports | [Manager Guide](03-manager-guide.md) |
+| A manager running catalog, staff, locations, reports, or the end-of-day close | [Manager Guide](03-manager-guide.md) |
 | Whoever installs, deploys, or backs up the system | [Operator Guide](04-operator-guide.md) |

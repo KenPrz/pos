@@ -198,6 +198,15 @@ right below it. Get a fresh code from the back office (see the Manager Guide's [
 an activation code](03-manager-guide.md#issue-an-activation-code)) and type it in on
 that same screen (see [Getting Started](00-getting-started.md#signing-in)).
 
+**Every till at one location refuses to open a shift, all at once.** The API is
+answering `day_closed` (**"The business day is closed. Reopen it before opening a
+shift."**) — a manager closed that location's business day for that date. It's scoped to
+one location and one date, so other stores are unaffected, and it blocks *only* opening a
+shift; refunds, reports, and variance approvals on that date still work. Only an **admin**
+can lift it, from the back office's **End of Day** section (see the Manager Guide's [End
+of Day](03-manager-guide.md#end-of-day)) — reopening needs a typed reason and is recorded
+in the audit log as `day.reopen`.
+
 **A till's drawer won't reconcile at close.** Read the Z-report for that shift first
 — it breaks down sales by tender and any cash movements (payouts, paid-ins) recorded
 during the shift. If the counted cash still doesn't match, the close records a
