@@ -138,4 +138,19 @@ describe('EndOfDaySection', () => {
     // The mutation is no longer pending once it has rejected, so the button re-enables.
     expect(screen.getByRole('button', { name: /^close day$/i })).toBeEnabled()
   })
+
+  it('refetches for the picked business date and disables days after location_today', async () => {
+    vi.mocked(api.day.get).mockResolvedValue(OPEN_STATUS)
+    renderSection('loc1')
+
+    await screen.findByText(/open shift\(s\) — close them first/i)
+    fireEvent.click(screen.getByRole('button', { name: /business date/i }))
+
+    // location_today is 2026-07-23 — later days are unclickable.
+    expect(screen.getByRole('button', { name: /july 25th, 2026/i })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: /july 20th, 2026/i }))
+    expect(await screen.findByRole('button', { name: /business date/i })).toHaveTextContent('Jul 20, 2026')
+    expect(vi.mocked(api.day.get)).toHaveBeenLastCalledWith('loc1', '2026-07-20')
+  })
 })

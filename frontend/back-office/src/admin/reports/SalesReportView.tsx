@@ -3,12 +3,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { DataTable, type DataTableColumn } from '../../components/DataTable'
+import { DateRangePicker } from '../../components/DateRangePicker'
 import { EmptyState } from '../../components/EmptyState'
 import { FieldRow } from '../../components/FieldRow'
 import { StatusPill } from '../../components/StatusPill'
 import { Button } from '../../components/ui/button'
 import { CardTitle } from '../../components/ui/card'
-import { Input } from '../../components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { ApiError, api, type SalesReportRow } from '../../lib/api'
 import { centsToDecimalString, downloadCsv, toCsv } from '../../lib/csv'
@@ -116,14 +116,18 @@ export function SalesReportView({
       </div>
 
       <div className="flex flex-wrap items-end gap-md">
-        <div className="w-[200px]">
-          <FieldRow label="From">
-            <Input id="sales-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </FieldRow>
-        </div>
-        <div className="w-[200px]">
-          <FieldRow label="To">
-            <Input id="sales-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        <div className="w-[280px]">
+          <FieldRow label="Date range">
+            <DateRangePicker
+              id="sales-range"
+              aria-label="Date range"
+              from={from}
+              to={to}
+              onChange={(r) => {
+                setFrom(r.from)
+                setTo(r.to)
+              }}
+            />
           </FieldRow>
         </div>
       </div>

@@ -91,4 +91,31 @@ describe('AuditSection', () => {
 
     expect(screen.queryByText('admin.location.update')).not.toBeInTheDocument()
   })
+
+  it('applies a picked date range through the Filter button', async () => {
+    // The filters start empty, so the calendar opens on the real current month — pin
+    // the clock (Date only, so waitFor's timers stay real) for a deterministic month.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 6, 23))
+    try {
+      vi.mocked(api.audit.list).mockResolvedValue({ ...PAGE_1, rows: [] })
+      renderSection()
+
+      await waitFor(() => expect(api.audit.list).toHaveBeenCalledTimes(1))
+
+      fireEvent.click(screen.getByRole('button', { name: /date range/i }))
+      fireEvent.click(screen.getByRole('button', { name: /july 10th, 2026/i }))
+      fireEvent.click(screen.getByRole('button', { name: /july 15th, 2026/i }))
+      expect(screen.getByRole('button', { name: /date range/i })).toHaveTextContent('Jul 10, 2026 – Jul 15, 2026')
+
+      fireEvent.click(screen.getByRole('button', { name: /^filter$/i }))
+      await waitFor(() =>
+        expect(api.audit.list).toHaveBeenLastCalledWith(
+          expect.objectContaining({ from: '2026-07-10', to: '2026-07-15' }),
+        ),
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

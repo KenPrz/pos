@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { DataTable } from '../../components/DataTable'
+import { DateRangePicker } from '../../components/DateRangePicker'
 import { FieldRow } from '../../components/FieldRow'
 import { Button } from '../../components/ui/button'
 import { CardTitle } from '../../components/ui/card'
@@ -150,23 +151,14 @@ export function AuditSection({ onUnauthorized }: { onUnauthorized: () => void })
             />
           </FieldRow>
         </div>
-        <div className="w-[180px]">
-          <FieldRow label="From">
-            <Input
-              id="audit-from"
-              type="date"
-              value={filters.from}
-              onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))}
-            />
-          </FieldRow>
-        </div>
-        <div className="w-[180px]">
-          <FieldRow label="To">
-            <Input
-              id="audit-to"
-              type="date"
-              value={filters.to}
-              onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
+        <div className="w-[280px]">
+          <FieldRow label="Date range">
+            <DateRangePicker
+              id="audit-range"
+              aria-label="Date range"
+              from={filters.from}
+              to={filters.to}
+              onChange={(r) => setFilters((f) => ({ ...f, from: r.from, to: r.to }))}
             />
           </FieldRow>
         </div>
