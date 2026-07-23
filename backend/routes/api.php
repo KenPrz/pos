@@ -27,6 +27,10 @@ use App\Http\Controllers\Admin\Catalog\UpdateModifierGroupController;
 use App\Http\Controllers\Admin\Catalog\UpdateProductController;
 use App\Http\Controllers\Admin\Catalog\UpdateTaxRateController;
 use App\Http\Controllers\Admin\Catalog\UpdateVariantController;
+use App\Http\Controllers\Admin\Day\CloseBusinessDayController;
+use App\Http\Controllers\Admin\Day\GetBusinessDayController;
+use App\Http\Controllers\Admin\Day\ListBusinessDaysController;
+use App\Http\Controllers\Admin\Day\ReopenBusinessDayController;
 use App\Http\Controllers\Admin\Locations\CreateLocationController;
 use App\Http\Controllers\Admin\Locations\ListLocationsController;
 use App\Http\Controllers\Admin\Locations\UpdateLocationController;
@@ -173,6 +177,21 @@ Route::prefix('v1')->group(function (): void {
         // archive via PATCH is_active, same as catalog.
         Route::get('/locations', ListLocationsController::class)->name('admin.locations.list');
         Route::post('/locations', CreateLocationController::class)->name('admin.locations.create');
+
+        // End of Day (business-day close). Location-scoped; day.close gates read+close,
+        // reopen is is_admin only. See the End-Of-Day design + docs/03-api.md. Registered
+        // before the locations PATCH below so the more specific `/day` segments read
+        // clearly next to the rest of the locations block (GET/POST vs PATCH don't
+        // collide by method regardless of order).
+        Route::get('/locations/{location}/day', GetBusinessDayController::class)
+            ->where('location', '[0-9a-f-]{36}')->name('admin.day.get');
+        Route::post('/locations/{location}/day/close', CloseBusinessDayController::class)
+            ->where('location', '[0-9a-f-]{36}')->name('admin.day.close');
+        Route::post('/locations/{location}/day/reopen', ReopenBusinessDayController::class)
+            ->where('location', '[0-9a-f-]{36}')->name('admin.day.reopen');
+        Route::get('/locations/{location}/days', ListBusinessDaysController::class)
+            ->where('location', '[0-9a-f-]{36}')->name('admin.day.list');
+
         Route::patch('/locations/{location}', UpdateLocationController::class)->name('admin.locations.update');
 
         Route::get('/registers', ListRegistersController::class)->name('admin.registers.list');
