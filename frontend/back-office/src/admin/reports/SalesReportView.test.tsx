@@ -104,4 +104,36 @@ describe('SalesReportView', () => {
 
     await waitFor(() => expect(screen.getByText(/ledger/i)).toBeInTheDocument())
   })
+
+  it('refetches when a new date range is picked', async () => {
+    // defaultRange() reads the real clock — pin it (Date only, so waitFor's timers
+    // stay real) so the asserted range and the calendar's month are deterministic.
+    // Noon UTC, because defaultRange formats via the UTC-based isoDate(): at local
+    // midnight the UTC calendar day (what the assertion sees) would be one behind
+    // anywhere east of Greenwich.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(Date.UTC(2026, 6, 23, 12)))
+    try {
+      vi.mocked(api.reports.sales).mockResolvedValue(DAY_REPORT)
+      renderView()
+
+      await waitFor(() => expect(api.reports.sales).toHaveBeenCalledTimes(1))
+      expect(vi.mocked(api.reports.sales).mock.calls[0][0]).toMatchObject({
+        from: '2026-07-17',
+        to: '2026-07-23',
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: /date range/i }))
+      fireEvent.click(screen.getByRole('button', { name: /july 10th, 2026/i }))
+      fireEvent.click(screen.getByRole('button', { name: /july 15th, 2026/i }))
+
+      await waitFor(() => expect(api.reports.sales).toHaveBeenCalledTimes(2))
+      expect(vi.mocked(api.reports.sales).mock.calls[1][0]).toMatchObject({
+        from: '2026-07-10',
+        to: '2026-07-15',
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
