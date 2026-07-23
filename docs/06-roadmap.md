@@ -716,8 +716,11 @@ sidebar location switcher).
   button once a date is closed. Deposit is a recorded number and note, not a tracked
   safe ledger — deferred until a store actually draws floats from one.
 
-**Status: complete.** 547 backend tests. `frontend/web` and `frontend/back-office`
-counts unchanged pending the frontend tasks that follow this one.
+**Status: complete.** Suites: 555 backend / 113 register / 177 back-office. The register
+app is untouched — its 113 are unchanged, which is the point. `scripts/e2e-admin-day.sh`
+gained steps 35–40: close the day, prove `OpenShift` refuses with `409 day_closed` (after
+re-logging the cashier in, since closing her shift revoked the session), reopen as admin,
+and prove the guard lifts.
 
 ---
 
