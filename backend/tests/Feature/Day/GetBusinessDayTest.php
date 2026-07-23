@@ -63,3 +63,25 @@ it('reports a closed, reconciled day as closable with its record', function (): 
         ->and($view->open_shifts)->toHaveCount(0)
         ->and($view->record)->toBeInstanceOf(BusinessDay::class);
 });
+
+it('counts a closed shift with an unapproved nonzero variance', function (): void {
+    $location = provisionedLocation(['code' => 'GV', 'timezone' => 'Asia/Manila']);
+    $register = registerAt($location);
+    $cashier = staffWithRole($location, Roles::CASHIER);
+
+    $shift = app(OpenShift::class)->execute(new OpenShiftInput(
+        registerId: $register->id, openingFloatCents: 10000, actorId: $cashier->id,
+    ));
+    // Counted differs from the expected (opening float, no sales) -> nonzero variance,
+    // left unapproved.
+    app(CloseShift::class)->execute(new CloseShiftInput(
+        shiftId: $shift->id, registerId: $register->id, countedCashCents: 9500, note: null, actorId: $cashier->id,
+    ));
+
+    $view = app(GetBusinessDay::class)->execute(new GetBusinessDayInput(
+        locationId: $location->id, businessDate: now($location->timezone)->toDateString(),
+    ));
+
+    expect($view->unapproved_variance_count)->toBe(1)
+        ->and($view->closable)->toBeTrue();
+});

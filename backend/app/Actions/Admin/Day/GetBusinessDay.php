@@ -6,6 +6,7 @@ namespace App\Actions\Admin\Day;
 
 use App\Domain\Day\DayTotals;
 use App\Models\BusinessDay;
+use App\Models\Location;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -20,6 +21,8 @@ final class GetBusinessDay
 
     public function execute(GetBusinessDayInput $in): object
     {
+        $tz = Location::query()->findOrFail($in->locationId)->timezone;
+
         $openShifts = DB::table('shifts as s')
             ->join('registers as r', 'r.id', '=', 's.register_id')
             ->join('users as u', 'u.id', '=', 's.opened_by')
@@ -40,7 +43,7 @@ final class GetBusinessDay
             ->join('registers as r', 'r.id', '=', 's.register_id')
             ->whereNotNull('s.closed_at')
             ->whereNull('s.variance_approved_at')
-            ->whereRaw('(s.closed_at at time zone (select timezone from locations where id = ?))::date = ?', [$in->locationId, $in->businessDate])
+            ->whereRaw('(s.closed_at at time zone ?)::date = ?', [$tz, $in->businessDate])
             ->where('r.location_id', $in->locationId)
             ->where('s.variance_cents', '<>', 0)
             ->count();
