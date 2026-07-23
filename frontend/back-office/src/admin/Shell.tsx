@@ -1,9 +1,9 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
 import { AppSidebar, type AppSidebarNavSection } from '../components/AppSidebar'
 import { api, type AdminUser, type Location } from '../lib/api'
+import { holdsSection, pathForSection, type Section } from './navigation'
 import { AuditSection } from './audit/AuditSection'
 import { CatalogSection } from './catalog/CatalogSection'
 import { EndOfDaySection } from './day/EndOfDaySection'
@@ -13,32 +13,17 @@ import { SettingsSection } from './settings/SettingsSection'
 import { TodaySection } from './today/TodaySection'
 import { UsersSection } from './users/UsersSection'
 
-export type Section = 'today' | 'catalog' | 'users' | 'locations' | 'reports' | 'audit' | 'settings' | 'day'
-
-/**
- * Section-permission → sidebar item, exact mapping from the brief (RBAC v2 Task 11).
- * `today` carries no entry — it's always visible regardless of `sections`. Everything
- * else needs at least one of its listed permissions held; `Shell` OR's the list, but the
- * two composite sections (Users, Reports) also read their two permissions individually
- * to decide which *tab* to show inside the section.
- */
-const SECTION_RULES: Record<Exclude<Section, 'today'>, string[]> = {
-  catalog: ['catalog.manage'],
-  users: ['user.manage', 'role.manage'],
-  locations: ['location.manage', 'register.enroll'],
-  reports: ['report.sales.view', 'report.stock.view'],
-  audit: ['audit.view'],
-  settings: ['settings.manage'],
-  day: ['day.close'],
-}
-
-function hasAny(sections: string[], required: string[]): boolean {
-  return required.some((permission) => sections.includes(permission))
-}
+// The section-permission mapping now lives in the registry (./navigation.ts —
+// SECTION_DEFS), which also owns each section's URL. `today` needs no permission.
+// The two composite sections (Users, Reports) still read their permissions
+// individually below to decide which *tab* to show inside the section.
+export type { Section } from './navigation'
 
 export function Shell({
   user,
   sections,
+  section,
+  onNavigate,
   onLogout,
   onUnauthorized,
   location,
@@ -50,6 +35,11 @@ export function Shell({
   // admin's is the full catalog; anyone else's is whatever `AdminAccess::sectionsFor`
   // computed from their roles/direct grants. Gates every nav item except Today.
   sections: string[]
+  // Controlled navigation (URL-driven): AdminApp resolves the pathname to a
+  // permission-checked Section and passes it down; nav clicks go back up as
+  // onNavigate → router.push. Shell never owns "where am I" anymore.
+  section: Section
+  onNavigate: (section: Section) => void
   onLogout: () => void
   // Threaded down to every section's queries/mutations: any 401 anywhere in the shell
   // drops back to the login screen the same way the register's onSessionExpired does.
@@ -60,17 +50,15 @@ export function Shell({
   locations: Location[]
   onLocationChange: (id: string) => void
 }) {
-  const [section, setSection] = useState<Section>('today')
-
-  const canManageCatalog = hasAny(sections, SECTION_RULES.catalog)
+  const canManageCatalog = holdsSection('catalog', sections)
   const canManageUsers = sections.includes('user.manage')
   const canManageRoles = sections.includes('role.manage')
-  const canManageLocations = hasAny(sections, SECTION_RULES.locations)
+  const canManageLocations = holdsSection('locations', sections)
   const canViewSalesReport = sections.includes('report.sales.view')
   const canViewStockReport = sections.includes('report.stock.view')
-  const canViewAudit = hasAny(sections, SECTION_RULES.audit)
-  const canManageSettings = hasAny(sections, SECTION_RULES.settings)
-  const canCloseDay = sections.includes('day.close')
+  const canViewAudit = holdsSection('audit', sections)
+  const canManageSettings = holdsSection('settings', sections)
+  const canCloseDay = holdsSection('day', sections)
 
   // Same query, same key, `TodaySection` itself uses for its low-stock KPI — React
   // Query dedupes this against TodaySection's request rather than firing a second one,
@@ -93,19 +81,28 @@ export function Shell({
     {
       eyebrow: 'Operations',
       items: [
-        { key: 'today', label: 'Today', count: lowStockCount > 0 ? lowStockCount : undefined },
-        ...(canManageCatalog ? [{ key: 'catalog', label: 'Catalog' }] : []),
-        ...(canManageUsers || canManageRoles ? [{ key: 'users', label: 'Users' }] : []),
-        ...(canManageLocations ? [{ key: 'locations', label: 'Locations & Registers' }] : []),
-        ...(canManageSettings ? [{ key: 'settings', label: 'Settings' }] : []),
-        ...(canCloseDay ? [{ key: 'day', label: 'End of Day' }] : []),
+        {
+          key: 'today',
+          label: 'Today',
+          href: pathForSection('today'),
+          count: lowStockCount > 0 ? lowStockCount : undefined,
+        },
+        ...(canManageCatalog ? [{ key: 'catalog', label: 'Catalog', href: pathForSection('catalog') }] : []),
+        ...(canManageUsers || canManageRoles ? [{ key: 'users', label: 'Users', href: pathForSection('users') }] : []),
+        ...(canManageLocations
+          ? [{ key: 'locations', label: 'Locations & Registers', href: pathForSection('locations') }]
+          : []),
+        ...(canManageSettings ? [{ key: 'settings', label: 'Settings', href: pathForSection('settings') }] : []),
+        ...(canCloseDay ? [{ key: 'day', label: 'End of Day', href: pathForSection('day') }] : []),
       ],
     },
     {
       eyebrow: 'Insights',
       items: [
-        ...(canViewSalesReport || canViewStockReport ? [{ key: 'reports', label: 'Reports' }] : []),
-        ...(canViewAudit ? [{ key: 'audit', label: 'Audit' }] : []),
+        ...(canViewSalesReport || canViewStockReport
+          ? [{ key: 'reports', label: 'Reports', href: pathForSection('reports') }]
+          : []),
+        ...(canViewAudit ? [{ key: 'audit', label: 'Audit', href: pathForSection('audit') }] : []),
       ],
     },
   ].filter((navSection) => navSection.items.length > 0)
@@ -115,7 +112,7 @@ export function Shell({
       <AppSidebar
         sections={navSections}
         active={section}
-        onNavigate={(key) => setSection(key as Section)}
+        onNavigate={(key) => onNavigate(key as Section)}
         location={location}
         locations={locations}
         onLocationChange={onLocationChange}

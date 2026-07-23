@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Shell } from './Shell'
+import type { Section } from './navigation'
 import { api, type SalesReport, type StockReportRow } from '../lib/api'
 
 afterEach(cleanup)
@@ -75,17 +76,25 @@ const ALL_SECTIONS = [
   'role.manage',
 ]
 
-function renderShell(stockRows: StockReportRow[] = [], onLogout = vi.fn(), sections: string[] = ALL_SECTIONS) {
+function renderShell(
+  stockRows: StockReportRow[] = [],
+  onLogout = vi.fn(),
+  sections: string[] = ALL_SECTIONS,
+  section: Section = 'today',
+) {
   vi.mocked(api.reports.sales).mockResolvedValue(EMPTY_SALES)
   vi.mocked(api.reports.stock).mockResolvedValue({ rows: stockRows })
   vi.mocked(api.registers.list).mockResolvedValue([])
   vi.mocked(api.audit.list).mockResolvedValue({ rows: [], page: 1, has_more: false })
+  const onNavigate = vi.fn()
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
       <Shell
         user={{ id: 'u-1', name: 'Alex Admin', email: 'alex@pos.test', is_admin: true }}
         sections={sections}
+        section={section}
+        onNavigate={onNavigate}
         onLogout={onLogout}
         onUnauthorized={vi.fn()}
         location={LOCATION}
@@ -94,6 +103,7 @@ function renderShell(stockRows: StockReportRow[] = [], onLogout = vi.fn(), secti
       />
     </QueryClientProvider>,
   )
+  return { onNavigate }
 }
 
 describe('Shell', () => {
@@ -101,7 +111,7 @@ describe('Shell', () => {
     renderShell()
 
     for (const label of ['Today', 'Catalog', 'Users', 'Locations & Registers', 'Reports', 'Audit']) {
-      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
     }
   })
 
@@ -115,17 +125,30 @@ describe('Shell', () => {
   it('defaults to Today as the active, rendered section', () => {
     renderShell()
 
-    expect(screen.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByText("What's happening at this location right now.")).toBeInTheDocument()
   })
 
-  it('navigates to a section on click', () => {
-    renderShell()
+  it('reports a nav click through onNavigate instead of navigating itself', () => {
+    const { onNavigate } = renderShell()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Catalog' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Catalog' }))
+
+    expect(onNavigate).toHaveBeenCalledExactlyOnceWith('catalog')
+  })
+
+  it('renders whichever section the prop names', () => {
+    renderShell([], vi.fn(), ALL_SECTIONS, 'catalog')
 
     expect(screen.getByText('Catalog stub')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Catalog' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Catalog' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('gives every nav item a real href for open-in-new-tab', () => {
+    renderShell()
+
+    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/reports')
   })
 
   it('fires onLogout when Sign out is pressed', () => {
@@ -140,14 +163,14 @@ describe('Shell', () => {
   it('shows no count badge on Today when nothing is low on stock', () => {
     renderShell()
 
-    const todayItem = screen.getByRole('button', { name: 'Today' }).closest('li') as HTMLElement
+    const todayItem = screen.getByRole('link', { name: 'Today' }).closest('li') as HTMLElement
     expect(within(todayItem).queryByText(/^\d+$/)).not.toBeInTheDocument()
   })
 
   it('badges Today with the low-stock count once the composed overview has rows', async () => {
     renderShell(LOW_STOCK_ROWS)
 
-    const todayItem = screen.getByRole('button', { name: 'Today' }).closest('li') as HTMLElement
+    const todayItem = screen.getByRole('link', { name: 'Today' }).closest('li') as HTMLElement
     expect(await within(todayItem).findByText('2')).toBeInTheDocument()
   })
 
@@ -157,11 +180,11 @@ describe('Shell', () => {
   it('shows only Today and Reports for a session scoped to report.sales.view', () => {
     renderShell([], vi.fn(), ['report.sales.view'])
 
-    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reports' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Today' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Reports' })).toBeInTheDocument()
 
     for (const label of ['Catalog', 'Users', 'Locations & Registers', 'Audit', 'Settings']) {
-      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: label })).not.toBeInTheDocument()
     }
   })
 
@@ -169,7 +192,7 @@ describe('Shell', () => {
     renderShell([], vi.fn(), ALL_SECTIONS)
 
     for (const label of ['Today', 'Catalog', 'Users', 'Locations & Registers', 'Reports', 'Audit', 'Settings']) {
-      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
     }
   })
 
@@ -178,7 +201,7 @@ describe('Shell', () => {
   it('renders no nav item for a section whose permission is not held, so it cannot be clicked', () => {
     renderShell([], vi.fn(), ['report.sales.view'])
 
-    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
     expect(screen.queryByText('Settings stub')).not.toBeInTheDocument()
   })
 })

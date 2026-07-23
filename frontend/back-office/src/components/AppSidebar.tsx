@@ -12,6 +12,7 @@ export interface AppSidebarLocation {
 export interface AppSidebarNavItem {
   key: string
   label: string
+  href: string
   count?: number
 }
 
@@ -80,10 +81,16 @@ export function AppSidebar({
                 const isActive = item.key === active
                 return (
                   <li key={item.key}>
-                    <button
-                      type="button"
+                    <a
+                      href={item.href}
                       aria-current={isActive ? 'page' : undefined}
-                      onClick={() => onNavigate(item.key)}
+                      onClick={(e) => {
+                        // Hijack only unmodified left-clicks — modified/middle clicks
+                        // keep native open-in-new-tab, which is why href is real.
+                        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+                        e.preventDefault()
+                        onNavigate(item.key)
+                      }}
                       className={cn(
                         'flex w-full items-center justify-between gap-xs border-l-2 border-transparent',
                         'px-xs py-sm text-left type-body-sm text-ink-muted hover:bg-surface-1',
@@ -94,7 +101,7 @@ export function AppSidebar({
                       {typeof item.count === 'number' ? (
                         <Badge variant="info">{item.count}</Badge>
                       ) : null}
-                    </button>
+                    </a>
                   </li>
                 )
               })}
