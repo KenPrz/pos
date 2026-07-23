@@ -22,7 +22,7 @@ the ones before it.
 | [manual/00-getting-started.md](manual/00-getting-started.md) | Everyone — enrollment, signing in, roles, the three surfaces. |
 | [manual/01-cashier-guide.md](manual/01-cashier-guide.md) | A cashier ringing up sales. |
 | [manual/02-supervisor-guide.md](manual/02-supervisor-guide.md) | A supervisor handling voids, discounts, refunds, or variance. |
-| [manual/03-manager-guide.md](manual/03-manager-guide.md) | A manager running catalog, staff, locations, or reports. |
+| [manual/03-manager-guide.md](manual/03-manager-guide.md) | A manager running catalog, staff, locations, reports, or the end-of-day close. |
 | [manual/04-operator-guide.md](manual/04-operator-guide.md) | Whoever installs, deploys, or backs up the system. |
 
 ## The five-line version

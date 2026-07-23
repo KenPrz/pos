@@ -8,6 +8,7 @@ operator who installs the system. Covers the register and the back office.
 | Version | Date | Changes |
 | --- | --- | --- |
 | 1.0 | 2026-07-22 | First edition: register, back office, troubleshooting, FAQ, glossary. |
+| 1.1 | 2026-07-23 | Added Chapter 14, End of Day (close, reopen, and what a closed day blocks). Later chapters renumbered. |
 
 # 1. Introduction
 
@@ -473,6 +474,12 @@ Check or edit the **Opening float**, then tap **Open drawer** — you're
 dropped straight into a new sale. If a shift's already open on this till,
 you skip this screen entirely.
 
+One thing can refuse an otherwise valid open: **"The business day is closed.
+Reopen it before opening a shift."** That means a manager has already closed
+this location's business day for that date (Chapter 14). It isn't a fault
+with the till, the PIN, or the float, and retyping won't clear it — only an
+admin can reopen the day, and the drawer opens normally the moment they do.
+
 ## Cash movements
 
 A payout, a deposit, a paid-in — any cash that moves in or out of the
@@ -546,10 +553,11 @@ you out of this till completely — you land back at **Enter PIN**.
 Everything in the back office sits behind one sign-in. Once you're in, a
 rail down the left holds every section your permissions unlock, under two
 headings — **Operations**: **Today**, **Catalog**, **Users**, **Locations &
-Registers**, **Settings**; **Insights**: **Reports**, **Audit**. **Today**
-always shows; every other section only appears if you hold a permission
-that unlocks it — an admin sees all seven, a manager granted only sales
-reporting sees **Today** and **Reports**. A **location switcher** sits above
+Registers**, **Settings**, **End of Day**; **Insights**: **Reports**,
+**Audit**. **Today** always shows; every other section only appears if you
+hold a permission that unlocks it — an admin sees all eight, a manager
+granted only sales reporting sees **Today** and **Reports**. A **location
+switcher** sits above
 the rail, and your name plus a **Sign out** button sit at the bottom.
 
 **Today**, **Reports**, and the **Stock** report all read whichever location
@@ -885,7 +893,103 @@ shows up as `admin.variant.update`, an activation-code issue as
 on for every entity in the system — not a separate history screen per
 entity.
 
-# 14. The desktop shell and printing
+# 14. End of Day
+
+Chapter 7 closed one drawer. This closes the whole store.
+
+**End of Day** is a back-office section, visible to an admin or anyone
+granted the **Close business day** permission. It reconciles every till at
+one location for one date, records the cash going to the bank, and freezes
+the result. It is the only thing in the system that can stop a shift from
+opening.
+
+![Figure 14.1 — End of Day for Manila Grocery: one till is still open, so the amber blocker shows and Close day stays disabled](assets/screenshots/034-bo-end-of-day.png)
+
+## The date is the store's, not yours
+
+The screen always shows one **location** — whichever the sidebar switcher is
+set to — and one **Business date**, which starts on that location's *own*
+local today. If you're managing a Manila store from another timezone, the
+date on this screen is Manila's day, not your browser's. You can look back at
+an earlier date; you can't pick a later one.
+
+## Close the day
+
+1. **End of Day** → confirm the **Business date** is the day you mean.
+2. Read the pills along the top. Amber ones are **blockers** — **"N open
+   shift(s) — close them first"** and **"N open order(s)"** — and **Close
+   day** stays greyed out while either stands.
+3. Check **Consolidated totals**: **Net sales**, **Tax**, **Expected cash**,
+   **Counted cash**, **Variance**, and the number of **Shifts** the day
+   covered.
+4. Fill in the **Close checklist** — tick **Cash drop confirmed**, enter the
+   **Deposit** going to the bank, and add **Spoilage / waste**, a **Note for
+   tomorrow**, or a general **Note**. All of it is optional; an empty
+   checklist still closes the day, and what you left blank is part of the
+   record.
+5. Tap **Close day** and confirm.
+
+> **Why cash can read zero while sales don't.** In Figure 14.1 the day has
+> ₱405.00 of net sales but **Expected cash**, **Counted cash**, and **Shifts**
+> all read zero. That's not a fault: the cash columns only count drawers that
+> have actually been *closed and counted*, and the one till here is still
+> open. Sales come from payments as they happen; cash comes from reconciled
+> drawers. Close the till and those figures fill in — which is exactly why an
+> open shift blocks the day close in the first place.
+
+A blue **"N unapproved variance(s)"** pill is a warning, not a blocker. It
+counts drawers that came up over or short past the approval threshold and
+haven't been signed off. The day closes anyway, on purpose — the same
+reasoning as Chapter 7's variance rule: a close that refuses over one
+unsigned drawer is a close that happens by unplugging something, and then
+there's no record at all.
+
+## What closing does — and what it doesn't
+
+Closing does exactly two things.
+
+- **It freezes the day's numbers.** The totals are copied onto the record as
+  they stood at the moment of close. A refund landing against that date
+  afterwards moves the live reports but never the frozen record — that is the
+  whole point of keeping one.
+- **It blocks new shifts.** Anyone opening a drawer at that location on that
+  date is refused: **"The business day is closed. Reopen it before opening a
+  shift."**
+
+Nothing else changes. Refunds, reports, receipts, and variance approvals on
+that date all still work. Closing a day is a reconciliation milestone, not a
+lock on the ledger.
+
+Closing is also a once-per-day act. Closing a day that's already closed is
+refused with **"That day is already closed."** rather than quietly
+overwriting the record, so a second tap can never rewrite a deposit figure
+somebody already signed off on.
+
+> **On the totals:** **Net sales** is ledger-basis — actual payments less
+> actual refunds — while **Tax** is read off the orders closed that day. A
+> refund therefore lowers net sales but not tax. It's the same split behind
+> the day-versus-category question in Chapter 17, and for the same reason:
+> the two numbers answer different questions and aren't meant to reconcile to
+> the cent.
+
+## Reopen a closed day
+
+Reopening is **admin only**. A manager holding **Close business day** can
+close but cannot reopen — reopening is what permits trading again on a date
+that was already signed off.
+
+1. **End of Day** → pick the closed date. A green **Day closed** pill shows,
+   with the checklist as it was filed.
+2. Type a **Reason for reopening**. It's required — **Reopen day** stays
+   disabled until there's something in the box.
+3. Tap **Reopen day** and confirm.
+
+Shifts can open on that date again immediately. When the day is closed a
+second time the totals are re-snapshotted from scratch, so the record
+reflects whatever happened in between. Every close and every reopen, with its
+reason, lands in the audit log (Chapter 13).
+
+# 15. The desktop shell and printing
 
 The register also ships as a desktop app — a Tauri v2 shell that hosts the
 very same SPA covered in Chapters 4–7, not a third frontend with its own

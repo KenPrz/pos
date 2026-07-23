@@ -28,10 +28,11 @@ device token involved.
 
 Once in, a rail down the left holds every section you hold a permission for, grouped
 under two headings — **Operations**: **Today**, **Catalog**, **Users**, **Locations &
-Registers**, **Settings**; **Insights**: **Reports**, **Audit**. **Today** always shows;
-every other section only appears if you hold the permission behind it, so two managers
-can see different rails depending on what each one was granted — a full admin sees all
-seven. A **location switcher** sits above the rail; **Today**, **Reports**, and
+Registers**, **Settings**, **End of Day**; **Insights**: **Reports**, **Audit**.
+**Today** always shows; every other section only appears if you hold the permission
+behind it, so two managers can see different rails depending on what each one was
+granted — a full admin sees all eight. A **location switcher** sits above the rail;
+**Today**, **Reports**, and
 **Stock** all read whichever location it's set to — there are no per-screen location
 pickers, and the switcher itself only offers locations your report permissions actually
 cover. Tap **Sign out**, at the bottom of the rail, when you're done.
@@ -337,6 +338,72 @@ the default" behavior as the per-location thresholds above.
 > the same way a letterhead change applies to every letter from then on, old and new
 > alike. That's different from Catalog (Chapter 9), where a repriced product's past
 > receipts deliberately never change.
+
+## End of Day
+
+**End of Day** (visible to **Admin** or anyone granted the **Close business day**
+permission) closes one location's trading day: you reconcile what every till did, record
+the cash going to the bank, and freeze the result. It's the layer above a drawer — a
+shift closes one register, End of Day closes the whole store for that date.
+
+The screen always shows one **location** (from the switcher above the rail) and one
+**Business date**, which starts on that location's *own* local today. That matters at a
+store in a different timezone from you: the date shown is the store's day, not your
+browser's. You can pick an earlier date, but never a later one.
+
+### Close the day
+
+1. **End of Day** → check the **Business date** is the day you mean.
+2. Read the pills across the top. Anything in amber is a **blocker** — **"N open
+   shift(s) — close them first"** or **"N open order(s)"** — and **Close day** stays
+   greyed out until both are clear.
+3. Check the **Consolidated totals** card: **Net sales**, **Tax**, **Expected cash**,
+   **Counted cash**, **Variance**, and how many **Shifts** the day covered.
+4. Fill in the **Close checklist**: tick **Cash drop confirmed**, type the **Deposit**
+   going to the bank, and add **Spoilage / waste**, a **Note for tomorrow**, or a general
+   **Note** if there's anything worth recording. Every one of these is optional — an
+   empty checklist closes the day just fine, and what you did or didn't fill in is part
+   of the record.
+5. Tap **Close day** and confirm.
+
+> Note: a blue **"N unapproved variance(s)"** pill is a *warning*, not a blocker — it
+> counts drawers that came up over or short by more than the approval threshold and
+> haven't been signed off yet. The day closes either way, deliberately: a day that
+> refuses to close over one unsigned drawer is a day that gets closed by other means,
+> and then there's no record at all. Chase the approval (Chapter 7's variance rules),
+> but don't let it hold the close hostage.
+
+### What closing actually does
+
+Two things, and only two.
+
+- **It freezes the day's numbers.** The totals are copied onto the record as they stood
+  at close. If a refund lands against that date afterwards, the live reports move but the
+  frozen record doesn't — that's the point of it.
+- **It blocks new shifts.** Anyone trying to open a drawer at that location on that date
+  is refused with **"The business day is closed. Reopen it before opening a shift."**
+
+Nothing else changes. Refunds, reports, and variance approvals on that date all still
+work — closing a day is a reconciliation milestone, not a lock on the ledger.
+
+> Note: closing is a once-per-day act. Closing an already-closed day is refused with
+> **"That day is already closed."** rather than quietly overwriting what's on file — so a
+> second tap can never rewrite a deposit figure somebody already signed off on.
+
+### Reopen a closed day
+
+Reopening is **Admin only** — not even a manager holding **Close business day** can do
+it, because reopening is what un-blocks trading on a date that was already signed off.
+
+1. **End of Day** → pick the closed date. The screen shows a green **Day closed** pill
+   and the checklist as it was filed.
+2. Type a **Reason for reopening** — it's required, and **Reopen day** stays disabled
+   until you've written one.
+3. Tap **Reopen day** and confirm.
+
+Shifts can open on that date again immediately. When the day is closed a second time, the
+totals are re-snapshotted from scratch, so the record reflects whatever happened in
+between. Every close and every reopen — with its reason — lands in the audit log.
 
 ## Reports
 
