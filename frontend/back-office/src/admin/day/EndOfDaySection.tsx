@@ -65,6 +65,17 @@ export function EndOfDaySection({
     if (query.error instanceof ApiError && query.error.status === 401) onUnauthorized()
   }, [query.error, onUnauthorized])
 
+  // Checklist/deposit form state is local, not derived from the fetched record — reset it
+  // whenever the selected date changes so a value typed for one day never gets carried
+  // over (and possibly submitted) against a different one.
+  useEffect(() => {
+    setDepositInput('')
+    setCashDrop(false)
+    setSpoilage('')
+    setNextDayNote('')
+    setReopenReason('')
+  }, [date])
+
   const closeMutation = useMutation({
     mutationFn: () =>
       api.day.close(locationId as string, {
@@ -127,7 +138,7 @@ export function EndOfDaySection({
             {!closed && status.open_orders_count > 0 && (
               <StatusPill tone="warning">{status.open_orders_count} open order(s)</StatusPill>
             )}
-            {status.unapproved_variance_count > 0 && (
+            {!closed && status.unapproved_variance_count > 0 && (
               <StatusPill tone="info">{status.unapproved_variance_count} unapproved variance(s)</StatusPill>
             )}
           </div>
