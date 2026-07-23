@@ -6,13 +6,14 @@ import { AppSidebar, type AppSidebarNavSection } from '../components/AppSidebar'
 import { api, type AdminUser, type Location } from '../lib/api'
 import { AuditSection } from './audit/AuditSection'
 import { CatalogSection } from './catalog/CatalogSection'
+import { EndOfDaySection } from './day/EndOfDaySection'
 import { PlacesSection } from './places/PlacesSection'
 import { ReportsSection } from './reports/ReportsSection'
 import { SettingsSection } from './settings/SettingsSection'
 import { TodaySection } from './today/TodaySection'
 import { UsersSection } from './users/UsersSection'
 
-export type Section = 'today' | 'catalog' | 'users' | 'locations' | 'reports' | 'audit' | 'settings'
+export type Section = 'today' | 'catalog' | 'users' | 'locations' | 'reports' | 'audit' | 'settings' | 'day'
 
 /**
  * Section-permission → sidebar item, exact mapping from the brief (RBAC v2 Task 11).
@@ -28,6 +29,7 @@ const SECTION_RULES: Record<Exclude<Section, 'today'>, string[]> = {
   reports: ['report.sales.view', 'report.stock.view'],
   audit: ['audit.view'],
   settings: ['settings.manage'],
+  day: ['day.close'],
 }
 
 function hasAny(sections: string[], required: string[]): boolean {
@@ -68,6 +70,7 @@ export function Shell({
   const canViewStockReport = sections.includes('report.stock.view')
   const canViewAudit = hasAny(sections, SECTION_RULES.audit)
   const canManageSettings = hasAny(sections, SECTION_RULES.settings)
+  const canCloseDay = sections.includes('day.close')
 
   // Same query, same key, `TodaySection` itself uses for its low-stock KPI — React
   // Query dedupes this against TodaySection's request rather than firing a second one,
@@ -95,6 +98,7 @@ export function Shell({
         ...(canManageUsers || canManageRoles ? [{ key: 'users', label: 'Users' }] : []),
         ...(canManageLocations ? [{ key: 'locations', label: 'Locations & Registers' }] : []),
         ...(canManageSettings ? [{ key: 'settings', label: 'Settings' }] : []),
+        ...(canCloseDay ? [{ key: 'day', label: 'End of Day' }] : []),
       ],
     },
     {
@@ -142,6 +146,13 @@ export function Shell({
         )}
         {section === 'audit' && <AuditSection onUnauthorized={onUnauthorized} />}
         {section === 'settings' && <SettingsSection onUnauthorized={onUnauthorized} />}
+        {section === 'day' && (
+          <EndOfDaySection
+            locationId={location?.id ?? null}
+            isAdmin={user?.is_admin ?? false}
+            onUnauthorized={onUnauthorized}
+          />
+        )}
       </div>
     </main>
   )

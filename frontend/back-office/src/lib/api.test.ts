@@ -108,3 +108,77 @@ describe('api.logout', () => {
     expect(adminToken.get()).toBeNull()
   })
 })
+
+describe('day api', () => {
+  it('exposes get/close/reopen/list as functions', () => {
+    expect(typeof api.day.get).toBe('function')
+    expect(typeof api.day.close).toBe('function')
+    expect(typeof api.day.reopen).toBe('function')
+    expect(typeof api.day.list).toBe('function')
+  })
+
+  it('builds the status URL with the location in the path and date in the query', async () => {
+    const fetchMock = stubFetch(() => jsonResponse({ data: { business_date: '2026-07-23' } }))
+
+    await api.day.get('loc-1', '2026-07-23')
+
+    const [url] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/admin/locations/loc-1/day?date=2026-07-23')
+  })
+
+  it('omits the date query param when no date is given', async () => {
+    const fetchMock = stubFetch(() => jsonResponse({ data: { business_date: '2026-07-23' } }))
+
+    await api.day.get('loc-1')
+
+    const [url] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/admin/locations/loc-1/day')
+    expect(String(url)).not.toContain('?date=')
+  })
+
+  it('posts the close body to the close endpoint and unwraps { data }', async () => {
+    const fetchMock = stubFetch(() =>
+      jsonResponse({
+        data: { id: 'day-1', location_id: 'loc-1', business_date: '2026-07-23', closed_by: 'user-1' },
+      }),
+    )
+
+    const record = await api.day.close('loc-1', { deposit_cents: 1000, checklist: { cash_drop_confirmed: true } })
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/admin/locations/loc-1/day/close')
+    expect(init?.method).toBe('POST')
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body).toEqual({ deposit_cents: 1000, checklist: { cash_drop_confirmed: true } })
+    expect(record.id).toBe('day-1')
+  })
+
+  it('posts the reopen body to the reopen endpoint', async () => {
+    const fetchMock = stubFetch(() =>
+      jsonResponse({ data: { id: 'day-1', location_id: 'loc-1', business_date: '2026-07-23', closed_by: 'user-1' } }),
+    )
+
+    await api.day.reopen('loc-1', { reason: 'miscounted deposit' })
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/admin/locations/loc-1/day/reopen')
+    expect(init?.method).toBe('POST')
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body).toEqual({ reason: 'miscounted deposit' })
+  })
+
+  it('lists business days for a location and unwraps { data: { items } }', async () => {
+    const fetchMock = stubFetch(() =>
+      jsonResponse({
+        data: { items: [{ id: 'day-1', location_id: 'loc-1', business_date: '2026-07-22', closed_by: 'user-1' }] },
+      }),
+    )
+
+    const days = await api.day.list('loc-1')
+
+    const [url] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/admin/locations/loc-1/days')
+    expect(days).toHaveLength(1)
+    expect(days[0].id).toBe('day-1')
+  })
+})

@@ -287,6 +287,18 @@ and a confirmed bug where a UI-created location got no roles provisioned at all.
 Suites: 527 backend / 113 register / 166 back-office. Full story in
 `docs/06-roadmap.md`; rule in `docs/05-rbac.md`.
 
+**End Of Day complete** — a location-scoped business-day close for the back office: a
+new `business_days` table (per-location reconciliation snapshot, not a ledger — closed
+iff a row exists and `reopened_at is null`), three actions
+(`CloseBusinessDay`/`ReopenBusinessDay`/`GetBusinessDay`), one write-path guard
+(`OpenShift` refuses to open on a closed day, `409 day_closed`), and one new
+admin-tier permission (`day.close`, granted by no default role, doubling as the
+back-office End-Of-Day section; reopen is `is_admin` only). Closing a day is rejected
+if any shift is open or any order is still open, and re-closing an already-closed day is
+`409 day_already_closed` — the frozen record is never silently overwritten. The register
+app is untouched. Suites: 555 backend / 113 register / 177 back-office. Full story in
+`docs/06-roadmap.md`.
+
 Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
 trigger that would revive each (monitoring, load test, runbook, registry/CD, and more).
 
