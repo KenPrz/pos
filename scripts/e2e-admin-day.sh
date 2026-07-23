@@ -237,6 +237,40 @@ VARIANCE=$(echo "$CLOSE" | jq .data.variance_cents)
 [ "$VARIANCE" = "0" ] || fail "shift should reconcile clean, got variance $VARIANCE"
 echo "34. shift closed clean: counted=5510 variance=0"
 
+# --- 9. End of Day: close, prove day_closed blocks a new shift, reopen, prove it lifts ---
+
+DAY_CLOSE=$(req POST "/admin/locations/$GROCERY_ID/day/close" -H "$AD" \
+  -d '{"deposit_cents":5000,"checklist":{"cash_drop_confirmed":true,"spoilage_note":"","next_day_note":"e2e"},"note":null}')
+[ "$(echo "$DAY_CLOSE" | jq .data.shift_count)" = "1" ] || fail "day close should report shift_count=1, got $(echo "$DAY_CLOSE" | jq .data.shift_count)"
+[ "$(echo "$DAY_CLOSE" | jq .data.expected_cash_cents)" = "5510" ] || fail "day close expected_cash_cents should be 5510, got $(echo "$DAY_CLOSE" | jq .data.expected_cash_cents)"
+echo "35. business day closed: shift_count=1, expected_cash=5510"
+
+# Closing the shift above revoked every staff session bound to Till 1, so Eve's $S
+# token is dead — re-login her to get a live one before proving the day_closed guard.
+LOGIN_EVE2=$(req POST /staff/login -H "$D" -d "{\"pin\":\"$E2E_PIN\"}")
+EVE_TOKEN2=$(echo "$LOGIN_EVE2" | jq -r .data.staff_token)
+S2="X-Staff-Token: $EVE_TOKEN2"
+echo "36. Eve re-logged in at Till 1 (her prior session died with the shift close) for a live staff token"
+
+GUARD_BODY=$(curl -s -X POST "$API/shifts/open" -H "$J" -H "$D" -H "$S2" -d '{"opening_float_cents":5000}')
+GUARD_CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/shifts/open" -H "$J" -H "$D" -H "$S2" -d '{"opening_float_cents":5000}')
+[ "$GUARD_CODE" = "409" ] || fail "expected 409 opening a shift on a closed day, got $GUARD_CODE"
+[ "$(echo "$GUARD_BODY" | jq -r .error.code)" = "day_closed" ] || fail "expected error.code=day_closed, got $(echo "$GUARD_BODY" | jq -r .error.code)"
+echo "37. OpenShift on the closed day correctly refused: 409 day_closed"
+
+REOPEN=$(req POST "/admin/locations/$GROCERY_ID/day/reopen" -H "$AD" -d '{"reason":"e2e reopen"}')
+[ "$(echo "$REOPEN" | jq -r .data.reopened_at)" != "null" ] || fail "reopen did not set reopened_at"
+echo "38. business day reopened: reopened_at=$(echo "$REOPEN" | jq -r .data.reopened_at)"
+
+NEW_SHIFT=$(req POST /shifts/open -H "$D" -H "$S2" -d '{"opening_float_cents":5000}')
+NEW_SHIFT_ID=$(echo "$NEW_SHIFT" | jq -r .data.shift.id)
+[ -n "$NEW_SHIFT_ID" ] && [ "$NEW_SHIFT_ID" != "null" ] || fail "expected a shift to open once the day was reopened"
+echo "39. OpenShift succeeds again once reopened: new shift $NEW_SHIFT_ID"
+
+CLOSE2=$(req POST "/shifts/$NEW_SHIFT_ID/close" -H "$D" -H "$S2" -H "Idempotency-Key: $(uuidgen)" -d '{"counted_cash_cents":5000}')
+[ "$(echo "$CLOSE2" | jq -r .data.shift.closed_at)" != "null" ] || fail "the reopened-day shift should close cleanly"
+echo "40. reopened-day shift closed clean, stack left tidy"
+
 echo
 echo "=== Admin day summary ==="
 printf "%-22s %s\n" "Location" "Manila Grocery (GRC)"
@@ -254,3 +288,7 @@ printf "%-26s %s\n" "Sales report (user)" "Eve=510 (ledger)"
 echo
 printf "%-10s %10s %10s %10s %10s\n" "Shift" "Float" "Expected" "Counted" "Variance"
 printf "%-10s %10s %10s %10s %10s\n" "Till 1" "5000" "5510" "5510" "0"
+echo
+printf "%-26s %s\n" "End of Day (GRC)" "closed: shift_count=1, expected_cash=5510"
+printf "%-26s %s\n" "  guard proven" "OpenShift on closed day -> 409 day_closed"
+printf "%-26s %s\n" "  reopened" "admin reopen -> new shift opened + closed clean"
