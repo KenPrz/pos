@@ -60,6 +60,9 @@ final class Permissions
     public const string STOCK_COUNT = 'stock.count';
     public const string STOCK_MOVEMENTS_VIEW = 'stock.movements.view';
 
+    // End of day (business-day close). Admin-tier, not a role default, not MONEY_LEAVES.
+    public const string DAY_CLOSE = 'day.close';
+
     /**
      * Every permission that can be used to remove money from a till without a customer
      * noticing. Supervisor-or-above, always.
@@ -120,6 +123,7 @@ final class Permissions
             self::STOCK_RECEIVE,
             self::STOCK_COUNT,
             self::STOCK_MOVEMENTS_VIEW,
+            self::DAY_CLOSE,
         ];
     }
 
@@ -177,7 +181,7 @@ final class Permissions
         return [
             'Orders' => [self::ORDER_OPEN, self::ORDER_LINE_ADD, self::ORDER_LINE_UPDATE, self::ORDER_LINE_VOID, self::ORDER_DISCOUNT_APPLY, self::ORDER_VOID, self::ORDER_REOPEN, self::ORDER_TRANSFER],
             'Payments & refunds' => [self::PAYMENT_TAKE, self::PAYMENT_VOID, self::REFUND_CREATE],
-            'Shifts & drawer' => [self::SHIFT_OPEN, self::SHIFT_CLOSE, self::SHIFT_CASH_MOVEMENT, self::SHIFT_APPROVE_VARIANCE, self::DRAWER_NO_SALE],
+            'Shifts & drawer' => [self::SHIFT_OPEN, self::SHIFT_CLOSE, self::SHIFT_CASH_MOVEMENT, self::SHIFT_APPROVE_VARIANCE, self::DRAWER_NO_SALE, self::DAY_CLOSE],
             'Administration' => [self::CATALOG_VIEW, self::CATALOG_MANAGE, self::USER_MANAGE, self::LOCATION_MANAGE, self::REGISTER_ENROLL, self::SETTINGS_MANAGE, self::ROLE_MANAGE],
             'Reports' => [self::REPORT_Z_VIEW, self::REPORT_SALES_VIEW, self::REPORT_STOCK_VIEW, self::AUDIT_VIEW],
             'Stock' => [self::STOCK_ADJUST, self::STOCK_RECEIVE, self::STOCK_COUNT, self::STOCK_MOVEMENTS_VIEW],

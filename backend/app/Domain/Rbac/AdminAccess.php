@@ -19,6 +19,7 @@ final class AdminAccess
         Permissions::CATALOG_MANAGE, Permissions::USER_MANAGE, Permissions::LOCATION_MANAGE,
         Permissions::REGISTER_ENROLL, Permissions::AUDIT_VIEW, Permissions::REPORT_SALES_VIEW,
         Permissions::REPORT_STOCK_VIEW, Permissions::SETTINGS_MANAGE, Permissions::ROLE_MANAGE,
+        Permissions::DAY_CLOSE,
     ];
 
     public function holdsAnywhere(User $user, string $permission): bool
