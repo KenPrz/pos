@@ -32,9 +32,10 @@ final class CloseBusinessDay
     {
         return DB::transaction(function () use ($in): BusinessDay {
             // Re-closing an already-closed (un-reopened) day would silently overwrite the
-            // frozen record — reject it instead. lockForUpdate also serializes two
-            // concurrent closes of the same location-date: the loser blocks here rather
-            // than racing the guards below and hitting the upsert together.
+            // frozen record — reject it instead. lockForUpdate serializes concurrent
+            // closes only once the row EXISTS (a re-close, or a close after reopen); two
+            // racing FIRST closes lock nothing and are settled by the unique index
+            // instead, surfacing as a constraint violation rather than this clean 409.
             $existing = BusinessDay::query()
                 ->where('location_id', $in->locationId)->where('business_date', $in->businessDate)
                 ->lockForUpdate()->first();
