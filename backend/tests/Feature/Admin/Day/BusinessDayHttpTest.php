@@ -70,3 +70,23 @@ it('lets a non-admin holder read the day but only admins reopen it', function ()
     // reopen is is_admin only — a day.close holder is still refused
     $this->postJson("/api/v1/admin/locations/{$location->id}/day/reopen", ['reason' => 'x'], $holderHeaders)->assertStatus(403);
 });
+
+it('scopes day.close to the location it was granted at, not every location', function (): void {
+    [$locationA, , , ] = dayHttpFixture();
+    $locationB = provisionedLocation(['code' => 'HB', 'timezone' => 'Asia/Manila']);
+
+    $user = User::factory()->create(['email' => fake()->unique()->safeEmail(), 'password_hash' => Hash::make('pw')]);
+    app(PermissionAssignments::class)->sync($user, [['location_id' => $locationA->id, 'permission' => Permissions::DAY_CLOSE]]);
+    $headers = ['Authorization' => 'Bearer '.$user->createToken('t')->plainTextToken];
+
+    // holds day.close at A — reading A's day succeeds
+    $this->getJson("/api/v1/admin/locations/{$locationA->id}/day", $headers)->assertOk();
+
+    // does not hold it at B — refused on both read and close
+    $this->getJson("/api/v1/admin/locations/{$locationB->id}/day", $headers)->assertStatus(403);
+    $this->postJson("/api/v1/admin/locations/{$locationB->id}/day/close", [
+        'deposit_cents' => 0,
+        'checklist' => ['cash_drop_confirmed' => true, 'spoilage_note' => '', 'next_day_note' => ''],
+        'note' => null,
+    ], $headers)->assertStatus(403);
+});
