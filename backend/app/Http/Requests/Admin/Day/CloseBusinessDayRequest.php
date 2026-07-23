@@ -18,6 +18,9 @@ final class CloseBusinessDayRequest extends FormRequest
 {
     use AuthorizesBackOffice;
 
+    /** @var list<string> */
+    private const CHECKLIST_KEYS = ['cash_drop_confirmed', 'spoilage_note', 'next_day_note'];
+
     public function authorize(): bool
     {
         return $this->allowsBackOffice(Permissions::DAY_CLOSE);
@@ -38,12 +41,35 @@ final class CloseBusinessDayRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        $validator->after(function (): void {
+        $validator->after(function (Validator $validator): void {
             $user = $this->user();
             if ($user instanceof User && ! $user->is_admin) {
                 $allowed = app(AdminAccess::class)->locationIdsWhere($user, Permissions::DAY_CLOSE) ?? [];
                 if (! in_array($this->route('location'), $allowed, true)) {
                     throw new AuthorizationException;
+                }
+            }
+
+            // "Today" is the LOCATION'S local today, never the server's — a naive
+            // before_or_equal:today rule would compare against the wrong clock. A future
+            // date here would freeze a day that hasn't happened yet and block OpenShift
+            // on it, so reject rather than silently accepting a typo.
+            $date = $this->string('date')->toString();
+            if ($date !== '') {
+                $location = Location::query()->find((string) $this->route('location'));
+                if ($location !== null && $date > now($location->timezone)->toDateString()) {
+                    $validator->errors()->add('date', 'The date may not be in the future.');
+                }
+            }
+
+            // `checklist` is fixed-key (docs/02-data-model.md) — 'present','array' alone
+            // lets arbitrary extra keys ride into the jsonb column, so reject anything
+            // outside the three known ones explicitly.
+            $checklist = $this->input('checklist');
+            if (is_array($checklist)) {
+                $unknown = array_diff(array_keys($checklist), self::CHECKLIST_KEYS);
+                if ($unknown !== []) {
+                    $validator->errors()->add('checklist', 'Unknown checklist key(s): '.implode(', ', $unknown).'.');
                 }
             }
         });

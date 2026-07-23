@@ -6,6 +6,7 @@ namespace App\Actions\Admin\Day;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Day\DayTotals;
+use App\Exceptions\Domain\DayAlreadyClosed;
 use App\Exceptions\Domain\DayHasOpenOrders;
 use App\Exceptions\Domain\DayHasOpenShifts;
 use App\Models\BusinessDay;
@@ -15,7 +16,9 @@ use Illuminate\Support\Facades\DB;
  * Freezes one location's local day: reconcile every drawer, record the deposit + a fixed
  * checklist, snapshot the totals from the ledgers. Preconditions — every shift closed,
  * zero open orders — are the reconciliation contract; unapproved variances DON'T block
- * (same philosophy as variance itself). Re-closing a reopened day updates the one row.
+ * (same philosophy as variance itself). Re-closing a reopened day re-snapshots the one
+ * row; re-closing a day that's still closed (never reopened since) is rejected —
+ * `409 day_already_closed` — the frozen record is never silently overwritten.
  * See the End-Of-Day design and docs/02-data-model.md.
  */
 final class CloseBusinessDay
@@ -28,6 +31,22 @@ final class CloseBusinessDay
     public function execute(CloseBusinessDayInput $in): BusinessDay
     {
         return DB::transaction(function () use ($in): BusinessDay {
+            // Re-closing an already-closed (un-reopened) day would silently overwrite the
+            // frozen record — reject it instead. lockForUpdate also serializes two
+            // concurrent closes of the same location-date: the loser blocks here rather
+            // than racing the guards below and hitting the upsert together.
+            $existing = BusinessDay::query()
+                ->where('location_id', $in->locationId)->where('business_date', $in->businessDate)
+                ->lockForUpdate()->first();
+            if ($existing !== null && $existing->reopened_at === null) {
+                throw new DayAlreadyClosed($in->locationId, $in->businessDate);
+            }
+
+            // Known check-then-act window: these guards read `shifts`/`orders`, then this
+            // action writes `business_days` — while `OpenShift` reads `business_days` then
+            // writes `shifts`. Under READ COMMITTED with no predicate locking, a shift can
+            // slip open in the gap right after this check. Bounded, once-a-day admin op —
+            // accepted rather than escalating to table-level locking.
             $openShifts = DB::table('shifts as s')
                 ->join('registers as r', 'r.id', '=', 's.register_id')
                 ->whereNull('s.closed_at')

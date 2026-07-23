@@ -9,9 +9,16 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The snapshot for one location's local day, read from the ledgers — never a running
- * total. Sales/refunds/tax key on `orders.business_date` (ledger + order basis, same
- * source as SalesReport::byDay). Cash sums the shifts whose `closed_at`, in the location
- * timezone, lands on that date — the drawers counted at that day's close.
+ * total. Cash sums the shifts whose `closed_at`, in the location timezone, lands on that
+ * date — the drawers counted at that day's close.
+ *
+ * `gross`/`refunds`/`net` are LEDGER-basis: read from `payments` (captured only) and
+ * `refunds`, same source and same basis as SalesReport::byDay. `tax`, however, is
+ * ORDER-basis: `sum(orders.tax_cents)` for closed orders on the date, because a refund
+ * writes no order rows and so has nothing to subtract there. The consequence: a refund
+ * lowers `net_sales_cents` but leaves `tax_cents` untouched, so the two do not reconcile
+ * inside one frozen `business_days` row — deliberate (mirrors the same split call made in
+ * SalesReport's own docblock), not a bug to "fix" by joining refunds into the tax sum.
  *
  * ponytail: shifts carry no business_date column; a shift crossing midnight is attributed
  * to the day it closed. Add a shifts.business_date column only if exact overnight

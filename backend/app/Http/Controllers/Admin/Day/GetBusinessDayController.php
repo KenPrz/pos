@@ -18,6 +18,7 @@ final class GetBusinessDayController
 
         return response()->json(['data' => [
             'business_date' => $view->business_date,
+            'location_today' => $view->location_today,
             'closable' => $view->closable,
             'open_shifts' => $view->open_shifts,
             'open_orders_count' => $view->open_orders_count,

@@ -359,18 +359,29 @@ totals, here's the cash that went to the bank." It reads from the same ledgers `
 and `SalesReport` already read (`03-api.md`) and never mutates them.
 
 **A business day is closed iff a row exists AND `reopened_at is null`.** The `unique
-(location_id, business_date)` is the entire "close a day once" invariant — structural, in
-the taste of `one_open_shift_per_register` above. The paired `check` on `reopened_*`
-mirrors the `variance_approved_*` pairing on `shifts`: "reopened" and "reopened by whom,
-when" are inseparable at the schema level, the same way "closed" and "counted" are.
-Reopening never deletes the row — it sets `reopened_at`/`reopened_by`, and a later close
-re-snapshots the same row and clears them, so the audit log carries the full
-close→reopen→close history even though only one row ever exists per location-date.
+(location_id, business_date)` bounds the row to one-per-location-date — the same
+`one_open_shift_per_register` taste — but because `CloseBusinessDay` writes through
+`updateOrCreate` keyed on that same pair, the unique index alone does not stop a *second*
+close of an already-closed day; it would simply match and overwrite. Rejecting a re-close
+(`409 day_already_closed`) is therefore an application-layer check in the action (a
+`lockForUpdate` read before the guards), not a structural one. The paired `check` on
+`reopened_*` mirrors the `variance_approved_*` pairing on `shifts`: "reopened" and
+"reopened by whom, when" are inseparable at the schema level, the same way "closed" and
+"counted" are. Reopening never deletes the row — it sets `reopened_at`/`reopened_by`, and
+a later close re-snapshots the same row and clears them, so the audit log carries the
+full close→reopen→close history even though only one row ever exists per location-date.
 
 `checklist` holds fixed keys — `cash_drop_confirmed`, `spoilage_note`, `next_day_note` —
 no separate table, no admin-configurable items. `deposit_cents` is its own column, not a
 checklist key, because it's money. Skipping a checklist item is allowed and recorded: the
 manager owns the call, and the row shows exactly what they did.
+
+**The snapshot mixes two bases.** `gross_sales_cents`/`refunds_cents`/`net_sales_cents`
+are ledger-basis (`payments`/`refunds`), but `tax_cents` is order-basis
+(`sum(orders.tax_cents)`) because a refund writes no order rows to subtract from. A
+refund therefore lowers `net_sales_cents` without lowering `tax_cents` — the frozen row's
+own numbers don't reconcile against each other by design (`DayTotals`'s docblock, and the
+same split `SalesReport` documents for its own totals).
 
 ---
 

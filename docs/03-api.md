@@ -137,7 +137,7 @@ One envelope (`01-architecture.md`):
 | 401 | `invalid_device_token`, `invalid_pin`, `staff_session_expired`, `invalid_credentials`, `invalid_activation_code`, `activation_code_expired` |
 | 403 | `forbidden`, `requires_supervisor`, `discount_needs_supervisor`, `wrong_location` (mostly structural — location scoping yields 404s; reserved for record/register location disagreements) |
 | 404 | `not_found` |
-| 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders`, `line_already_voided`, `payment_already_voided`, `payment_shift_closed`, `day_closed`, `day_has_open_shifts`, `day_has_open_orders`, `day_not_closed` |
+| 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders`, `line_already_voided`, `payment_already_voided`, `payment_shift_closed`, `day_closed`, `day_has_open_shifts`, `day_has_open_orders`, `day_not_closed`, `day_already_closed` |
 | 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use`, `split_too_fine`, `self_lockout`, `role_template_in_use`, `role_template_is_system` |
 | 429 | `too_many_pin_attempts`, `too_many_requests` |
 
@@ -703,13 +703,13 @@ even though no single key is itself money-moving.
 
 ```
 GET  /api/v1/admin/locations/{location}/day?date=YYYY-MM-DD
-  → { business_date, snapshot, open_shifts[], open_orders_count,
+  → { business_date, location_today, snapshot, open_shifts[], open_orders_count,
       unapproved_variance_count, closable, record }
 
 POST /api/v1/admin/locations/{location}/day/close
   { "deposit_cents": 40000, "checklist": { "cash_drop_confirmed": true,
     "spoilage_note": "", "next_day_note": "" }, "note": null }
-  → { business_day }               # 409 day_has_open_shifts, day_has_open_orders
+  → { business_day }       # 409 day_has_open_shifts, day_has_open_orders, day_already_closed
 
 POST /api/v1/admin/locations/{location}/day/reopen                    # is_admin only
   { "reason": "miscount" }
@@ -722,11 +722,27 @@ GET  /api/v1/admin/locations/{location}/days
 
 The location-scoped layer above a shift: reconcile every drawer, record the bank deposit
 and a fixed checklist, and freeze an immutable day record. `GET .../day` powers the
-End-Of-Day screen — live totals if the day is still open, the persisted snapshot once
-closed — plus `closable` (no open shifts, no open orders) and the blockers/warnings that
-explain why not: `open_shifts`/`open_orders_count` block the close, an unapproved
-variance only warns (same non-blocking philosophy as variance itself). `date` defaults
-to the location's local today when omitted.
+End-Of-Day screen — `snapshot` is computed live off the ledgers while the day is still
+open, and read straight from the persisted `business_days` row's own eight columns once
+closed (never recomputed against the live ledger again) — plus `closable` (no open
+shifts, no open orders) and the blockers/warnings that explain why not:
+`open_shifts`/`open_orders_count` block the close, an unapproved variance over the
+location's variance-approval threshold only warns (same non-blocking philosophy as
+variance itself; a variance at or under threshold isn't even approvable, so it's never
+counted here). `date` defaults to the location's local today when omitted; `location_today`
+is always the location's local today (`Y-m-d`) regardless of what `date` was requested,
+for a UI that needs it without trusting the browser's own clock/timezone.
+
+Closing rejects a `date` later than the location's local today (`400 validation_failed`),
+and rejects re-closing a day that's already closed and hasn't been reopened since
+(`409 day_already_closed`) — the persisted record is immutable once closed; only a
+reopen followed by a new close may change it, and that re-close re-snapshots the whole
+row and clears `reopened_at`/`reopened_by`.
+
+`snapshot`/the close record mix two bases: `gross_sales_cents`/`refunds_cents`/
+`net_sales_cents` are ledger-basis, `tax_cents` is order-basis, and a refund lowers the
+former without lowering the latter — the two do not reconcile against each other inside
+one record by design (`02-data-model.md`).
 
 `GET|POST .../day` and `GET .../days` are gated `day.close`, location-scoped like the
 report endpoints below. **Reopen is `is_admin` only** — it is the sole action that

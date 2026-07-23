@@ -4,25 +4,23 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin\Day;
 
+use App\Actions\Admin\Day\ListBusinessDays;
 use App\Http\Requests\Admin\Day\GetBusinessDayRequest;
 use App\Http\Resources\Admin\BusinessDayResource;
-use App\Models\BusinessDay;
+use Illuminate\Http\JsonResponse;
 
 /**
- * The day-close record for a location — most recent first, last 60 days. Reuses
- * GetBusinessDayRequest purely for its authorize()/location-scope; the `date` rule is
- * harmless here (unused).
+ * Reuses GetBusinessDayRequest purely for its authorize()/location-scope; the `date`
+ * rule is harmless here (unused).
  */
 final class ListBusinessDaysController
 {
-    public function __invoke(GetBusinessDayRequest $request): object
+    public function __invoke(GetBusinessDayRequest $request, ListBusinessDays $action): JsonResponse
     {
-        $rows = BusinessDay::query()
-            ->where('location_id', (string) $request->route('location'))
-            ->orderByDesc('business_date')
-            ->limit(60)
-            ->get();
+        $rows = $action->execute((string) $request->route('location'));
 
-        return BusinessDayResource::collection($rows);
+        return response()->json([
+            'data' => ['items' => BusinessDayResource::collection($rows)],
+        ]);
     }
 }
