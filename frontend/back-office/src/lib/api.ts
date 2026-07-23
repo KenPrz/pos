@@ -432,6 +432,65 @@ export type AuditPage = { rows: AuditLogEntry[]; page: number; has_more: boolean
 
 export type Setting = { key: string; value: string | null; source: 'db' | 'config' }
 
+// ---------------------------------------------------------------------------
+// End of day (Task 10) — verified against BusinessDayResource.php and the
+// business-day status/close/reopen/list controllers.
+// ---------------------------------------------------------------------------
+
+export type DayChecklist = {
+  cash_drop_confirmed?: boolean
+  spoilage_note?: string
+  next_day_note?: string
+}
+
+export type BusinessDayTotals = {
+  gross_sales_cents: number
+  refunds_cents: number
+  net_sales_cents: number
+  tax_cents: number
+  expected_cash_cents: number
+  counted_cash_cents: number
+  variance_cents: number
+  shift_count: number
+}
+
+export type BusinessDayRecord = {
+  id: string
+  location_id: string
+  business_date: string
+  closed_by: string
+  closed_at: string | null
+  deposit_cents: number
+  checklist: DayChecklist
+  note: string | null
+  reopened_at: string | null
+  reopened_by: string | null
+} & BusinessDayTotals
+
+export type BusinessDayOpenShift = {
+  register_id: string
+  register_name: string
+  shift_id: string
+  opened_by_name: string
+}
+
+export type BusinessDayStatus = {
+  business_date: string
+  closable: boolean
+  open_shifts: BusinessDayOpenShift[]
+  open_orders_count: number
+  unapproved_variance_count: number
+  totals: BusinessDayTotals
+  record: BusinessDayRecord | null
+}
+
+export type CloseDayBody = {
+  deposit_cents: number
+  checklist: DayChecklist
+  note?: string | null
+  date?: string
+}
+
 /**
  * Build a query string from a flat params object, dropping `undefined`/empty values —
  * every report/audit filter is optional-by-omission, never sent as the literal string
@@ -533,6 +592,21 @@ export const api = {
   },
   audit: {
     list: (params: AuditParams): Promise<AuditPage> => request<AuditPage>(`/admin/audit${qs(params)}`),
+  },
+
+  // End of day (Task 10) — verified against BusinessDayResource.php. `get` reads the
+  // current (or `date`-given) business day's status; `close`/`reopen` are POST actions
+  // that return the full BusinessDayRecord; `list` returns the location's closed-day
+  // history. All four unwrap `{ data }` the same way every other call above does.
+  day: {
+    get: (locationId: string, date?: string): Promise<BusinessDayStatus> =>
+      request<BusinessDayStatus>(`/admin/locations/${locationId}/day${qs(date ? { date } : {})}`),
+    close: (locationId: string, body: CloseDayBody): Promise<BusinessDayRecord> =>
+      post<BusinessDayRecord>(`/admin/locations/${locationId}/day/close`, body),
+    reopen: (locationId: string, body: { reason: string; date?: string }): Promise<BusinessDayRecord> =>
+      post<BusinessDayRecord>(`/admin/locations/${locationId}/day/reopen`, body),
+    list: (locationId: string): Promise<BusinessDayRecord[]> =>
+      request<BusinessDayRecord[]>(`/admin/locations/${locationId}/days`),
   },
 
   // Settings (Task 11) — `update` sends only the changed keys, `null` clearing an
