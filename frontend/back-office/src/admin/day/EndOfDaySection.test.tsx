@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EndOfDaySection } from './EndOfDaySection'
-import { api, type BusinessDayRecord, type BusinessDayStatus } from '../../lib/api'
+import { ApiError, api, type BusinessDayRecord, type BusinessDayStatus } from '../../lib/api'
 import { setCurrency } from '../../lib/currency'
 
 afterEach(cleanup)
@@ -20,12 +20,17 @@ vi.mock('../../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/api')>()
   return {
     ...actual,
-    api: { ...actual.api, day: { ...actual.api.day, get: vi.fn() } },
+    api: { ...actual.api, day: { ...actual.api.day, get: vi.fn(), close: vi.fn() } },
   }
 })
 
+// `location_today` is the location's local "today" (final-review FIX A/4) — present on
+// every response regardless of which date was queried. The component now reads it for
+// the date picker's `max` instead of the browser's own UTC clock, so every fixture below
+// needs it even where it simply agrees with `business_date`.
 const OPEN_STATUS: BusinessDayStatus = {
   business_date: '2026-07-23',
+  location_today: '2026-07-23',
   closable: false,
   open_shifts: [{ register_id: 'r1', register_name: 'Till 1', shift_id: 's1', opened_by_name: 'Ana' }],
   open_orders_count: 0,
@@ -113,5 +118,24 @@ describe('EndOfDaySection', () => {
     expect(screen.getByLabelText(/reason for reopening/i)).toBeInTheDocument()
     // Empty reason keeps the reopen button disabled until a reason is typed.
     expect(screen.getByRole('button', { name: /reopen day/i })).toBeDisabled()
+  })
+
+  it('renders an error message when closing the day fails (final-review FIX B)', async () => {
+    vi.mocked(api.day.get).mockResolvedValue({ ...OPEN_STATUS, closable: true, open_shifts: [] })
+    vi.mocked(api.day.close).mockRejectedValue(
+      new ApiError('day_has_open_shifts', 'Every shift must be closed before the day can close.', 409),
+    )
+    renderSection('loc1')
+
+    const closeButton = await screen.findByRole('button', { name: /^close day$/i })
+    expect(closeButton).toBeEnabled()
+    fireEvent.click(closeButton)
+
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /^close day$/i }))
+
+    expect(await screen.findByText('Every shift must be closed before the day can close.')).toBeInTheDocument()
+    // The mutation is no longer pending once it has rejected, so the button re-enables.
+    expect(screen.getByRole('button', { name: /^close day$/i })).toBeEnabled()
   })
 })

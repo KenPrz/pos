@@ -476,6 +476,12 @@ export type BusinessDayOpenShift = {
 
 export type BusinessDayStatus = {
   business_date: string
+  // The location's own local "today" (its timezone, not the browser's) — the date
+  // picker's default and its `max` both derive from this, never from the browser's
+  // clock (final-review FIX 4/A). Present on every GET regardless of which `date` was
+  // queried; it answers "what date is it AT THE LOCATION right now", not "what date did
+  // I ask about".
+  location_today: string
   closable: boolean
   open_shifts: BusinessDayOpenShift[]
   open_orders_count: number
@@ -605,8 +611,11 @@ export const api = {
       post<BusinessDayRecord>(`/admin/locations/${locationId}/day/close`, body),
     reopen: (locationId: string, body: { reason: string; date?: string }): Promise<BusinessDayRecord> =>
       post<BusinessDayRecord>(`/admin/locations/${locationId}/day/reopen`, body),
+    // `{ items: [...] }`, same envelope every other list endpoint in this file unwraps —
+    // ListBusinessDaysController matches ListLocationsController's shape (final-review
+    // FIX C/6), not the bare array this used to read.
     list: (locationId: string): Promise<BusinessDayRecord[]> =>
-      request<BusinessDayRecord[]>(`/admin/locations/${locationId}/days`),
+      request<{ items: BusinessDayRecord[] }>(`/admin/locations/${locationId}/days`).then((r) => r.items),
   },
 
   // Settings (Task 11) — `update` sends only the changed keys, `null` clearing an

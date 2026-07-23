@@ -167,9 +167,11 @@ describe('day api', () => {
     expect(body).toEqual({ reason: 'miscounted deposit' })
   })
 
-  it('lists business days for a location and unwraps { data }', async () => {
+  it('lists business days for a location and unwraps { data: { items } }', async () => {
     const fetchMock = stubFetch(() =>
-      jsonResponse({ data: [{ id: 'day-1', location_id: 'loc-1', business_date: '2026-07-22', closed_by: 'user-1' }] }),
+      jsonResponse({
+        data: { items: [{ id: 'day-1', location_id: 'loc-1', business_date: '2026-07-22', closed_by: 'user-1' }] },
+      }),
     )
 
     const days = await api.day.list('loc-1')
