@@ -679,6 +679,48 @@ sets the hardcoded roles used to.
 
 ---
 
+## End Of Day
+
+A location-scoped **business-day close** for the back office, the layer above a shift:
+a manager reconciles the day's registers, records the bank deposit and a fixed
+operational checklist, and freezes an immutable, self-contained day record. Closing a
+day forbids exactly one thing — opening a new shift at that location on that date — and
+is reversible only by an admin. The register app is untouched; everything reuses M2–M6
+machinery (`ShiftTotals`, the day-basis `SalesReport`, `AdminAccess`, the audit log, the
+sidebar location switcher).
+
+- **One new table, `business_days`** (`02-data-model.md`) — a reconciliation snapshot,
+  not a ledger. Closed iff a row exists AND `reopened_at is null`; `unique
+  (location_id, business_date)` is the entire "close a day once" invariant, and the
+  paired `reopened_at`/`reopened_by` check mirrors `shifts.variance_approved_*`.
+  Reopening never deletes the row — a later close re-snapshots it and clears the pair,
+  so the audit log carries the full close→reopen→close history off one row.
+- **Three actions**, `app/Actions/Admin/Day/`: `CloseBusinessDay` (asserts every shift
+  closed and zero open orders for the date, snapshots gross/refunds/net/tax/cash/
+  variance/shift-count from the ledgers, upserts the row, audits `day.close`) —
+  `ReopenBusinessDay` (`is_admin` only, mandatory reason, audits `day.reopen`, the only
+  thing that un-forbids opening a shift on a closed date) — `GetBusinessDay` (read-only
+  status: live totals, blockers, a non-blocking unapproved-variance warning, `closable`,
+  the close record).
+- **One write-path guard.** `OpenShift` now refuses to open on a closed, un-reopened
+  business day at the register's location — `409 day_closed`. Nothing else is
+  forbidden: variance approval, refunds, and reports stay legal on a closed day, same
+  philosophy as variance itself not blocking a close.
+- **One new permission, `day.close`** (`05-rbac.md`) — admin-tier, granted by no default
+  role (like `location.manage`/`register.enroll`; admins bypass), doubling as the
+  back-office nav section (`AdminAccess::SECTIONS`). It gates read + close; reopen is
+  `is_admin` only.
+- **Back-office only**, one new **End of Day** section: blockers panel, the consolidated
+  Z, a checklist form (fixed items + a deposit-cents money input + a note), a Close
+  action disabled while any blocker is present, and a read-only record with a Reopen
+  button once a date is closed. Deposit is a recorded number and note, not a tracked
+  safe ledger — deferred until a store actually draws floats from one.
+
+**Status: complete.** 547 backend tests. `frontend/web` and `frontend/back-office`
+counts unchanged pending the frontend tasks that follow this one.
+
+---
+
 ## Sequencing rationale
 
 - **Money before schema** — everything computes on it.
