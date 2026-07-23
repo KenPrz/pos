@@ -30,6 +30,26 @@ describe('DatePicker', () => {
     expect(screen.queryByRole('grid')).not.toBeInTheDocument()
   })
 
+  it('never leaves an unscoped text-primary on the selected cell (blue-on-blue regression)', () => {
+    // The selected day is ALSO today here — the two modifiers stack on one <td>, and
+    // an unscoped text-primary (from `today`) outranks text-on-primary in the compiled
+    // stylesheet, rendering the number blue-on-blue. `today`'s text color must be
+    // scoped to unselected cells (not-aria-selected:), never a bare text-primary token.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 6, 23))
+    try {
+      render(<DatePicker value="2026-07-23" onChange={vi.fn()} aria-label="Business date" />)
+      openPicker()
+
+      const selectedCell = document.querySelector('td[aria-selected="true"]')
+      expect(selectedCell).not.toBeNull()
+      expect(selectedCell?.classList.contains('text-on-primary')).toBe(true)
+      expect(selectedCell?.classList.contains('text-primary')).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('disables days after max', () => {
     const onChange = vi.fn()
     render(<DatePicker value="2026-07-10" max="2026-07-20" onChange={onChange} aria-label="Business date" />)

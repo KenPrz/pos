@@ -37,7 +37,11 @@ function Calendar({ className, classNames, ...props }: CalendarProps) {
           'size-[40px] cursor-pointer p-0 text-[14px] leading-none outline-none hover:bg-surface-1 ' +
           'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ' +
           'disabled:cursor-default disabled:hover:bg-transparent',
-        today: 'font-semibold text-primary',
+        // today's blue is scoped to unselected cells: the `selected` modifier lands on
+        // the SAME td, and a bare text-primary outranks text-on-primary in the compiled
+        // stylesheet — blue number on blue fill, i.e. invisible (aria-selected sits on
+        // the td, which is what the not- variant keys off).
+        today: 'font-semibold not-aria-selected:text-primary',
         selected: 'bg-primary text-on-primary',
         range_start: 'bg-primary text-on-primary',
         range_end: 'bg-primary text-on-primary',
