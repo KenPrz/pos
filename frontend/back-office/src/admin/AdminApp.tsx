@@ -1,13 +1,19 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, adminToken, api, type AdminSession, type AdminUser } from '../lib/api'
 import { initCurrencyFromStorage } from '../lib/currency'
 import { LoginScreen } from './LoginScreen'
+import { pathForSection, resolveSection } from './navigation'
 import { Shell } from './Shell'
 
 type Stage = { name: 'booting' } | { name: 'login' } | { name: 'shell' }
+
+// The persisted sidebar-location choice — a UI preference, so deliberately NOT
+// cleared on logout/401 the way pos.admin_token/pos.admin_user are.
+const LOCATION_KEY = 'pos.admin_location'
 
 // Session-expiry convention (mirrors the register app): whichever screen's query or
 // mutation surfaces a 401 calls `handleUnauthorized` below, dropping back to this same
@@ -31,6 +37,8 @@ export function AdminApp() {
   // per-screen pickers are gone — the frozen contract's named switcher-relocation
   // exception).
   const [locationId, setLocationId] = useState<string | null>(null)
+  const pathname = usePathname()
+  const router = useRouter()
 
   useEffect(() => {
     // A reload has no in-memory `user` yet — hydrate it from the cache Task 8's review
@@ -104,13 +112,32 @@ export function AdminApp() {
     return all.filter((l) => reportLocationIds.includes(l.id))
   }, [locations.data, reportLocationIds])
 
-  // Default to the first (visible) location once the list arrives — the switcher never
-  // sits empty when there is anything to pick.
+  // Default to the persisted location (when it's still visible to this session), else
+  // the first visible one, once the list arrives — the switcher never sits empty when
+  // there is anything to pick.
   useEffect(() => {
     if (!locationId && visibleLocations.length > 0) {
-      setLocationId(visibleLocations[0].id)
+      const stored = localStorage.getItem(LOCATION_KEY)
+      const restored = stored !== null && visibleLocations.some((l) => l.id === stored)
+      setLocationId(restored ? stored : visibleLocations[0].id)
     }
   }, [visibleLocations, locationId])
+
+  const changeLocation = useCallback((id: string) => {
+    localStorage.setItem(LOCATION_KEY, id)
+    setLocationId(id)
+  }, [])
+
+  // URL → section, permission-checked (see ./navigation.ts). URL honesty: while the
+  // shell is up, a pathname that resolves to something other than itself (unknown
+  // slug, unheld section, sub-path no section owns yet) is replaced with the canonical
+  // path. Stage-guarded: during login `sections` is [] and this would eat deep links.
+  const section = resolveSection(pathname, sections)
+  useEffect(() => {
+    if (stage.name !== 'shell') return
+    const canonical = pathForSection(resolveSection(pathname, sections))
+    if (pathname !== canonical) router.replace(canonical)
+  }, [stage.name, pathname, sections, router])
 
   // Booting and login are chrome-less relative to the shell: Shell is the one that
   // owns the full chassis (the AppSidebar + section body) — nesting a second <main>
@@ -147,11 +174,13 @@ export function AdminApp() {
     <Shell
       user={user}
       sections={sections}
+      section={section}
+      onNavigate={(s) => router.push(pathForSection(s))}
       onLogout={logout}
       onUnauthorized={handleUnauthorized}
       location={selectedLocation}
       locations={visibleLocations}
-      onLocationChange={setLocationId}
+      onLocationChange={changeLocation}
     />
   )
 }

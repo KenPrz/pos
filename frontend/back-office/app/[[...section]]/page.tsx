@@ -1,4 +1,4 @@
-import { AdminApp } from '../src/admin/AdminApp'
+import { AdminApp } from '../../src/admin/AdminApp'
 
 // AdminApp is one deliberate client boundary under this server shell: everything it
 // does (tokens in localStorage, login, the nav shell) is interactive by nature. There
