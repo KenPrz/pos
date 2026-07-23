@@ -351,6 +351,13 @@ The screen always shows one **location** (from the switcher above the rail) and 
 store in a different timezone from you: the date shown is the store's day, not your
 browser's. You can pick an earlier date, but never a later one.
 
+> Note: "never a later one" includes tonight. A business date is the store's *calendar*
+> day, so tomorrow only becomes pickable when the store's clock passes midnight — not
+> when you finish closing. Close at 11:17 PM and the next date stays greyed out until
+> 12:00 AM. That's protection, not a bug: a day that hasn't started has nothing on it,
+> and if it could be picked tonight it could be *closed* tonight — which would stop
+> every till from opening in the morning until an admin reopened the day.
+
 ### Close the day
 
 1. **End of Day** → check the **Business date** is the day you mean.

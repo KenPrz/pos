@@ -9,6 +9,7 @@ operator who installs the system. Covers the register and the back office.
 | --- | --- | --- |
 | 1.0 | 2026-07-22 | First edition: register, back office, troubleshooting, FAQ, glossary. |
 | 1.1 | 2026-07-23 | Added Chapter 14, End of Day (close, reopen, and what a closed day blocks). Later chapters renumbered. |
+| 1.2 | 2026-07-23 | Chapter 14: explained why the next business date stays unavailable until the store's midnight, even after closing. |
 
 # 1. Introduction
 
@@ -912,6 +913,18 @@ set to — and one **Business date**, which starts on that location's *own*
 local today. If you're managing a Manila store from another timezone, the
 date on this screen is Manila's day, not your browser's. You can look back at
 an earlier date; you can't pick a later one.
+
+> **Closed up for the night, but tomorrow is still greyed out?** That's
+> deliberate. A business date is the store's *calendar* day, so "tomorrow"
+> only becomes pickable when the store's clock passes midnight — not when you
+> finish closing. Lock the door at 11:17 PM and close the day, and the next
+> date stays greyed out for another 43 minutes. There's nothing you could do
+> there anyway: a day that hasn't started has no shifts, no orders, and
+> all-zero totals. And if it *could* be picked tonight, it could be *closed*
+> tonight — and every till would refuse to open in the morning ("The business
+> day is closed…") until an admin reopened it. The greyed-out day is the
+> system protecting tomorrow's opening. It appears on its own at midnight;
+> nothing needs doing before then.
 
 ## Close the day
 
