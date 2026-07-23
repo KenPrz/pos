@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { DatePicker } from '../../components/DatePicker'
 import { EmptyState } from '../../components/EmptyState'
 import { FieldRow } from '../../components/FieldRow'
 import { SectionHeader } from '../../components/SectionHeader'
@@ -147,13 +148,14 @@ export function EndOfDaySection({
         title="End of Day"
         subline="Review the day's totals, then close it out."
         action={
-          <Input
-            type="date"
-            value={pickerDate}
-            max={status?.location_today}
-            aria-label="Business date"
-            onChange={(e) => setDate(e.target.value)}
-          />
+          <div className="w-[200px]">
+            <DatePicker
+              value={pickerDate}
+              max={status?.location_today}
+              aria-label="Business date"
+              onChange={setDate}
+            />
+          </div>
         }
       />
 
