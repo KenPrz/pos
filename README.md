@@ -70,5 +70,3 @@ On first launch it asks for the API's address, then enrols like any other termin
 - **[Technical documentation](docs/README.md)** — architecture, data model, API,
   conventions, RBAC, and the roadmap. The design docs are the source of truth; the
   code follows them, and CI enforces the conventions mechanically (`tests/Arch`).
-- **[CLAUDE.md](CLAUDE.md)** — how to run and develop, including the gotchas that cost
-  an afternoon each to learn.
