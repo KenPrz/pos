@@ -4884,12 +4884,47 @@ git commit -m "feat(register): API client tenders by payment method code"
 
 **Files:**
 - Modify: `frontend/web/src/register/SaleScreen.tsx`
+- Modify: `frontend/web/src/register/RefundScreen.tsx` — **a live bug, see Step 0**
 - Modify: any screen reading the Z-report's driver maps (find with `grep -rn "sales_by_driver\|refunds_by_driver" frontend/web/src`)
-- Test: `frontend/web/src/register/SaleScreen.test.tsx`
+- Test: `frontend/web/src/register/SaleScreen.test.tsx`, `frontend/web/src/register/RefundScreen.test.tsx`
 
 **Interfaces:**
 - Consumes: `api.catalog()` → `payment_methods` and the new `api.takePayment` signature (Task 15).
 - Produces: the tender step rendering one button per active method, grouped by group name when the location has more than one group.
+
+- [ ] **Step 0: Fix `RefundScreen`, which is silently broken**
+
+`RefundScreen.tsx:51` calls `api.refund(order.id, 'cash', ...)`. That argument used to be a
+`driver` and is now a **payment method code** — and codes are UPPERCASE, so this sends
+`payment_method_code: 'cash'` and gets `422 payment_method_unknown` at runtime. The
+typechecker cannot catch it: the parameter widened from the literal `'cash'` to `string`,
+so the old value still compiles.
+
+Do not hardcode `'CASH'` either — a location need not have a method with that exact code.
+Read the refundable methods off the catalog the screen already has access to, and use the
+first one. Only `cash`-driver methods are refundable (`RefundOrder` gates on
+`Capabilities::refundable`), so that filter is the correct definition of "refundable here":
+
+```tsx
+  // Only cash-driver methods can be refunded through us — an external_card tender's money
+  // never passed through this system (RefundOrder gates on Capabilities::refundable). The
+  // code is per-location DATA, so it must come from the catalog, never a literal.
+  const catalog = useQuery({ queryKey: ['catalog'], queryFn: () => api.catalog(), staleTime: 5 * 60_000 })
+  const refundMethod = (catalog.data?.payment_methods ?? []).find((m) => m.driver === 'cash') ?? null
+```
+
+Pass `refundMethod.code` to `api.refund(...)`, and refuse to submit with a clear message
+when `refundMethod` is null — a location with no cash method genuinely cannot refund:
+
+```tsx
+    if (refundMethod === null) {
+      return setError('This location has no cash payment method, so refunds cannot be issued here.')
+    }
+```
+
+Add a test to `RefundScreen.test.tsx` proving the posted body carries the catalog's code
+(use a fixture whose cash method is deliberately **not** `CASH` — e.g. `PETTYCASH` — so the
+test fails if anyone reintroduces a literal).
 
 - [ ] **Step 1: Write the failing test**
 
