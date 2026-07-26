@@ -1598,10 +1598,16 @@ namespace App\Exceptions\Domain;
  */
 final class RefundMethodNotRefundable extends DomainException
 {
+    // NOT a promoted `$code` property: `Exception` already declares a non-readonly
+    // `$code`, and redeclaring it readonly in a subclass is a fatal error. The sibling
+    // PaymentMethodUnknown/PaymentMethodInactive exceptions use this same shape.
+    private readonly string $methodCode;
+
     public function __construct(
-        private readonly string $code,
+        string $code,
         private readonly string $driver,
     ) {
+        $this->methodCode = $code;
         parent::__construct("Payments taken on '{$code}' cannot be refunded through this system.");
     }
 
@@ -1617,7 +1623,7 @@ final class RefundMethodNotRefundable extends DomainException
 
     public function details(): array
     {
-        return ['payment_method_code' => $this->code, 'driver' => $this->driver];
+        return ['payment_method_code' => $this->methodCode, 'driver' => $this->driver];
     }
 }
 ```
