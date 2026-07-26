@@ -29,7 +29,10 @@ final class TakePaymentRequest extends FormRequest
         return [
             // The set of legal codes is per-location DATA, so it is not an `in:` list —
             // PaymentMethodResolver is the gate, and it answers 422 unknown/inactive.
-            'payment_method_code' => ['nullable', 'string', 'max:32'],
+            // `required` here is the structural gate: a request naming no tender at all is
+            // malformed, and this codebase answers malformed with 400 validation_failed
+            // (ApiErrorEnvelope), reserving 422 for structurally-fine-but-rejected.
+            'payment_method_code' => ['required', 'string', 'max:32'],
             'amount_cents' => ['required', 'integer', 'min:1'],
             'tendered_cents' => ['nullable', 'integer', 'min:1'],   // absent = exact tender
             'reference' => ['nullable', 'string', 'max:100'],

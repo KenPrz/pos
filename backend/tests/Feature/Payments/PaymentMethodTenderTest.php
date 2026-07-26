@@ -122,8 +122,12 @@ it('still refuses a driver-shaped body', function (): void {
     $headers = staffHeaders($this->register, $this->cashier)
         + ['Idempotency-Key' => (string) \Illuminate\Support\Str::uuid(), 'If-Match' => '0'];
 
-    // There is ONE way to name a tender. `driver` is not it anymore.
+    // There is ONE way to name a tender, and `driver` is not it anymore. A body that
+    // names no tender is MALFORMED, so it is 400 validation_failed — 422 is reserved for
+    // structurally-fine requests that are semantically rejected (ApiErrorEnvelope).
     $this->postJson("/api/v1/orders/{$this->order->id}/payments", [
         'driver' => 'cash', 'amount_cents' => 5000, 'tendered_cents' => 5000,
-    ], $headers)->assertStatus(422);
+    ], $headers)
+        ->assertStatus(400)
+        ->assertJsonPath('error.code', 'validation_failed');
 });
