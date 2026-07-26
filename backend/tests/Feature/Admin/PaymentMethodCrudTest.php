@@ -51,13 +51,12 @@ it('derives location from the group and refuses a group at another location', fu
 });
 
 it('refuses a duplicate code at one location even across groups', function (): void {
-    $cash = PaymentMethodGroup::query()
-        ->where('location_id', $this->location->id)->where('code', 'CASH')->firstOrFail();
-
-    // CASH already exists under the cash group; the code is unique per LOCATION.
+    // CASH already exists under the location's CASH group. Posting it under the CARD
+    // group is what proves the index is scoped to the LOCATION and not to the group —
+    // a per-group index would happily accept this.
     $this->postJson('/api/v1/admin/payment-methods', [
         'location_id' => $this->location->id,
-        'group_id' => $cash->id,
+        'group_id' => $this->cardGroup->id,
         'code' => 'CASH', 'name' => 'Cash again',
     ], $this->headers)->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
@@ -82,10 +81,11 @@ it('ignores code, group and location on update', function (): void {
         ->where('location_id', $this->location->id)->where('code', 'CARD')->firstOrFail();
     $cash = PaymentMethodGroup::query()
         ->where('location_id', $this->location->id)->where('code', 'CASH')->firstOrFail();
+    $other = provisionedLocation(['code' => 'ZZZ']);
 
     $this->patchJson("/api/v1/admin/payment-methods/{$method->id}", [
         'name' => 'Bank card', 'sort_order' => 5,
-        'code' => 'PLASTIC', 'group_id' => $cash->id,
+        'code' => 'PLASTIC', 'group_id' => $cash->id, 'location_id' => $other->id,
     ], $this->headers)->assertOk();
 
     $method->refresh();
@@ -95,6 +95,7 @@ it('ignores code, group and location on update', function (): void {
     // Moving a method between groups would change its DRIVER and retroactively re-bucket
     // every historical payment taken on it.
     expect($method->group_id)->toBe($this->cardGroup->id);
+    expect($method->location_id)->toBe($this->location->id);
 });
 
 it('has no delete route', function (): void {
