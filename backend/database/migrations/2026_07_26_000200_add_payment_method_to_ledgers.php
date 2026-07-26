@@ -52,10 +52,16 @@ return new class extends Migration
                and pm.code = case r.driver when 'cash' then 'CASH' else 'CARD' end
         ");
 
+        // `payments` only. TakePayment (this task) writes all three columns, so they can
+        // be tightened now. `refunds` stays NULLABLE until Task 5 teaches RefundOrder to
+        // write them — tightening a column before its writer exists would leave the refund
+        // path returning a raw 23502 for the span of a commit, which is a dead financial
+        // write path, not a task boundary. Task 5 owns the refunds tightening.
+        DB::statement('alter table payments alter column payment_method_id set not null');
+        DB::statement('alter table payments alter column payment_method_code set not null');
+        DB::statement('alter table payments alter column payment_method_name set not null');
+
         foreach (['payments', 'refunds'] as $table) {
-            DB::statement("alter table {$table} alter column payment_method_id set not null");
-            DB::statement("alter table {$table} alter column payment_method_code set not null");
-            DB::statement("alter table {$table} alter column payment_method_name set not null");
             DB::statement("alter table {$table}
                 add constraint {$table}_payment_method_fk
                 foreign key (payment_method_id) references payment_methods (id)");

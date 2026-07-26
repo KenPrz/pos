@@ -27,7 +27,7 @@ beforeEach(function (): void {
     ]);
 });
 
-function takeOn(object $t, string $code, ?int $tendered = null, ?string $reference = null): \App\Models\Payment
+function t4pTakeOn(object $t, string $code, ?int $tendered = null, ?string $reference = null): \App\Models\Payment
 {
     return app(TakePayment::class)->execute(new TakePaymentInput(
         orderId: $t->order->id,
@@ -42,7 +42,7 @@ function takeOn(object $t, string $code, ?int $tendered = null, ?string $referen
 }
 
 it('derives the driver from the method\'s group and snapshots code and name', function (): void {
-    $payment = takeOn($this, 'CASH', tendered: 6000);
+    $payment = t4pTakeOn($this, 'CASH', tendered: 6000);
 
     expect($payment->driver)->toBe('cash');            // derived, never sent
     expect($payment->payment_method_code)->toBe('CASH');
@@ -56,14 +56,15 @@ it('takes a tender on an admin-created e-wallet method', function (): void {
         'location_id' => $this->location->id,
         'code' => 'EWALLET', 'name' => 'E-wallets', 'driver' => 'external_card', 'sort_order' => 2,
     ]);
-    PaymentMethod::factory()->create([
+    $method = PaymentMethod::factory()->create([
         'location_id' => $this->location->id, 'group_id' => $group->id,
         'code' => 'GCASH', 'name' => 'GCash',
     ]);
 
-    $payment = takeOn($this, 'GCASH', reference: '0917 555 0101');
+    $payment = t4pTakeOn($this, 'GCASH', reference: '0917 555 0101');
 
     expect($payment->driver)->toBe('external_card');
+    expect($payment->payment_method_id)->toBe($method->id);
     expect($payment->payment_method_code)->toBe('GCASH');
     expect($payment->payment_method_name)->toBe('GCash');
     expect($payment->reference)->toBe('0917 555 0101');
@@ -71,7 +72,7 @@ it('takes a tender on an admin-created e-wallet method', function (): void {
 });
 
 it('renaming a method never rewrites a past tender', function (): void {
-    $payment = takeOn($this, 'CASH', tendered: 5000);
+    $payment = t4pTakeOn($this, 'CASH', tendered: 5000);
 
     PaymentMethod::query()->where('location_id', $this->location->id)
         ->where('code', 'CASH')->update(['name' => 'Cash (peso)']);
@@ -80,8 +81,8 @@ it('renaming a method never rewrites a past tender', function (): void {
     expect($payment->fresh()->payment_method_name)->toBe('Cash');
 });
 
-it('refuses a method the location does not offer', function (): void {
-    expect(fn () => takeOn($this, 'MAYA', tendered: 5000))
+it('refuses a method code that does not exist', function (): void {
+    expect(fn () => t4pTakeOn($this, 'MAYA', tendered: 5000))
         ->toThrow(PaymentMethodUnknown::class);
 });
 
@@ -89,7 +90,7 @@ it('refuses an archived method', function (): void {
     PaymentMethod::query()->where('location_id', $this->location->id)
         ->where('code', 'CASH')->update(['is_active' => false]);
 
-    expect(fn () => takeOn($this, 'CASH', tendered: 5000))
+    expect(fn () => t4pTakeOn($this, 'CASH', tendered: 5000))
         ->toThrow(PaymentMethodInactive::class);
 });
 
