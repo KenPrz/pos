@@ -356,6 +356,39 @@ export type Register = {
 export type IssuedActivationCode = { activation_code: string; expires_at: string }
 
 // ---------------------------------------------------------------------------
+// Payment methods — verified against AdminPaymentMethodGroupResource.php and
+// AdminPaymentMethodResource.php. Per-LOCATION rows: both lists take location_id, and
+// both codes are unique per location (the same code at another store is legal).
+// ---------------------------------------------------------------------------
+
+/** The code seam. Carried by the GROUP, which is why a method has no driver of its own. */
+export type PaymentDriverCode = 'cash' | 'external_card'
+
+export type PaymentMethod = {
+  id: string
+  location_id: string
+  group_id: string
+  /** Immutable after create — a wire identifier and a report key. */
+  code: string
+  name: string
+  sort_order: number
+  is_active: boolean
+}
+
+export type PaymentMethodGroup = {
+  id: string
+  location_id: string
+  /** Immutable after create, like `driver`. */
+  code: string
+  name: string
+  driver: PaymentDriverCode
+  sort_order: number
+  is_active: boolean
+  /** Nested by the list endpoint's eager load, so the section renders in one call. */
+  methods?: PaymentMethod[]
+}
+
+// ---------------------------------------------------------------------------
 // Reports & audit wire types (Task 11) — verified against
 // app/Http/Resources/Admin/{SalesReportResource,StockReportResource}.php and
 // app/Actions/Admin/Audit/ListAuditLog.php.
@@ -365,7 +398,7 @@ export type SalesReportParams = {
   location_id: string
   from: string // 'YYYY-MM-DD', inclusive
   to: string // 'YYYY-MM-DD', inclusive
-  group_by: 'day' | 'category' | 'user'
+  group_by: 'day' | 'category' | 'user' | 'payment_method'
 }
 
 /**
@@ -382,6 +415,11 @@ export type SalesReportRow = {
   net_cents?: number
   qty_sold?: string
   line_total_cents?: number
+  // Present only for group_by=payment_method (ledger basis).
+  method_code?: string
+  method_name?: string
+  group_code?: string | null
+  group_name?: string | null
 }
 
 export type SalesReport = {
@@ -586,6 +624,39 @@ export const api = {
     // once; raw device tokens never cross the API anymore.
     issueActivationCode: (registerId: string): Promise<IssuedActivationCode> =>
       post<IssuedActivationCode>(`/admin/registers/${registerId}/activation-code`, {}),
+  },
+
+  // Both lists are location-scoped: holding payment_method.manage somewhere gets you
+  // into the section, not into every store's tenders (docs/05-rbac.md).
+  paymentMethodGroups: {
+    list: (locationId: string): Promise<PaymentMethodGroup[]> =>
+      request<{ items: PaymentMethodGroup[] }>(
+        `/admin/payment-method-groups${qs({ location_id: locationId })}`,
+      ).then((r) => r.items),
+    create: (body: Record<string, unknown>): Promise<PaymentMethodGroup> =>
+      post<{ payment_method_group: PaymentMethodGroup }>('/admin/payment-method-groups', body).then(
+        (r) => r.payment_method_group,
+      ),
+    // name / sort_order / is_active only — code and driver are immutable server-side and
+    // are silently dropped if sent, so the editor renders them read-only on edit.
+    update: (id: string, body: Record<string, unknown>): Promise<PaymentMethodGroup> =>
+      patch<{ payment_method_group: PaymentMethodGroup }>(
+        `/admin/payment-method-groups/${id}`,
+        body,
+      ).then((r) => r.payment_method_group),
+  },
+  paymentMethods: {
+    list: (locationId: string): Promise<PaymentMethod[]> =>
+      request<{ items: PaymentMethod[] }>(`/admin/payment-methods${qs({ location_id: locationId })}`).then(
+        (r) => r.items,
+      ),
+    create: (body: Record<string, unknown>): Promise<PaymentMethod> =>
+      post<{ payment_method: PaymentMethod }>('/admin/payment-methods', body).then((r) => r.payment_method),
+    // name / sort_order / is_active only — code and group_id are immutable server-side.
+    update: (id: string, body: Record<string, unknown>): Promise<PaymentMethod> =>
+      patch<{ payment_method: PaymentMethod }>(`/admin/payment-methods/${id}`, body).then(
+        (r) => r.payment_method,
+      ),
   },
 
   // ---------------------------------------------------------------------------
