@@ -1247,10 +1247,16 @@ return new class extends Migration
                and pm.code = case r.driver when 'cash' then 'CASH' else 'CARD' end
         ");
 
+        // `payments` only. TakePayment (this task) writes all three columns, so they can
+        // be tightened now. `refunds` stays NULLABLE until Task 5 teaches RefundOrder to
+        // write them — tightening a column before its writer exists would leave the refund
+        // path returning a raw 23502 for the span of a commit, which is a dead financial
+        // write path, not a task boundary. Task 5 owns the refunds tightening.
+        DB::statement('alter table payments alter column payment_method_id set not null');
+        DB::statement('alter table payments alter column payment_method_code set not null');
+        DB::statement('alter table payments alter column payment_method_name set not null');
+
         foreach (['payments', 'refunds'] as $table) {
-            DB::statement("alter table {$table} alter column payment_method_id set not null");
-            DB::statement("alter table {$table} alter column payment_method_code set not null");
-            DB::statement("alter table {$table} alter column payment_method_name set not null");
             DB::statement("alter table {$table}
                 add constraint {$table}_payment_method_fk
                 foreign key (payment_method_id) references payment_methods (id)");
@@ -1455,6 +1461,7 @@ git commit -m "feat(payments): tender on a per-location method code, driver deri
 ## Task 5: Refunds on method codes, refundability from `Capabilities`
 
 **Files:**
+- Create: `backend/database/migrations/2026_07_26_000300_tighten_refund_payment_method.php`
 - Create: `backend/app/Exceptions/Domain/RefundMethodNotRefundable.php`
 - Modify: `backend/app/Actions/Refunds/RefundOrderInput.php`, `backend/app/Actions/Refunds/RefundOrder.php`
 - Modify: `backend/app/Http/Requests/Refunds/RefundOrderRequest.php`
@@ -1713,6 +1720,44 @@ In `backend/app/Http/Resources/RefundResource.php`, add the two snapshot fields 
             'driver' => $this->driver,
             'payment_method_code' => $this->payment_method_code,
             'payment_method_name' => $this->payment_method_name,
+```
+
+- [ ] **Step 8a: Tighten the refund columns, now that a writer exists**
+
+Task 4 deliberately left `refunds.payment_method_id/code/name` nullable, because tightening
+a column before its writer exists leaves the refund path returning a raw `23502` — a dead
+financial write path, not a task boundary. `RefundOrder` now writes all three, so create
+`backend/database/migrations/2026_07_26_000300_tighten_refund_payment_method.php`:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * The other half of 2026_07_26_000200. That migration added these three columns to
+ * `refunds` and backfilled them but left them nullable, because RefundOrder could not yet
+ * write them. It can now, so the invariant becomes the schema's.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        DB::statement('alter table refunds alter column payment_method_id set not null');
+        DB::statement('alter table refunds alter column payment_method_code set not null');
+        DB::statement('alter table refunds alter column payment_method_name set not null');
+    }
+
+    public function down(): void
+    {
+        DB::statement('alter table refunds alter column payment_method_id drop not null');
+        DB::statement('alter table refunds alter column payment_method_code drop not null');
+        DB::statement('alter table refunds alter column payment_method_name drop not null');
+    }
+};
 ```
 
 - [ ] **Step 9: Run the new test to verify it passes**
