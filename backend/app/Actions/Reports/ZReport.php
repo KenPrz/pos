@@ -15,14 +15,18 @@ use App\Models\Shift;
 final readonly class ZReport
 {
     /**
-     * @param  array<string, int>  $salesByDriver
-     * @param  array<string, int>  $refundsByDriver
+     * @param  array<string, int>  $salesByMethod    method code => captured cents
+     * @param  array<string, int>  $salesByGroup     group code  => captured cents
+     * @param  array<string, int>  $refundsByMethod
+     * @param  array<string, int>  $refundsByGroup
      * @param  array{paid_in: int, payout: int, drop: int}  $movements
      */
     public function __construct(
         public Shift $shift,
-        public array $salesByDriver,
-        public array $refundsByDriver,
+        public array $salesByMethod,
+        public array $salesByGroup,
+        public array $refundsByMethod,
+        public array $refundsByGroup,
         public array $movements,
         public int $ordersClosed,
         public int $ordersVoided,

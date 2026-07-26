@@ -102,8 +102,8 @@ it('reads the drawer\'s whole day off the ledgers — open (the running X) and t
 
     expect($report->shift->id)->toBe($this->shift->id)
         ->and($report->shift->closed_at)->toBeNull()
-        ->and($report->salesByDriver)->toBe(['cash' => 2176, 'external_card' => 500])
-        ->and($report->refundsByDriver)->toBe(['cash' => 1000])
+        ->and($report->salesByMethod)->toEqual(['CASH' => 2176, 'CARD' => 500])
+        ->and($report->refundsByMethod)->toEqual(['CASH' => 1000])
         ->and($report->movements)->toBe(['paid_in' => 0, 'payout' => 300, 'drop' => 0])
         ->and($report->ordersClosed)->toBe(2)
         ->and($report->ordersVoided)->toBe(0)
@@ -116,9 +116,9 @@ it('reads the drawer\'s whole day off the ledgers — open (the running X) and t
         ->assertOk()
         ->assertJsonPath('data.shift.id', $this->shift->id)
         ->assertJsonPath('data.shift.variance_cents', null)
-        ->assertJsonPath('data.sales_by_driver.cash', 2176)
-        ->assertJsonPath('data.sales_by_driver.external_card', 500)
-        ->assertJsonPath('data.refunds_by_driver.cash', 1000)
+        ->assertJsonPath('data.sales_by_method.CASH', 2176)
+        ->assertJsonPath('data.sales_by_method.CARD', 500)
+        ->assertJsonPath('data.refunds_by_method.CASH', 1000)
         ->assertJsonPath('data.movements.paid_in', 0)
         ->assertJsonPath('data.movements.payout', 300)
         ->assertJsonPath('data.movements.drop', 0)
@@ -136,7 +136,7 @@ it('reads the drawer\'s whole day off the ledgers — open (the running X) and t
     expect($closedReport->shift->closed_at)->not->toBeNull()
         ->and($closedReport->shift->variance_cents)->toBe(0)
         ->and($closedReport->expectedCashCents)->toBe(20876)
-        ->and($closedReport->salesByDriver)->toBe(['cash' => 2176, 'external_card' => 500]);
+        ->and($closedReport->salesByMethod)->toEqual(['CASH' => 2176, 'CARD' => 500]);
 
     $this->getJson('/api/v1/reports/z?shift_id='.$this->shift->id, staffHeaders($this->register, $this->cashier))
         ->assertOk()
@@ -167,6 +167,66 @@ it("is scoped to the acting register's location, not to the shift's own register
 it('requires shift_id', function (): void {
     $this->getJson('/api/v1/reports/z', staffHeaders($this->register, $this->cashier))
         ->assertStatus(400);
+});
+
+/** A closed order paid in full on one method, in the open shift. Own name — Pest's
+ *  file-scoped functions collide across files, and this file already namespaces its own. */
+function zmTenderedOrder(object $t, string $methodCode, int $cents): void
+{
+    // forRegister() wires location/register/shift into one chain and computes
+    // business_date in the LOCATION's timezone, which ledger-basis reports depend on.
+    $order = Order::factory()->forRegister($t->register)->create([
+        'opened_by' => $t->cashier->id,
+        'subtotal_cents' => $cents,
+        'total_cents' => $cents,
+    ]);
+    // Eloquent create() never hydrates DB column defaults (version's included) —
+    // refresh so expectedVersion below is the real row value, not null.
+    $order->refresh();
+
+    app(TakePayment::class)->execute(new TakePaymentInput(
+        orderId: $order->id,
+        registerId: $t->register->id,
+        paymentMethodCode: $methodCode,
+        amountCents: $cents,
+        tenderedCents: $cents,
+        reference: null,
+        expectedVersion: $order->version,
+        actorId: $t->cashier->id,
+    ));
+}
+
+it('breaks sales down by method and rolls them up by group', function (): void {
+    // Two groups sharing one driver — the whole reason the rollup is by GROUP and not by
+    // driver: a supervisor counting a drawer needs GCash apart from Visa.
+    $ewallet = \App\Models\PaymentMethodGroup::factory()->create([
+        'location_id' => $this->location->id,
+        'code' => 'EWALLET', 'name' => 'E-wallets', 'driver' => 'external_card', 'sort_order' => 2,
+    ]);
+    \App\Models\PaymentMethod::factory()->create([
+        'location_id' => $this->location->id, 'group_id' => $ewallet->id,
+        'code' => 'GCASH', 'name' => 'GCash',
+    ]);
+
+    zmTenderedOrder($this, 'CASH', 1000);
+    zmTenderedOrder($this, 'CARD', 2000);
+    zmTenderedOrder($this, 'GCASH', 3000);
+
+    $z = app(GetZReport::class)->execute($this->shift->id, $this->register->id);
+
+    expect($z->salesByMethod)->toEqual(['CASH' => 1000, 'CARD' => 2000, 'GCASH' => 3000]);
+    // GCash rolls into EWALLET, not into CARD, even though both drive external_card.
+    expect($z->salesByGroup)->toEqual(['CASH' => 1000, 'CARD' => 2000, 'EWALLET' => 3000]);
+});
+
+it('omits methods with no activity', function (): void {
+    zmTenderedOrder($this, 'CASH', 1000);
+
+    // Same shape the driver maps had: only codes with money against them appear.
+    $z = app(GetZReport::class)->execute($this->shift->id, $this->register->id);
+
+    expect($z->salesByMethod)->not->toHaveKey('CARD');
+    expect($z->salesByGroup)->not->toHaveKey('CARD');
 });
 
 it('separates a split original from a genuine void — orders_voided excludes splits, orders_split counts only them', function (): void {

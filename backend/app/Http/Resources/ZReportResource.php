@@ -14,8 +14,10 @@ final class ZReportResource extends JsonResource
     {
         return [
             'shift' => new ShiftResource($this->shift),
-            'sales_by_driver' => $this->salesByDriver,
-            'refunds_by_driver' => $this->refundsByDriver,
+            'sales_by_method' => $this->salesByMethod,
+            'sales_by_group' => $this->salesByGroup,
+            'refunds_by_method' => $this->refundsByMethod,
+            'refunds_by_group' => $this->refundsByGroup,
             'movements' => $this->movements,
             'orders_closed' => $this->ordersClosed,
             'orders_voided' => $this->ordersVoided,
