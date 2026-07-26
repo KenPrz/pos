@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ApiError, api, tokens, type CatalogProduct, type CatalogVariant, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
+import { ApiError, api, tokens, type CatalogPaymentMethod, type CatalogProduct, type CatalogVariant, type Order, type PaymentOutcome, type Receipt } from '../lib/api'
 import { getCurrency } from '../lib/currency'
 import { cents, formatMoney, parseCentsOrNull, subtract } from '../lib/money'
 import { hasHardware, printReceipt } from '../lib/shell'
@@ -20,7 +20,19 @@ import { SplitPrompt, SplitStrip } from './SplitStrip'
 // this always reflects whatever the catalog fetch most recently set (lib/currency.ts).
 const fm = (n: number) => formatMoney(cents(n), getCurrency())
 
-type Driver = 'cash' | 'external_card'
+/**
+ * Methods bucketed by group name, preserving the server's order — the catalog already
+ * sorted by group then method, so first appearance is the group's own rank.
+ */
+function groupMethods(methods: CatalogPaymentMethod[]): Array<[string, CatalogPaymentMethod[]]> {
+  const buckets = new Map<string, CatalogPaymentMethod[]>()
+  for (const method of methods) {
+    const bucket = buckets.get(method.group_name)
+    if (bucket) bucket.push(method)
+    else buckets.set(method.group_name, [method])
+  }
+  return [...buckets.entries()]
+}
 
 // One paid-off child, kept for the combined done plate once every check has closed.
 type PaidChild = { outcome: PaymentOutcome; receipt: Receipt | null }
@@ -108,7 +120,9 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
   const [order, setOrder] = useState<Order | null>(null)
   const [phase, setPhase] = useState<Phase>({ name: 'scanning' })
   const [barcode, setBarcode] = useState('')
-  const [driver, setDriver] = useState<Driver>('cash')
+  // The method the cashier picked, by code. Null until the methods land; the first
+  // method in the (already sorted) list is selected as soon as they do.
+  const [methodCode, setMethodCode] = useState<string | null>(null)
   const [tendered, setTendered] = useState('')
   const [reference, setReference] = useState('')
   const [voidingLineId, setVoidingLineId] = useState<string | null>(null)
@@ -166,6 +180,26 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
     staleTime: Infinity,
     select: (catalog) => catalog.discounts.filter((d) => d.scope === 'order'),
   })
+
+  // Tender buttons are admin-configured data (payment_method_groups / payment_methods),
+  // fetched with the catalog. Ungated: taking payment needs no discount permission.
+  // ['catalog'] is the key Register.tsx and MenuGrid.tsx already use, so this shares
+  // their cache entry instead of firing a third request.
+  const paymentMethods = useQuery({
+    queryKey: ['catalog'],
+    queryFn: () => api.catalog(),
+    staleTime: 5 * 60_000,
+    select: (catalog) => catalog.payment_methods,
+  })
+  const methods = paymentMethods.data ?? []
+  const selected = methods.find((m) => m.code === methodCode) ?? methods[0] ?? null
+  const groupedMethods = groupMethods(methods)
+
+  // Reset to the location's first method whenever the tender phase opens, so a card
+  // selection from the previous sale never carries into the next one.
+  useEffect(() => {
+    if (phase.name === 'tender') setMethodCode(methods[0]?.code ?? null)
+  }, [phase.name, methods])
 
   // A lost response (network_unreachable) may have succeeded server-side, so a rescan
   // of the SAME barcode right after one reuses the same idempotency key and replays
@@ -339,10 +373,15 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
     mutationFn: async ({ key }: { key: string }) => {
       const current = order as Order
       const amount = subtract(cents(current.total_cents), cents(current.paid_cents))
+      const method = selected as CatalogPaymentMethod
       const outcome =
-        driver === 'cash'
-          ? await api.takePayment(current, amount, 'cash', key, { tenderedCents: parseCentsOrNull(tendered) ?? 0 })
-          : await api.takePayment(current, amount, 'external_card', key, { reference: reference.trim() || undefined })
+        method.driver === 'cash'
+          ? await api.takePayment(current, amount, method.code, key, {
+              tenderedCents: parseCentsOrNull(tendered) ?? 0,
+            })
+          : await api.takePayment(current, amount, method.code, key, {
+              reference: reference.trim() || undefined,
+            })
       const receipt = await api.receipt(outcome.order.id).catch(() => null)
       return { outcome, receipt }
     },
@@ -426,7 +465,10 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
   // zone's Take payment button — one guard path, exactly the old submitPay behavior.
   const doPay = () => {
     if (!order || phase.name !== 'tender' || pay.isPending) return
-    if (driver === 'cash' && parseCentsOrNull(tendered) === null) return setError('Enter the cash handed over, like 50.00')
+    if (selected === null) return setError('This location has no payment methods. Add one in the back office.')
+    if (selected.driver === 'cash' && parseCentsOrNull(tendered) === null) {
+      return setError('Enter the cash handed over, like 50.00')
+    }
     setError(null)
     pay.mutate({ key: phase.key })
   }
@@ -438,7 +480,6 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
 
   const newSale = () => {
     setPhase({ name: 'scanning' })
-    setDriver('cash')
     setSplit(null)
     setSplitPromptOpen(false)
     setSplitWays(2)
@@ -473,7 +514,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
           <p className="type-body-sm text-ink-muted">
             {paidCash
               ? `${fm(payment.amount_cents)} paid on ${fm(payment.tendered_cents ?? payment.amount_cents)} tendered`
-              : `${fm(payment.amount_cents)} recorded on the card terminal`}
+              : `${fm(payment.amount_cents)} recorded on ${payment.payment_method_name}`}
           </p>
           {phase.receipt && <ReceiptCard receipt={phase.receipt} />}
         </div>
@@ -490,7 +531,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
             <p className="type-body-sm text-ink-muted">
               {outcome.payment.driver === 'cash'
                 ? `${fm(outcome.payment.amount_cents)} paid on ${fm(outcome.payment.tendered_cents ?? outcome.payment.amount_cents)} tendered`
-                : `${fm(outcome.payment.amount_cents)} recorded on the card terminal`}
+                : `${fm(outcome.payment.amount_cents)} recorded on ${outcome.payment.payment_method_name}`}
             </p>
             {receipt && <ReceiptCard receipt={receipt} />}
           </div>
@@ -606,40 +647,61 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
 
         {order && phase.name === 'tender' && !splitPromptOpen && (
           <form onSubmit={submitPay} className="flex flex-col gap-md">
-            <div className="flex gap-sm" role="group" aria-label="Payment method">
-              <Button
-                type="button" size="lg" className="flex-1"
-                variant={driver === 'cash' ? 'primary' : 'tertiary'}
-                aria-pressed={driver === 'cash'}
-                onClick={() => setDriver('cash')}
-              >
-                Cash
-              </Button>
-              <Button
-                type="button" size="lg" className="flex-1"
-                variant={driver === 'external_card' ? 'primary' : 'tertiary'}
-                aria-pressed={driver === 'external_card'}
-                onClick={() => setDriver('external_card')}
-              >
-                Card
-              </Button>
-            </div>
-            {driver === 'cash' ? (
-              <label className="block">
-                <span className="type-body-sm text-ink-muted">Cash tendered (owed: {fm(balance)})</span>
-                <Input
-                  value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" autoFocus
-                  className="type-money mt-xs h-[56px] text-[24px]"
-                />
-              </label>
+            {methods.length === 0 ? (
+              <p className="type-body-sm text-ink-muted">
+                No payment methods are set up for this location. Add one in the back
+                office before taking payment.
+              </p>
             ) : (
-              <label className="block">
-                <span className="type-body-sm text-ink-muted">Card terminal reference (owed: {fm(balance)})</span>
-                <Input
-                  value={reference} onChange={(e) => setReference(e.target.value)} placeholder="auth 004321" autoFocus
-                  className="mt-xs h-[56px]"
-                />
-              </label>
+              <>
+                {/* ONE role="group" named "Payment method", wrapping every group. Keeping
+                    the existing label matters: SaleScreen.test.tsx and
+                    docs/user-manual/capture_screenshots.mjs both select on it, and nesting
+                    a second group role per bucket would break both for no a11y gain. */}
+                <div className="flex flex-col gap-md" role="group" aria-label="Payment method">
+                  {groupedMethods.map(([groupName, groupMembers]) => (
+                    <div key={groupName} className="flex flex-col gap-xs">
+                      {/* One group needs no heading — the buttons are the whole story. */}
+                      {groupedMethods.length > 1 && (
+                        <span className="type-body-sm text-ink-muted">{groupName}</span>
+                      )}
+                      <div className="flex flex-wrap gap-sm">
+                        {groupMembers.map((method) => (
+                          <Button
+                            key={method.id}
+                            type="button" size="lg" className="flex-1"
+                            variant={selected?.code === method.code ? 'primary' : 'tertiary'}
+                            aria-pressed={selected?.code === method.code}
+                            onClick={() => setMethodCode(method.code)}
+                          >
+                            {method.name}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {selected?.driver === 'cash' ? (
+                  <label className="block">
+                    <span className="type-body-sm text-ink-muted">Cash tendered (owed: {fm(balance)})</span>
+                    <Input
+                      value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" autoFocus
+                      className="type-money mt-xs h-[56px] text-[24px]"
+                    />
+                  </label>
+                ) : (
+                  <label className="block">
+                    <span className="type-body-sm text-ink-muted">
+                      {selected?.name} reference (owed: {fm(balance)})
+                    </span>
+                    <Input
+                      value={reference} onChange={(e) => setReference(e.target.value)} placeholder="auth 004321" autoFocus
+                      className="mt-xs h-[56px]"
+                    />
+                  </label>
+                )}
+              </>
             )}
           </form>
         )}

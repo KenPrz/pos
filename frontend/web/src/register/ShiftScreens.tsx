@@ -84,11 +84,11 @@ function ZReportPanel({ z }: { z: ReturnType<typeof useZReport> }) {
     <div className="mt-lg">
       <p className="type-body-sm mb-xs text-ink">Z-report</p>
       <dl className="m-0">
-        {Object.entries(r.sales_by_driver).map(([driver, amount]) => (
-          <div key={driver} className={row}><dt className={label}>Sales — {driver}</dt><dd className={value}>{fm(amount)}</dd></div>
+        {Object.entries(r.sales_by_method).map(([method, amount]) => (
+          <div key={method} className={row}><dt className={label}>Sales — {method}</dt><dd className={value}>{fm(amount)}</dd></div>
         ))}
-        {Object.entries(r.refunds_by_driver).map(([driver, amount]) => (
-          <div key={driver} className={row}><dt className={label}>Refunds — {driver}</dt><dd className={value}>−{fm(amount)}</dd></div>
+        {Object.entries(r.refunds_by_method).map(([method, amount]) => (
+          <div key={method} className={row}><dt className={label}>Refunds — {method}</dt><dd className={value}>−{fm(amount)}</dd></div>
         ))}
         <div className={row}><dt className={label}>Paid in</dt><dd className={value}>{fm(r.movements.paid_in)}</dd></div>
         <div className={row}><dt className={label}>Payouts</dt><dd className={value}>−{fm(r.movements.payout)}</dd></div>

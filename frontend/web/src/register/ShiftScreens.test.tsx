@@ -57,8 +57,10 @@ function makeShift(overrides: Partial<Shift> = {}): Shift {
 function makeZReport(expectedCashCents: number): ZReport {
   return {
     shift: makeShift(),
-    sales_by_driver: { cash: expectedCashCents },
-    refunds_by_driver: {},
+    sales_by_method: { CASH: expectedCashCents },
+    sales_by_group: { CASH: expectedCashCents },
+    refunds_by_method: {},
+    refunds_by_group: {},
     movements: { paid_in: 0, payout: 0, drop: 0 },
     orders_closed: 3,
     orders_voided: 0,
