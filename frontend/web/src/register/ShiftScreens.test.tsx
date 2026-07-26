@@ -54,8 +54,11 @@ function makeShift(overrides: Partial<Shift> = {}): Shift {
   }
 }
 
-function makeZReport(expectedCashCents: number): ZReport {
-  return {
+// Accepts either the plain expected-cash number the earlier tests pass, or a partial
+// ZReport override (Task 20's group-rollup tests need more than one method/group active).
+function makeZReport(overrides: number | Partial<ZReport> = {}): ZReport {
+  const expectedCashCents = typeof overrides === 'number' ? overrides : (overrides.expected_cash_cents ?? 0)
+  const base: ZReport = {
     shift: makeShift(),
     sales_by_method: { CASH: expectedCashCents },
     sales_by_group: { CASH: expectedCashCents },
@@ -67,6 +70,30 @@ function makeZReport(expectedCashCents: number): ZReport {
     orders_split: 2,
     expected_cash_cents: expectedCashCents,
   }
+  return typeof overrides === 'number' ? base : { ...base, ...overrides }
+}
+
+// The Z-report panel only renders once the drawer is closed (the close revokes the
+// register's staff sessions, so it's fetched beforehand — see ZReportPanel's own doc
+// comment). This helper drives a full close so the group-rollup rows in the panel are
+// actually on screen, rather than duplicating that flow in every rollup test.
+async function renderZReport(report: ZReport) {
+  vi.mocked(api.zReport).mockResolvedValue(report)
+  vi.mocked(api.closeShift).mockResolvedValue({
+    shift: makeShift({
+      closed_at: new Date().toISOString(),
+      counted_cash_cents: report.expected_cash_cents,
+      expected_cash_cents: report.expected_cash_cents,
+      variance_cents: 0,
+    }),
+    expected_cash_cents: report.expected_cash_cents,
+    variance_cents: 0,
+    requires_approval: false,
+  })
+  renderClose()
+  fireEvent.change(await screen.findByLabelText(/counted cash/i), { target: { value: '0.00' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+  await screen.findByText('Drawer reconciled')
 }
 
 function renderClose(can: (permission: string) => boolean = () => false) {
@@ -185,5 +212,29 @@ describe('CloseShiftScreen — approve variance', () => {
     await waitFor(() => expect(api.approveVariance).toHaveBeenCalledWith('shift-1'))
     expect(screen.queryByText(/approved by/i)).not.toBeInTheDocument()
     expect(screen.getByText(/needs supervisor approval/i)).toBeInTheDocument()
+  })
+})
+
+describe('CloseShiftScreen — Z-report group rollup', () => {
+  it('rolls the drawer up by group when the location has more than one', async () => {
+    // CARD and EWALLET share the external_card driver — the group rollup is the only place
+    // a supervisor sees them apart, which is the whole reason groups exist.
+    await renderZReport(makeZReport({
+      sales_by_method: { CASH: 1000, VISA: 2000, GCASH: 3000 },
+      sales_by_group: { CASH: 1000, CARD: 2000, EWALLET: 3000 },
+    }))
+
+    expect(await screen.findByText('Sales by group — EWALLET')).toBeInTheDocument()
+    expect(screen.getByText('Sales by group — CARD')).toBeInTheDocument()
+  })
+
+  it('omits the group rollup when there is only one group', async () => {
+    await renderZReport(makeZReport({
+      sales_by_method: { CASH: 1000 },
+      sales_by_group: { CASH: 1000 },
+    }))
+
+    expect(await screen.findByText('Sales — CASH')).toBeInTheDocument()
+    expect(screen.queryByText(/Sales by group/)).not.toBeInTheDocument()
   })
 })

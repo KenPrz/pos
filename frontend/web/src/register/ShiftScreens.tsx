@@ -90,6 +90,23 @@ function ZReportPanel({ z }: { z: ReturnType<typeof useZReport> }) {
         {Object.entries(r.refunds_by_method).map(([method, amount]) => (
           <div key={method} className={row}><dt className={label}>Refunds — {method}</dt><dd className={value}>−{fm(amount)}</dd></div>
         ))}
+        {/* Only worth the rows when there IS a rollup: with one group it just repeats the
+            method lines above. Two groups may share a driver (CARD and EWALLET both drive
+            external_card), and this is the only place a supervisor sees them apart. */}
+        {Object.keys(r.sales_by_group).length > 1 &&
+          Object.entries(r.sales_by_group).map(([group, amount]) => (
+            <div key={`g-${group}`} className={row}>
+              <dt className={label}>Sales by group — {group}</dt>
+              <dd className={value}>{fm(amount)}</dd>
+            </div>
+          ))}
+        {Object.keys(r.refunds_by_group).length > 1 &&
+          Object.entries(r.refunds_by_group).map(([group, amount]) => (
+            <div key={`gr-${group}`} className={row}>
+              <dt className={label}>Refunds by group — {group}</dt>
+              <dd className={value}>−{fm(amount)}</dd>
+            </div>
+          ))}
         <div className={row}><dt className={label}>Paid in</dt><dd className={value}>{fm(r.movements.paid_in)}</dd></div>
         <div className={row}><dt className={label}>Payouts</dt><dd className={value}>−{fm(r.movements.payout)}</dd></div>
         <div className={row}><dt className={label}>Drops</dt><dd className={value}>−{fm(r.movements.drop)}</dd></div>

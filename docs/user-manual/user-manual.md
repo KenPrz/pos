@@ -876,23 +876,25 @@ kiosk is a real thing), so nothing stops you — the till just says so.
 
 The Z-report at the till (Chapter 7) breaks sales and refunds down by individual
 payment method — every method gets its own line, so Visa and GCash always show up
-separately from each other and from Cash. It doesn't roll those lines up by group on
-screen: the group is what the server used to decide whether that money could be
-refunded here, but this version's till only ever prints the method-level total, not a
-group subtotal.
+separately from each other and from Cash. When the location has more than one group
+active, it also rolls those same lines up by group — CARD and EWALLET both drive
+`external_card`, so the group rollup is the only place a supervisor counting the
+drawer sees GCash apart from Visa. A location with only one group active skips the
+rollup; it would just repeat the method lines above.
 
-The back office's **Reports → Sales** (Chapter 13) doesn't have a payment-method
-breakdown of its own yet either — its group-by is **Day**, **Category**, or **User**.
-"How much came in on GCash last month" means adding up GCash's line across that
-range's Z-reports today, not one report screen.
+The back office's **Reports → Sales** (Chapter 13) also offers a **Payment method**
+grouping, alongside **Day**, **Category**, and **User**. "How much came in on GCash
+last month" is answered directly by that one report screen, picking **Payment
+method** and the range in question — not by adding up a figure across a range of
+Z-reports.
 
 # 13. Reports
 
 ## Sales
 
 **Reports** → **Sales** tab: pick a **From**/**To** date range, then a
-group-by tab — **Day**, **Category**, or **User**. The location comes from
-the sidebar's location switcher.
+group-by tab — **Day**, **Category**, **User**, or **Payment method**. The
+location comes from the sidebar's location switcher.
 
 ![Figure 13.1 — Sales by day, Manila Grocery, one closed order](assets/screenshots/031-bo-report-sales.png)
 
@@ -905,12 +907,18 @@ refunds that moved money, with columns **Orders closed**, **Gross**,
 **Category** is **line-basis** instead — summed from order lines, joined to
 *current* category names, with columns **Qty sold** and **Line total**.
 
-These two bases are **not required to reconcile**, and that's by design, not
-a bug to chase down. A payment covers a whole order at once; a category
-breakdown has to attribute individual lines. They're answering different
-questions — "how much cash and card came in" versus "what sold" — so don't
-expect the Day total and the sum of the Category totals to match to the
-cent.
+**Payment method** is ledger-basis too, one row per method that had activity in
+the range, with columns **Method**, **Code**, **Group**, **Gross**, **Refunds**,
+**Net** — the method's name and its group are shown side by side with the code
+the ledger is actually keyed on, so "how much came in on GCash last month" is one
+row, not an addition exercise.
+
+These bases are **not required to reconcile** with each other, and that's by
+design, not a bug to chase down. A payment covers a whole order at once; a
+category breakdown has to attribute individual lines. They're answering
+different questions — "how much cash and card came in" versus "what sold" —
+so don't expect the Day total and the sum of the Category totals to match to
+the cent.
 
 Tap **Export CSV** on the **Sales** tab to download the report exactly as
 displayed, with money figures as plain decimal strings rather than
