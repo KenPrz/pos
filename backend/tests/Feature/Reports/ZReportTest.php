@@ -104,6 +104,7 @@ it('reads the drawer\'s whole day off the ledgers — open (the running X) and t
         ->and($report->shift->closed_at)->toBeNull()
         ->and($report->salesByMethod)->toEqual(['CASH' => 2176, 'CARD' => 500])
         ->and($report->refundsByMethod)->toEqual(['CASH' => 1000])
+        ->and($report->refundsByGroup)->toEqual(['CASH' => 1000])
         ->and($report->movements)->toBe(['paid_in' => 0, 'payout' => 300, 'drop' => 0])
         ->and($report->ordersClosed)->toBe(2)
         ->and($report->ordersVoided)->toBe(0)
@@ -119,6 +120,7 @@ it('reads the drawer\'s whole day off the ledgers — open (the running X) and t
         ->assertJsonPath('data.sales_by_method.CASH', 2176)
         ->assertJsonPath('data.sales_by_method.CARD', 500)
         ->assertJsonPath('data.refunds_by_method.CASH', 1000)
+        ->assertJsonPath('data.refunds_by_group.CASH', 1000)
         ->assertJsonPath('data.movements.paid_in', 0)
         ->assertJsonPath('data.movements.payout', 300)
         ->assertJsonPath('data.movements.drop', 0)
@@ -227,6 +229,54 @@ it('omits methods with no activity', function (): void {
 
     expect($z->salesByMethod)->not->toHaveKey('CARD');
     expect($z->salesByGroup)->not->toHaveKey('CARD');
+});
+
+it('rolls refunds up by group across two groups that share the cash driver', function (): void {
+    // Refundability is a DRIVER capability — RefundOrder gates on
+    // Capabilities::refundable, and only `cash`-driver methods qualify (external_card's
+    // is false). So unlike the sales-side EWALLET/CARD case above, proving refund group
+    // rollup needs two groups that BOTH drive `cash`: the location's own CASH group,
+    // plus a second PETTY group added here.
+    $petty = \App\Models\PaymentMethodGroup::factory()->create([
+        'location_id' => $this->location->id,
+        'code' => 'PETTY', 'name' => 'Petty cash', 'driver' => 'cash', 'sort_order' => 3,
+    ]);
+    \App\Models\PaymentMethod::factory()->create([
+        'location_id' => $this->location->id, 'group_id' => $petty->id,
+        'code' => 'PETTYCASH', 'name' => 'Petty cash drawer',
+    ]);
+
+    $variantA = ProductVariant::factory()->untracked()->create(['price_cents' => 1000]);
+    $variantB = ProductVariant::factory()->untracked()->create(['price_cents' => 700]);
+
+    $orderA = Order::factory()->forRegister($this->register)->create(['opened_by' => $this->cashier->id]);
+    $orderA = t12AddLine($this, $orderA->id, $variantA->id, '1');
+    $lineA = $orderA->lines->first();
+    $orderA = t12Pay($this, $orderA->id, 'cash', $orderA->total_cents);
+
+    $orderB = Order::factory()->forRegister($this->register)->create(['opened_by' => $this->cashier->id]);
+    $orderB = t12AddLine($this, $orderB->id, $variantB->id, '1');
+    $lineB = $orderB->lines->first();
+    $orderB = t12Pay($this, $orderB->id, 'cash', $orderB->total_cents);
+
+    // Both sales were rung up on CASH; the refunds are issued through two different
+    // cash-driver methods — CASH and PETTYCASH — so the group rollup must keep the two
+    // buckets apart rather than collapsing them into one `cash` bucket.
+    app(RefundOrder::class)->execute(new RefundOrderInput(
+        originalOrderId: $orderA->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
+        reason: 'test return', lines: [new RefundLineInput($lineA->id, '1', restock: false)],
+        actorId: $this->supervisor->id,
+    ));
+    app(RefundOrder::class)->execute(new RefundOrderInput(
+        originalOrderId: $orderB->id, registerId: $this->register->id, paymentMethodCode: 'PETTYCASH',
+        reason: 'test return', lines: [new RefundLineInput($lineB->id, '1', restock: false)],
+        actorId: $this->supervisor->id,
+    ));
+
+    $z = app(GetZReport::class)->execute($this->shift->id, $this->register->id);
+
+    expect($z->refundsByMethod)->toEqual(['CASH' => 1000, 'PETTYCASH' => 700]);
+    expect($z->refundsByGroup)->toEqual(['CASH' => 1000, 'PETTY' => 700]);
 });
 
 it('separates a split original from a genuine void — orders_voided excludes splits, orders_split counts only them', function (): void {
