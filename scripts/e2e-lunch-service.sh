@@ -3,7 +3,8 @@
 # The M5 'lunch service' — the milestone's end-to-end proof, runnable against a
 # freshly seeded stack: two tabs on two registers, modifiers (with a repeated one),
 # a fired course, a qty bump on a fired line, a transfer, a three-way split paid
-# across cash and card, a forced-and-approved drawer variance, and a clean close.
+# across cash and an e-wallet (GCash), a forced-and-approved drawer variance, and a
+# clean close.
 # Set POS_DEVICE_TOKEN (RST / Till 2) and POS_DEVICE_TOKEN_2 (RST / Till 1) first — the
 # Manila Restaurant's two food-mode tills. Never a token literal in this file.
 #
@@ -136,15 +137,15 @@ QTY_SUM=$(echo "$ADOBO_QTYS" | awk '{s+=$1} END{printf "%.3f", s}')
 echo "14. split adobo line qtys: $(echo "$ADOBO_QTYS" | tr '\n' ' ')(fractional, allocator-exact, sum $QTY_SUM)"
 
 req POST "/orders/$CHILD0/payments" -H "$D" -H "$A" -H 'If-Match: 0' -H "Idempotency-Key: $(uuidgen)" \
-  -d "{\"driver\":\"cash\",\"amount_cents\":$T0,\"tendered_cents\":$T0}" \
+  -d "{\"payment_method_code\":\"CASH\",\"amount_cents\":$T0,\"tendered_cents\":$T0}" \
   | jq -e '.data.order.status == "closed"' > /dev/null || fail "split child 1 (cash) did not close"
 req POST "/orders/$CHILD1/payments" -H "$D" -H "$A" -H 'If-Match: 0' -H "Idempotency-Key: $(uuidgen)" \
-  -d "{\"driver\":\"cash\",\"amount_cents\":$T1,\"tendered_cents\":$T1}" \
+  -d "{\"payment_method_code\":\"CASH\",\"amount_cents\":$T1,\"tendered_cents\":$T1}" \
   | jq -e '.data.order.status == "closed"' > /dev/null || fail "split child 2 (cash) did not close"
 req POST "/orders/$CHILD2/payments" -H "$D" -H "$A" -H 'If-Match: 0' -H "Idempotency-Key: $(uuidgen)" \
-  -d "{\"driver\":\"external_card\",\"amount_cents\":$T2,\"reference\":\"auth 998877\"}" \
-  | jq -e '.data.order.status == "closed"' > /dev/null || fail "split child 3 (card) did not close"
-echo "15. all three children paid and closed (cash, cash, card) — total cash from the split: $((T0 + T1))"
+  -d "{\"payment_method_code\":\"GCASH\",\"amount_cents\":$T2,\"reference\":\"auth 998877\"}" \
+  | jq -e '.data.order.status == "closed"' > /dev/null || fail "split child 3 (e-wallet) did not close"
+echo "15. all three children paid and closed (cash, cash, e-wallet/GCash) — total cash from the split: $((T0 + T1))"
 
 # Expected qty for child 0's adobo line, computed independently of the server response:
 # the same earliest-absorbs-the-remainder allocator SplitOrder::allocateMilli() uses,
@@ -171,7 +172,7 @@ TRANSFER=$(req POST "/orders/$ORDER_A/transfer" -H "$D2" -H "$B1" -H 'If-Match: 
 echo "17. Tab A transferred to Till 1 (supervisor Bob), register_id now $TILL1"
 
 PAY_A=$(req POST "/orders/$ORDER_A/payments" -H "$D2" -H "$B1" -H 'If-Match: 4' -H "Idempotency-Key: $(uuidgen)" \
-  -d "{\"driver\":\"cash\",\"amount_cents\":$TOTAL_A_PRE_TRANSFER,\"tendered_cents\":$TOTAL_A_PRE_TRANSFER}")
+  -d "{\"payment_method_code\":\"CASH\",\"amount_cents\":$TOTAL_A_PRE_TRANSFER,\"tendered_cents\":$TOTAL_A_PRE_TRANSFER}")
 [ "$(echo "$PAY_A" | jq -r .data.order.status)" = "closed" ] || fail "Tab A did not close on Till 1"
 echo "18. Tab A paid cash on Till 1 (it's that drawer's tab now): $TOTAL_A_PRE_TRANSFER"
 
