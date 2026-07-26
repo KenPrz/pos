@@ -138,7 +138,7 @@ One envelope (`01-architecture.md`):
 | 403 | `forbidden`, `requires_supervisor`, `discount_needs_supervisor`, `wrong_location` (mostly structural — location scoping yields 404s; reserved for record/register location disagreements) |
 | 404 | `not_found` |
 | 409 | `order_version_conflict`, `insufficient_stock`, `shift_already_open`, `order_closed`, `idempotency_key_reused`, `no_open_shift`, `shift_already_closed`, `shift_has_open_orders`, `line_already_voided`, `payment_already_voided`, `payment_shift_closed`, `day_closed`, `day_has_open_shifts`, `day_has_open_orders`, `day_not_closed`, `day_already_closed` |
-| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use`, `split_too_fine`, `self_lockout`, `role_template_in_use`, `role_template_is_system` |
+| 422 | `payment_exceeds_balance`, `refund_exceeds_original`, `refund_amount_zero`, `modifier_group_required`, `modifier_not_applicable`, `line_total_negative`, `transfer_target_no_shift`, `transfer_same_shift`, `variance_already_approved`, `variance_approval_not_required`, `insufficient_tender`, `order_has_payments`, `discount_scope_mismatch`, `order_not_zero`, `pin_already_in_use`, `split_too_fine`, `self_lockout`, `role_template_in_use`, `role_template_is_system`, `payment_method_unknown`, `payment_method_inactive`, `refund_method_not_refundable` |
 | 429 | `too_many_pin_attempts`, `too_many_requests` |
 
 `code` is stable forever once shipped; clients branch on it. `message` is for humans and
@@ -177,7 +177,8 @@ mutation returns the incremented `version`.
 
 ```
 GET /api/v1/catalog?location_id=&updated_since=
-  → { categories[], products[], variants[], modifier_groups[], modifiers[], tax_rates[], discounts[], currency }
+  → { categories[], products[], variants[], modifier_groups[], modifiers[], tax_rates[],
+      discounts[], payment_methods[], currency }
 ```
 
 **One denormalized payload, not five REST resources.** A register needs the whole menu to
@@ -191,6 +192,14 @@ Pricing logic living in exactly one place is worth the denormalization.
 As of M4, `discounts[]` carries the location's active catalog discounts — what a
 supervisor can apply, not what's already applied. Applied discounts live on the order
 (see Discounts, below).
+
+`payment_methods[]` is the tender buttons the till renders:
+`{ id, code, name, group_code, group_name, driver, sort_order }`. Active methods in
+active groups only — an archived group hides every method under it without touching
+their rows — ordered group `sort_order` → group `code` → method `sort_order` → method
+`code`, a total order so two rows sharing a sort value never render in a different
+sequence per request. `driver` rides along so the register knows which tender flow
+(cash vs. a bare capture) a code will trigger without a second lookup.
 
 `currency` is `config('pos.currency')` (`POS_CURRENCY`) — the server's ISO-4217 code, so
 the register formats every amount it renders instead of hardcoding one. It's also on the
@@ -472,10 +481,16 @@ For food service: a customer orders another round after settling. Audited.
 
 ```
 POST /api/v1/orders/{id}/payments                # Idempotency-Key REQUIRED, If-Match
-  { "driver": "cash", "amount_cents": 5000, "tendered_cents": 6000 }
-  → { payment: { status: "captured", change_cents: 1000 },
+  { "payment_method_code": "CASH", "amount_cents": 5000, "tendered_cents": 6000 }
+  → { payment: { status: "captured", change_cents: 1000,
+                 payment_method_code: "CASH", payment_method_name: "Cash" },
       order:   { paid_cents: 5000, status: "closed", version: 8 } }
 ```
+
+`payment_method_code` names a per-location tender (`02-data-model.md`), not a driver —
+`driver` is resolved from the method's group and comes back on the payment, it is never
+sent. An unknown code at this location is `422 payment_method_unknown`; an archived
+method or an archived group is `422 payment_method_inactive`.
 
 Change is computed **server-side, in integers**. The client displays what it's told; it
 never does the subtraction itself.
@@ -486,10 +501,10 @@ $10 change. Tendering *less* than the amount applied is `422 insufficient_tender
 is a different thing from underpaying the order (that's just a partial payment, and the
 order stays open).
 
-`external_card`:
+A method whose group drives `external_card`:
 
 ```json
-{ "driver": "external_card", "amount_cents": 5000, "reference": "auth 004321" }
+{ "payment_method_code": "VISA", "amount_cents": 5000, "reference": "auth 004321" }
 ```
 
 Recorded as `captured` immediately — we're a ledger for it, not a processor
@@ -514,7 +529,7 @@ endpoint and settles via webhook + `GET /api/v1/payments/{id}`. The shape does n
 POST /api/v1/refunds                             # Idempotency-Key required, supervisor
   {
     "original_order_id": "...",
-    "driver": "cash",
+    "payment_method_code": "CASH",
     "reason": "Faulty",
     "lines": [ { "original_order_line_id": "...", "qty": "1", "restock": true } ]
   }
@@ -525,8 +540,10 @@ Amounts are **derived from the original lines**, never sent by the client — a
 client-specified refund amount is an open till. Validated inside the transaction against
 prior refunds on each line (`422 refund_exceeds_original`). A derived amount of zero — a
 fully discounted line, or a quantity that rounds to nothing — is refused
-(`422 refund_amount_zero`) rather than writing a no-op refund. `driver: "external_card"`
-is rejected: that money never came through us.
+(`422 refund_amount_zero`) rather than writing a no-op refund. Refundability comes from
+the method's driver capability, not the method itself — a method whose group drives
+`external_card` is refused with `422 refund_method_not_refundable`, because that money
+never came through us.
 
 The original order is never modified.
 
@@ -677,6 +694,30 @@ transfer picker, or finding another open register to approve a variance from), w
 a staff action even though it never touches money or the back office. It needs a staff
 session like any other staff-tier route, not an admin one.
 
+### Payment methods — `payment_method.manage`
+
+```
+GET   /api/v1/admin/payment-method-groups?location_id=
+POST  /api/v1/admin/payment-method-groups   { location_id, code, name, driver, sort_order }
+PATCH /api/v1/admin/payment-method-groups/{group}   { name?, sort_order?, is_active? }
+
+GET   /api/v1/admin/payment-methods?location_id=
+POST  /api/v1/admin/payment-methods   { location_id, group_id, code, name, sort_order }
+PATCH /api/v1/admin/payment-methods/{method}   { name?, sort_order?, is_active? }
+```
+
+`code` and `driver` (group) and `code` and `group_id` (method) are absent from the PATCH
+bodies because they are immutable after create — changing a group's driver would change
+how every method under it behaves and retroactively re-bucket history; moving a method to
+another group would do the same at the method level. A client that sends one anyway is
+silently ignored, the same shape every admin `PATCH` here has, rather than a 422.
+
+Codes are normalized to uppercase and unique per location — the same code at a different
+location is legal and expected. Both endpoints check the given (or the row's own)
+`location_id` against where the caller actually holds `payment_method.manage`, same as
+the report endpoints below: holding the permission *somewhere* is what gets a non-admin
+into the section, not a blank check on every store's tenders.
+
 ### Settings (RBAC v2)
 
 ```
@@ -759,10 +800,10 @@ variance, refunds, and reports all stay legal on a closed day.
 
 ```
 GET /api/v1/reports/z?shift_id=                                       # staff tier
-  → { shift, sales_by_driver, refunds_by_driver, movements,
-      orders_closed, orders_voided, orders_split, expected_cash_cents }
+  → { shift, sales_by_method, sales_by_group, refunds_by_method, refunds_by_group,
+      movements, orders_closed, orders_voided, orders_split, expected_cash_cents }
 
-GET /api/v1/admin/reports/sales?location_id=&from=&to=&group_by=day|category|user
+GET /api/v1/admin/reports/sales?location_id=&from=&to=&group_by=day|category|user|payment_method
   → { rows[], totals, basis }                            # gated report.sales.view
 
 GET /api/v1/admin/reports/stock?location_id=&low_only=true
@@ -785,15 +826,25 @@ counts the *originals* `POST /orders/{id}/split` leaves behind (voided, not clos
 separately from ordinary voids, so a busy split day at the till doesn't read as a wave of
 walkouts.
 
-**`group_by=day` and `group_by=user` are LEDGER-basis** — summed straight from captured
-`payments` and `refunds`, i.e. money that actually moved and who moved it. **`group_by=
-category` is LINE-basis** — summed from non-voided lines of closed orders, joined to the
-**live** catalog for a human-readable category name (a report is allowed to do that join;
-a receipt never is, since it must reprint identically to what it said on the day it was
-made). The response's `basis` field names which kind of number a given `group_by`
-produced. **The two bases are not required to reconcile with each other** — a line-level
-discount changes what a line's total was without changing what tender captured it — and
-that's a fact about what each slice measures, not a bug to chase down.
+**`group_by=day`, `group_by=user`, and `group_by=payment_method` are LEDGER-basis** —
+summed straight from captured `payments` and `refunds`, i.e. money that actually moved,
+who moved it, and what it was moved on; `payment_method` groups on the snapshot columns
+(`payment_method_code`/`payment_method_name`), not a join to the live `payment_methods`
+table, for the same reason receipts read snapshots — a renamed or archived method must not
+reshape a historical report. **`group_by=category` is LINE-basis** — summed from
+non-voided lines of closed orders, joined to the **live** catalog for a human-readable
+category name (a report is allowed to do that join; a receipt never is, since it must
+reprint identically to what it said on the day it was made). The response's `basis` field
+names which kind of number a given `group_by` produced. **The two bases are not required
+to reconcile with each other** — a line-level discount changes what a line's total was
+without changing what tender captured it — and that's a fact about what each slice
+measures, not a bug to chase down.
+
+The Z-report's `sales_by_method`/`refunds_by_method` and `sales_by_group`/
+`refunds_by_group` replace the M4-era `sales_by_driver`/`refunds_by_driver` — a per-shift
+cash count needs to see GCash separately from Visa even though both drive
+`external_card`, which a driver-keyed breakdown could never show. Both are keyed on the
+snapshot code/name, same reasoning as above.
 
 The audit viewer is read-only (no `audit_log` row for reading the audit log) and
 paginates at 50 rows. `entity_type`/`entity_id`, `user_id`, and `action` are each covered

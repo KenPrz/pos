@@ -299,6 +299,29 @@ if any shift is open or any order is still open, and re-closing an already-close
 app is untouched. Suites: 555 backend / 113 register / 177 back-office. Full story in
 `docs/06-roadmap.md`.
 
+**Payment methods complete** — the hardcoded `driver` string on every payment and refund
+is now a per-location taxonomy: `payment_method_groups` (id, location_id, code, name,
+driver, sort_order, is_active) and `payment_methods` (id, location_id, group_id, code,
+name, sort_order, is_active), unique on `(location_id, code)` for both, with a composite
+FK `(group_id, location_id) → payment_method_groups (id, location_id)` so a method can't
+belong to another location's group. The **group carries the driver** — `CARD` and
+`EWALLET` can both drive `external_card` and stay separate groups, because a drawer count
+needs GCash apart from Visa — and `driver` survives on `payments`/`refunds` as a plain
+derived column, so `ShiftTotals` and the `payments_change_balances` check needed no
+change at all. `payment_method_code`/`payment_method_name` snapshot onto both tables (the
+order-lines rule, applied to tenders); a code, a method's `group_id`, and a group's
+`driver` are all immutable after create, with `PATCH` silently dropping those keys rather
+than erroring. New admin-tier permission `payment_method.manage` (granted by no default
+role, its own back-office section, deliberately not money-leaves — naming a tender moves
+no money, taking one is still `payment.take`) backs six routes under
+`/admin/payment-method-groups` and `/admin/payment-methods`, no `DELETE`. The Z-report's
+`sales_by_driver`/`refunds_by_driver` became `sales_by_method`/`sales_by_group`/
+`refunds_by_method`/`refunds_by_group`, and `GET /admin/reports/sales` gained
+`group_by=payment_method` (ledger-basis, keyed on the snapshot columns, like `day`/
+`user`). `PaymentMethodProvisioner` closes the same bug class RBAC v2 closed for roles —
+a location created in the back office now gets a working `CASH`/`CARD` pair instead of
+422ing on its first tender. Suites: 613 backend / 121 register / 222 back-office.
+
 Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
 trigger that would revive each (monitoring, load test, runbook, registry/CD, and more).
 
@@ -364,3 +387,8 @@ trigger that would revive each (monitoring, load test, runbook, registry/CD, and
   `infra/docker-compose.yml` (same default project name) attaches to that same volume —
   a real database, not a fresh one — unless it's torn down with `-v` first or the prod
   stack boots under an overridden `COMPOSE_PROJECT_NAME`.
+- **A payment method's group carries the driver, and neither a code nor a group is
+  editable.** Moving a method between groups would silently change its behaviour and
+  retroactively re-bucket every payment taken on it, so `UpdatePaymentMethod` refuses
+  `group_id` and `code` outright — the fix for a wrong one is archive-and-recreate. The
+  same applies to a group's own `code` and `driver`.

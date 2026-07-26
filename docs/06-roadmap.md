@@ -724,6 +724,58 @@ and prove the guard lifts.
 
 ---
 
+## Payment methods complete
+
+Cash and card were a hardcoded `driver` string on every payment and refund since M4 —
+fine for two tenders, wrong once a location wants to tell GCash apart from Maya at the
+drawer, or rename "Cards" without touching a code every report and receipt depends on.
+This work replaces the string with a per-location taxonomy: `payment_method_groups` (one
+row per driver-backed bucket) and `payment_methods` (the admin-named variants a till
+actually offers), full story in `02-data-model.md`.
+
+- **The one decision worth remembering: the group carries the driver, not the method.**
+  `PaymentMethodResolver` still turns a code into a driver exactly as before — nothing in
+  `PaymentDriver`, `DriverRegistry`, or `Capabilities` changed, and no code seam moved.
+  Methods are just admin data sitting *above* that seam. That's what makes `CARD` and
+  `EWALLET` both drive `external_card` while staying separate groups (the Manila seed
+  ships Visa/Mastercard under `CARD` and GCash/Maya under `EWALLET`) — a second e-wallet
+  is a row now, not a class.
+- **A code, a method's group, and a group's driver are all immutable after create.**
+  Moving a method between groups or repointing a group's driver would silently change
+  live behaviour and retroactively re-bucket every payment already taken on it; `PATCH`
+  drops those keys rather than erroring, the same shape every admin `PATCH` in this API
+  has for a field it doesn't recognize. The fix for a wrong one is archive-and-recreate.
+- **The bug class this closes**: `CreateLocation` provisioned roles but not payment
+  methods, so a location made in the back office would 422 on its first tender — the
+  same shape RBAC v2 closed for roles, one table over. `PaymentMethodProvisioner` is
+  `RoleProvisioner`'s counterpart, idempotent by code, and every location (seeded or
+  admin-created) now gets a working `CASH`/`CARD` pair for free.
+- **Payments and refunds snapshot `payment_method_code`/`payment_method_name`** (the
+  order-lines rule, applied to tenders) while `driver` stays a plain derived column —
+  which is why `ShiftTotals` and the `payments_change_balances` check needed zero
+  changes. The three columns landed across two migrations on purpose: `refunds` stayed
+  nullable until `RefundOrder` could write them, tightened only once its writer shipped.
+- **The breaking wire change**: `POST /orders/{id}/payments` and `POST /refunds` take
+  `payment_method_code` instead of `driver`; the Z-report's `sales_by_driver`/
+  `refunds_by_driver` become `sales_by_method`/`sales_by_group`/`refunds_by_method`/
+  `refunds_by_group`, and `GET /admin/reports/sales` gains `group_by=payment_method`
+  (ledger-basis, keyed on the snapshot columns). `GET /catalog` gains `payment_methods[]`
+  so the register renders tender buttons from location data instead of two hardcoded
+  ones. Full shapes in `03-api.md`.
+- **New permission `payment_method.manage`** (`05-rbac.md`) — admin-tier, granted by no
+  default role, doubling as its own back-office section, deliberately not
+  `moneyLeaves()`: naming a tender moves no money, and taking one is still `payment.take`
+  against a user and a shift. Six routes under `/admin/payment-method-groups` and
+  `/admin/payment-methods`, no `DELETE`, location-scoped the same way the report
+  permissions are.
+- **All three e2e scripts updated**: `e2e-retail-day.sh` and `e2e-lunch-service.sh` tender
+  on method codes instead of `driver` strings; `e2e-admin-day.sh` exercises the new admin
+  CRUD and the Z-report's method/group breakdown.
+
+**Status: complete.** Suites: 613 backend / 121 register / 222 back-office.
+
+---
+
 ## Sequencing rationale
 
 - **Money before schema** — everything computes on it.

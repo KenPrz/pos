@@ -369,6 +369,15 @@ v1 ships:
   *not* refundable through us: the money didn't go through us, so pretending we can send
   it back is a lie that would corrupt reconciliation.
 
+Groups and methods (`02-data-model.md`) sit **above** this seam, not inside it. A payment
+method group is per-location admin data naming exactly one driver; its methods are names an
+admin gives to behaviour the driver already implements. That split is what decides where new
+work goes: a second e-wallet or a named card scheme is a **row**, because it behaves
+identically to something already here; Stripe Terminal is still a **driver class**, because
+it behaves differently. Nothing in `PaymentDriver`, `DriverRegistry` or `Capabilities`
+knows that methods exist — `PaymentMethodResolver` turns a code into a driver and the rest
+of the payment path is untouched.
+
 ## Error format
 
 One shape, everywhere, so the client has one code path:
