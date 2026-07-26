@@ -5708,3 +5708,198 @@ Plan: `docs/superpowers/plans/2026-07-26-payment-methods.md`
 EOF
 )"
 ```
+
+## Task 20: Wire the two report groupings into the UI
+
+Added after Task 19 discovered that both features were complete server-side but unreachable
+by a user — no task in the original plan owned them. The spec promised both:
+"the Z-report breaks the drawer down by method *and* by group", and "In the back office,
+**Reports → Sales** grouped by **Payment method** answers 'how much came in on GCash last
+month'." Neither is true of the shipped UI today.
+
+**Files:**
+- Modify: `frontend/back-office/src/admin/reports/SalesReportView.tsx`
+- Modify: `frontend/back-office/src/admin/reports/SalesReportView.test.tsx`
+- Modify: `frontend/web/src/register/ShiftScreens.tsx`
+- Modify: `frontend/web/src/register/ShiftScreens.test.tsx`
+
+**Interfaces:**
+- Consumes: `api.reports.sales({ group_by: 'payment_method' })` and the `SalesReportRow` fields
+  `method_code`/`method_name`/`group_code`/`group_name` (Task 13); `ZReport.sales_by_group` /
+  `refunds_by_group` (Task 15). All four already exist and are typed — this is wiring only.
+- Produces: no new API surface.
+
+- [ ] **Step 1: Write the failing back-office test**
+
+Append to `frontend/back-office/src/admin/reports/SalesReportView.test.tsx`, matching the
+file's existing render helper and `api.reports.sales` mock:
+
+```tsx
+it('offers a Payment method grouping and requests it', async () => {
+  renderReport()
+
+  fireEvent.click(await screen.findByRole('tab', { name: 'Payment method' }))
+
+  await waitFor(() =>
+    expect(api.reports.sales).toHaveBeenCalledWith(expect.objectContaining({ group_by: 'payment_method' })),
+  )
+})
+
+it('shows the method and its group as separate columns', async () => {
+  vi.mocked(api.reports.sales).mockResolvedValue({
+    rows: [{
+      bucket: 'GCASH', method_code: 'GCASH', method_name: 'GCash',
+      group_code: 'EWALLET', group_name: 'E-wallets',
+      gross_cents: 2500, refunds_cents: 0, net_cents: 2500,
+    }],
+    totals: { gross_cents: 2500, refunds_cents: 0, net_cents: 2500 },
+    basis: 'ledger',
+  } as never)
+
+  renderReport()
+  fireEvent.click(await screen.findByRole('tab', { name: 'Payment method' }))
+
+  // The method name is what a human recognises; the code is what reports key on.
+  expect(await screen.findByText('GCash')).toBeInTheDocument()
+  expect(screen.getByText('E-wallets')).toBeInTheDocument()
+})
+```
+
+Match the file's real helper names and its mocking style; this repo has no
+`@testing-library/user-event`, so use `fireEvent`.
+
+- [ ] **Step 2: Run it to confirm it fails**
+
+Run: `cd frontend/back-office && npm test -- SalesReportView`
+Expected: FAIL — there is no tab named "Payment method".
+
+- [ ] **Step 3: Add the grouping to the back-office report**
+
+In `SalesReportView.tsx`, widen the union and add the tab:
+
+```tsx
+type GroupBy = 'day' | 'category' | 'user' | 'payment_method'
+
+const GROUP_BY_TABS: Array<{ id: GroupBy; label: string }> = [
+  { id: 'day', label: 'Day' },
+  { id: 'category', label: 'Category' },
+  { id: 'user', label: 'User' },
+  { id: 'payment_method', label: 'Payment method' },
+]
+```
+
+The existing `isLines` branch picks columns off `basis`, but `payment_method` is
+ledger-basis like `day`/`user`, so `basis` cannot distinguish it — branch on `groupBy` for
+this one. Add a third column set rather than bending the generic ledger one, because a
+payment-method row has no `orders_closed` and would otherwise render a column of dashes:
+
+```tsx
+  const isMethods = groupBy === 'payment_method'
+
+  const columns: DataTableColumn<SalesReportRow>[] = isLines
+    ? [ /* ...unchanged category columns... */ ]
+    : isMethods
+      ? [
+          // The name is what a human recognises; the code is what the ledger is keyed on,
+          // so both are shown rather than making the reader guess which they're looking at.
+          { key: 'method_name', header: 'Method', render: (r) => r.method_name ?? r.bucket },
+          { key: 'method_code', header: 'Code', render: (r) => r.method_code ?? r.bucket },
+          { key: 'group_name', header: 'Group', render: (r) => r.group_name ?? '—' },
+          { key: 'gross_cents', header: 'Gross', render: (r) => fm(r.gross_cents ?? 0) },
+          { key: 'refunds_cents', header: 'Refunds', render: (r) => fm(r.refunds_cents ?? 0) },
+          { key: 'net_cents', header: 'Net', render: (r) => fm(r.net_cents ?? 0) },
+        ]
+      : [ /* ...unchanged day/user columns... */ ]
+```
+
+Give the CSV export and the totals footer matching branches — a payment-method export's
+headers are `['Method', 'Code', 'Group', 'Gross', 'Refunds', 'Net']` and its footer is
+`['Total', '', '', gross, refunds, net]`. Update `rowToCsv` accordingly.
+
+- [ ] **Step 4: Run the back-office tests**
+
+Run: `cd frontend/back-office && npm test -- SalesReportView && npm run typecheck`
+Expected: PASS, typecheck clean.
+
+- [ ] **Step 5: Write the failing register test**
+
+Append to `frontend/web/src/register/ShiftScreens.test.tsx`, extending its `makeZReport`
+fixture so more than one group has activity:
+
+```tsx
+it('rolls the drawer up by group when the location has more than one', async () => {
+  // CARD and EWALLET share the external_card driver — the group rollup is the only place
+  // a supervisor sees them apart, which is the whole reason groups exist.
+  renderZReport(makeZReport({
+    sales_by_method: { CASH: 1000, VISA: 2000, GCASH: 3000 },
+    sales_by_group: { CASH: 1000, CARD: 2000, EWALLET: 3000 },
+  }))
+
+  expect(await screen.findByText('Sales by group — EWALLET')).toBeInTheDocument()
+  expect(screen.getByText('Sales by group — CARD')).toBeInTheDocument()
+})
+
+it('omits the group rollup when there is only one group', async () => {
+  renderZReport(makeZReport({
+    sales_by_method: { CASH: 1000 },
+    sales_by_group: { CASH: 1000 },
+  }))
+
+  expect(await screen.findByText('Sales — CASH')).toBeInTheDocument()
+  expect(screen.queryByText(/Sales by group/)).not.toBeInTheDocument()
+})
+```
+
+Match the file's real fixture and render helper names.
+
+- [ ] **Step 6: Render the group rollup in the Z panel**
+
+In `ShiftScreens.tsx`'s `ZReportPanel`, after the `refunds_by_method` rows:
+
+```tsx
+        {/* Only worth the rows when there IS a rollup: with one group it just repeats the
+            method lines above. Two groups may share a driver (CARD and EWALLET both drive
+            external_card), and this is the only place a supervisor sees them apart. */}
+        {Object.keys(r.sales_by_group).length > 1 &&
+          Object.entries(r.sales_by_group).map(([group, amount]) => (
+            <div key={`g-${group}`} className={row}>
+              <dt className={label}>Sales by group — {group}</dt>
+              <dd className={value}>{fm(amount)}</dd>
+            </div>
+          ))}
+        {Object.keys(r.refunds_by_group).length > 1 &&
+          Object.entries(r.refunds_by_group).map(([group, amount]) => (
+            <div key={`gr-${group}`} className={row}>
+              <dt className={label}>Refunds by group — {group}</dt>
+              <dd className={value}>−{fm(amount)}</dd>
+            </div>
+          ))}
+```
+
+- [ ] **Step 7: Run everything**
+
+```bash
+cd frontend/web && npm test && npm run typecheck && npm run build
+cd ../back-office && npm test && npm run typecheck && npm run build
+```
+Expected: all green.
+
+- [ ] **Step 8: Correct the manual's "Reading it back" section**
+
+Task 19 rewrote `docs/user-manual/user-manual.md`'s Chapter 12 "Reading it back" to describe
+the reduced reality, because the features were unreachable. They are reachable now — restore
+the accurate description: the till's Z-report breaks the drawer down by method and, when the
+location has more than one group, by group; and **Reports → Sales** in the back office offers
+a **Payment method** grouping. Do not rebuild the PDF in this step; note it for Step 9.
+
+- [ ] **Step 9: Rebuild the manual PDF**
+
+Run: `make manual`
+Expected: succeeds. (WeasyPrint output is not byte-stable, so a large PDF diff is expected.)
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add frontend/back-office/src/admin/reports frontend/web/src/register docs/user-manual
+git commit -m "feat(reports): surface the payment-method grouping and group rollup in the UI"
+```
