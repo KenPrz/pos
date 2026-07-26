@@ -48,6 +48,13 @@ final class Permissions
     public const string SETTINGS_MANAGE = 'settings.manage';
     public const string ROLE_MANAGE = 'role.manage';
 
+    /**
+     * The per-location tender taxonomy (payment method groups and methods). Admin-tier:
+     * granted by no default role, doubles as the back-office section. Deliberately NOT
+     * in moneyLeaves() — naming a tender moves no money; taking one is payment.take.
+     */
+    public const string PAYMENT_METHOD_MANAGE = 'payment_method.manage';
+
     // Reports
     public const string REPORT_Z_VIEW = 'report.z.view';
     public const string REPORT_SALES_VIEW = 'report.sales.view';
@@ -115,6 +122,7 @@ final class Permissions
             self::REGISTER_ENROLL,
             self::SETTINGS_MANAGE,
             self::ROLE_MANAGE,
+            self::PAYMENT_METHOD_MANAGE,
             self::REPORT_Z_VIEW,
             self::REPORT_SALES_VIEW,
             self::REPORT_STOCK_VIEW,
@@ -182,7 +190,7 @@ final class Permissions
             'Orders' => [self::ORDER_OPEN, self::ORDER_LINE_ADD, self::ORDER_LINE_UPDATE, self::ORDER_LINE_VOID, self::ORDER_DISCOUNT_APPLY, self::ORDER_VOID, self::ORDER_REOPEN, self::ORDER_TRANSFER],
             'Payments & refunds' => [self::PAYMENT_TAKE, self::PAYMENT_VOID, self::REFUND_CREATE],
             'Shifts & drawer' => [self::SHIFT_OPEN, self::SHIFT_CLOSE, self::SHIFT_CASH_MOVEMENT, self::SHIFT_APPROVE_VARIANCE, self::DRAWER_NO_SALE, self::DAY_CLOSE],
-            'Administration' => [self::CATALOG_VIEW, self::CATALOG_MANAGE, self::USER_MANAGE, self::LOCATION_MANAGE, self::REGISTER_ENROLL, self::SETTINGS_MANAGE, self::ROLE_MANAGE],
+            'Administration' => [self::CATALOG_VIEW, self::CATALOG_MANAGE, self::USER_MANAGE, self::LOCATION_MANAGE, self::REGISTER_ENROLL, self::SETTINGS_MANAGE, self::ROLE_MANAGE, self::PAYMENT_METHOD_MANAGE],
             'Reports' => [self::REPORT_Z_VIEW, self::REPORT_SALES_VIEW, self::REPORT_STOCK_VIEW, self::AUDIT_VIEW],
             'Stock' => [self::STOCK_ADJUST, self::STOCK_RECEIVE, self::STOCK_COUNT, self::STOCK_MOVEMENTS_VIEW],
         ];
