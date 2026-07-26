@@ -34,8 +34,11 @@ use App\Http\Controllers\Admin\Day\ReopenBusinessDayController;
 use App\Http\Controllers\Admin\Locations\CreateLocationController;
 use App\Http\Controllers\Admin\Locations\ListLocationsController;
 use App\Http\Controllers\Admin\Locations\UpdateLocationController;
+use App\Http\Controllers\Admin\PaymentMethods\CreatePaymentMethodController;
 use App\Http\Controllers\Admin\PaymentMethods\CreatePaymentMethodGroupController;
 use App\Http\Controllers\Admin\PaymentMethods\ListPaymentMethodGroupsController;
+use App\Http\Controllers\Admin\PaymentMethods\ListPaymentMethodsController;
+use App\Http\Controllers\Admin\PaymentMethods\UpdatePaymentMethodController;
 use App\Http\Controllers\Admin\PaymentMethods\UpdatePaymentMethodGroupController;
 use App\Http\Controllers\Admin\Registers\CreateRegisterController;
 use App\Http\Controllers\Admin\Registers\IssueActivationCodeController;
@@ -222,6 +225,13 @@ Route::prefix('v1')->group(function (): void {
             ->name('admin.payment-method-groups.create');
         Route::patch('/payment-method-groups/{group}', UpdatePaymentMethodGroupController::class)
             ->name('admin.payment-method-groups.update');
+
+        Route::get('/payment-methods', ListPaymentMethodsController::class)
+            ->name('admin.payment-methods.list');
+        Route::post('/payment-methods', CreatePaymentMethodController::class)
+            ->name('admin.payment-methods.create');
+        Route::patch('/payment-methods/{method}', UpdatePaymentMethodController::class)
+            ->name('admin.payment-methods.update');
 
         // Reports (M6 task 6). Reads only — no audit. day/user are ledger-basis (from
         // payments + refunds); category is line-basis (non-voided lines of closed
