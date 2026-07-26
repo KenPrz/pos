@@ -59,7 +59,8 @@ function reportsAddLine(object $t, string $orderId, string $variantId, string $q
 function reportsPay(object $t, string $orderId, string $driver, int $amountCents, User $actor): Order
 {
     return app(TakePayment::class)->execute(new TakePaymentInput(
-        orderId: $orderId, registerId: $t->register->id, driver: $driver,
+        orderId: $orderId, registerId: $t->register->id,
+        paymentMethodCode: $driver === 'cash' ? 'CASH' : 'CARD',
         amountCents: $amountCents, tenderedCents: $driver === 'cash' ? $amountCents : null,
         reference: null, expectedVersion: Order::findOrFail($orderId)->version, actorId: $actor->id,
     ))->order;

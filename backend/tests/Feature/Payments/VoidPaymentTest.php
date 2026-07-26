@@ -38,7 +38,7 @@ function t5TakeCash(object $t): Payment
     return app(TakePayment::class)->execute(new TakePaymentInput(
         orderId: $t->order->id,
         registerId: $t->register->id,
-        driver: 'cash',
+        paymentMethodCode: 'CASH',
         amountCents: 5000,
         tenderedCents: 5000,
         reference: null,

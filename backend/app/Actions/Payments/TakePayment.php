@@ -8,6 +8,7 @@ use App\Domain\Audit\AuditLogger;
 use App\Domain\Money\Money;
 use App\Domain\Payments\DriverRegistry;
 use App\Domain\Payments\PaymentIntent;
+use App\Domain\Payments\PaymentMethodResolver;
 use App\Exceptions\Domain\NoOpenShift;
 use App\Exceptions\Domain\OrderClosed;
 use App\Exceptions\Domain\OrderVersionConflict;
@@ -29,6 +30,7 @@ final class TakePayment
 {
     public function __construct(
         private readonly DriverRegistry $drivers,
+        private readonly PaymentMethodResolver $methods,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -58,7 +60,11 @@ final class TakePayment
                 throw new PaymentExceedsBalance($order->id, $in->amountCents, $balance);
             }
 
-            $result = $this->drivers->driver($in->driver)->authorize(new PaymentIntent(
+            // Resolved inside the transaction, so an admin archiving a method mid-tender
+            // loses the race rather than half-winning it.
+            $method = $this->methods->resolve($locationId, $in->paymentMethodCode);
+
+            $result = $this->drivers->driver($method->driver)->authorize(new PaymentIntent(
                 amount: Money::fromCents($in->amountCents),
                 tendered: $in->tenderedCents === null ? null : Money::fromCents($in->tenderedCents),
                 reference: $in->reference,
@@ -67,7 +73,10 @@ final class TakePayment
             $payment = Payment::create([
                 'order_id' => $order->id,
                 'shift_id' => $shift->id,
-                'driver' => $in->driver,
+                'driver' => $method->driver,
+                'payment_method_id' => $method->id,
+                'payment_method_code' => $method->code,
+                'payment_method_name' => $method->name,
                 'status' => $result->status,
                 'amount_cents' => $in->amountCents,
                 'tendered_cents' => $result->tender?->tendered->cents,
@@ -92,7 +101,8 @@ final class TakePayment
 
             $this->audit->record('payment.take', $payment, $in->actorId, [
                 'order_id' => $order->id,
-                'driver' => $in->driver,
+                'payment_method_code' => $method->code,
+                'driver' => $method->driver,
                 'amount_cents' => $in->amountCents,
             ], registerId: $in->registerId);
 

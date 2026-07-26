@@ -41,7 +41,7 @@ function dayTotalsRingUpCashSale(Location $location, TaxRate $taxRate): Order
     ));
     $order = Order::findOrFail($order->id);
     app(TakePayment::class)->execute(new TakePaymentInput(
-        orderId: $order->id, registerId: $register->id, driver: 'cash',
+        orderId: $order->id, registerId: $register->id, paymentMethodCode: 'CASH',
         amountCents: $order->total_cents, tenderedCents: $order->total_cents,
         reference: null, expectedVersion: $order->version, actorId: $cashier->id,
     ));

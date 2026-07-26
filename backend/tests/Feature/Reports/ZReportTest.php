@@ -49,7 +49,8 @@ function t12AddLine(object $t, string $orderId, string $variantId, string $qty):
 function t12Pay(object $t, string $orderId, string $driver, int $amountCents, ?string $reference = null): Order
 {
     return app(TakePayment::class)->execute(new TakePaymentInput(
-        orderId: $orderId, registerId: $t->register->id, driver: $driver,
+        orderId: $orderId, registerId: $t->register->id,
+        paymentMethodCode: $driver === 'cash' ? 'CASH' : 'CARD',
         amountCents: $amountCents, tenderedCents: $driver === 'cash' ? $amountCents : null,
         reference: $reference, expectedVersion: Order::findOrFail($orderId)->version, actorId: $t->cashier->id,
     ))->order;

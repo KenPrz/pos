@@ -51,7 +51,7 @@ it('the same key text on two different orders collides and is rejected, never si
     // NOT execute twice and must NOT replay order A's response against order B — it
     // 409s, proving there is no cross-order collision hazard either way.
     $key = (string) Illuminate\Support\Str::uuid();
-    $body = ['driver' => 'cash', 'amount_cents' => 500, 'tendered_cents' => 500];
+    $body = ['payment_method_code' => 'CASH', 'amount_cents' => 500, 'tendered_cents' => 500];
 
     $this->postJson("/api/v1/orders/{$this->orderA->id}/payments", $body,
         staffHeaders($this->register, $this->cashier) + ['If-Match' => (string) $this->orderA->version, 'Idempotency-Key' => $key],
@@ -68,7 +68,7 @@ it('replaying one of them still replays, not re-executes', function (): void {
     $key = (string) Str::uuid();
     $headers = staffHeaders($this->register, $this->cashier)
         + ['If-Match' => (string) $this->orderA->version, 'Idempotency-Key' => $key];
-    $body = ['driver' => 'cash', 'amount_cents' => 500, 'tendered_cents' => 500];
+    $body = ['payment_method_code' => 'CASH', 'amount_cents' => 500, 'tendered_cents' => 500];
 
     $first = $this->postJson("/api/v1/orders/{$this->orderA->id}/payments", $body, $headers);
     $first->assertCreated();

@@ -25,6 +25,7 @@ pest()->extend(TestCase::class)
 use App\Domain\Payments\PaymentMethodProvisioner;
 use App\Domain\Rbac\RoleProvisioner;
 use App\Models\Location;
+use App\Models\PaymentMethod;
 use App\Models\Register;
 use App\Models\User;
 use Spatie\Permission\PermissionRegistrar;
@@ -41,6 +42,24 @@ function provisionedLocation(array $attrs = []): Location
     app(PaymentMethodProvisioner::class)->provisionForLocation($location->id);
 
     return $location;
+}
+
+/**
+ * The three not-null tender columns a directly-created Payment/Refund row needs.
+ * Spread it: `Payment::create([... , ...tenderColumns($location)])`.
+ */
+function tenderColumns(Location $location, string $code = 'CASH'): array
+{
+    $method = PaymentMethod::query()
+        ->where('location_id', $location->id)
+        ->where('code', $code)
+        ->firstOrFail();
+
+    return [
+        'payment_method_id' => $method->id,
+        'payment_method_code' => $method->code,
+        'payment_method_name' => $method->name,
+    ];
 }
 
 function registerAt(Location $location): Register

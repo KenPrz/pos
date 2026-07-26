@@ -63,7 +63,7 @@ function t8AddLine(object $t, string $orderId, string $variantId, string $qty): 
 function t8Pay(object $t, string $orderId, int $amountCents): Order
 {
     return app(TakePayment::class)->execute(new TakePaymentInput(
-        orderId: $orderId, registerId: $t->register->id, driver: 'cash',
+        orderId: $orderId, registerId: $t->register->id, paymentMethodCode: 'CASH',
         amountCents: $amountCents, tenderedCents: $amountCents, reference: null,
         expectedVersion: Order::findOrFail($orderId)->version, actorId: $t->cashier->id,
     ))->order;
@@ -280,7 +280,7 @@ it('at a tax-inclusive location, a refund is the gross line total — never gros
         ->and($line->tax_cents)->toBe(500);
 
     $order = app(TakePayment::class)->execute(new TakePaymentInput(
-        orderId: $order->id, registerId: $register->id, driver: 'cash',
+        orderId: $order->id, registerId: $register->id, paymentMethodCode: 'CASH',
         amountCents: $order->total_cents, tenderedCents: $order->total_cents, reference: null,
         expectedVersion: Order::findOrFail($order->id)->version, actorId: $cashier->id,
     ))->order;
@@ -305,7 +305,7 @@ it('at a tax-inclusive location, a refund is the gross line total — never gros
     ))->order;
     $partialLine = $partialOrder->lines->first();
     $partialOrder = app(TakePayment::class)->execute(new TakePaymentInput(
-        orderId: $partialOrder->id, registerId: $register->id, driver: 'cash',
+        orderId: $partialOrder->id, registerId: $register->id, paymentMethodCode: 'CASH',
         amountCents: $partialOrder->total_cents, tenderedCents: $partialOrder->total_cents, reference: null,
         expectedVersion: Order::findOrFail($partialOrder->id)->version, actorId: $cashier->id,
     ))->order;

@@ -29,7 +29,7 @@ beforeEach(function (): void {
 
     // Pay it in full so it auto-closes — the state Reopen operates on.
     $this->order = app(TakePayment::class)->execute(new TakePaymentInput(
-        orderId: $this->order->id, registerId: $this->register->id, driver: 'cash',
+        orderId: $this->order->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         amountCents: 1000, tenderedCents: 1000, reference: null,
         expectedVersion: $this->order->version, actorId: $this->cashier->id,
     ))->order;
@@ -68,7 +68,7 @@ it('adding a line then paying the difference re-closes the reopened order', func
     $balance = $order->total_cents - $order->paid_cents;
 
     $payment = app(TakePayment::class)->execute(new TakePaymentInput(
-        orderId: $order->id, registerId: $this->register->id, driver: 'cash',
+        orderId: $order->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         amountCents: $balance, tenderedCents: $balance, reference: null,
         expectedVersion: $order->version, actorId: $this->cashier->id,
     ));
