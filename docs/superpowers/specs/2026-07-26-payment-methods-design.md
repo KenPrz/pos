@@ -323,13 +323,29 @@ Nothing else about the tender flow, the split flow, or the idempotency-key handl
 When the location has no active methods the tender zone shows an empty state naming the
 back office instead of an unusable button row.
 
+## Provisioning a location's defaults
+
+`App\Domain\Payments\PaymentMethodProvisioner` writes one location's default set — group
+`CASH` (driver `cash`) with method `CASH`, group `CARD` (driver `external_card`) with
+method `CARD` — and is idempotent, skipping any code that already exists at that location.
+
+It is called from three places: the backfill migration, `CreateLocation`, and the
+`provisionedLocation()` test helper.
+
+`CreateLocation` matters most. RBAC v2 fixed a confirmed bug where a location created in
+the back office got no roles provisioned and was therefore unusable; a location with no
+payment methods is the same bug with a different noun — every tender at it would 422.
+Roles have `RoleProvisioner` for exactly this reason, and tenders now have the
+counterpart.
+
 ## Migration and seeding
 
 One migration, in order:
 
 1. Create both tables with their indexes and constraints.
-2. Insert, for every existing location, group `CASH` (driver `cash`) with method `CASH`,
-   and group `CARD` (driver `external_card`) with method `CARD`.
+2. Provision the default set into every existing location (the same `CASH`/`CARD` pairs
+   `PaymentMethodProvisioner` writes, inlined as SQL — a migration must not depend on a
+   domain class that may change under it).
 3. Add the three columns to `payments` and `refunds`, nullable.
 4. Backfill: join each row to its location (`payments` through `orders`, `refunds`
    directly) and set the method matching the row's existing `driver`.
@@ -366,7 +382,9 @@ from another location refused by the composite FK; `code`, `driver` and `group_i
 on `PATCH`. Reports: Z grouped by method and by group across two groups sharing a driver;
 `group_by=payment_method` on snapshot columns, including a method renamed after the sale.
 RBAC: non-holder 403, holder at another location refused its `location_id`, `is_admin`
-exempt. Migration backfill is covered by the suite running against a seeded database.
+exempt. `PaymentMethodProvisioner`: writes the default set, is idempotent on a second
+call, and a location created through `POST /admin/locations` can take a cash payment
+immediately. Migration backfill is covered by the suite running against a seeded database.
 
 `tests/Arch/` must stay green — new actions are `final`, take Input DTOs, touch no HTTP,
 and no `env()` appears outside `config/`.
