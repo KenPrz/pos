@@ -1176,10 +1176,14 @@ it('still refuses a driver-shaped body', function (): void {
     $headers = staffHeaders($this->register, $this->cashier)
         + ['Idempotency-Key' => (string) \Illuminate\Support\Str::uuid(), 'If-Match' => '0'];
 
-    // There is ONE way to name a tender. `driver` is not it anymore.
+    // There is ONE way to name a tender, and `driver` is not it anymore. A body that names
+    // no tender is MALFORMED, so it is 400 validation_failed — 422 is reserved for
+    // structurally-fine requests that are semantically rejected (ApiErrorEnvelope).
     $this->postJson("/api/v1/orders/{$this->order->id}/payments", [
         'driver' => 'cash', 'amount_cents' => 5000, 'tendered_cents' => 5000,
-    ], $headers)->assertStatus(422);
+    ], $headers)
+        ->assertStatus(400)
+        ->assertJsonPath('error.code', 'validation_failed');
 });
 ```
 
@@ -2308,7 +2312,7 @@ it('refuses a duplicate code at one location', function (): void {
     $this->postJson('/api/v1/admin/payment-method-groups', [
         'location_id' => $this->location->id,
         'code' => 'CASH', 'name' => 'Cash again', 'driver' => 'cash',
-    ], $this->headers)->assertStatus(422);
+    ], $this->headers)->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
 
 it('accepts the same code at a different location', function (): void {
@@ -2330,7 +2334,7 @@ it('refuses a driver outside the registry', function (): void {
     $this->postJson('/api/v1/admin/payment-method-groups', [
         'location_id' => $this->location->id,
         'code' => 'CRYPTO', 'name' => 'Crypto', 'driver' => 'bitcoin',
-    ], $this->headers)->assertStatus(422);
+    ], $this->headers)->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
 
 it('ignores code, driver and location on update', function (): void {
@@ -2993,7 +2997,7 @@ it('derives location from the group and refuses a group at another location', fu
         'location_id' => $this->location->id,
         'group_id' => $groupAtOther->id,
         'code' => 'VISA', 'name' => 'Visa',
-    ], $this->headers)->assertStatus(422);
+    ], $this->headers)->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
 
 it('refuses a duplicate code at one location even across groups', function (): void {
@@ -3005,7 +3009,7 @@ it('refuses a duplicate code at one location even across groups', function (): v
         'location_id' => $this->location->id,
         'group_id' => $cash->id,
         'code' => 'CASH', 'name' => 'Cash again',
-    ], $this->headers)->assertStatus(422);
+    ], $this->headers)->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
 
 it('accepts the same code at a different location', function (): void {
@@ -3614,7 +3618,7 @@ it('still rejects an unknown group_by', function (): void {
         "/api/v1/admin/reports/sales?location_id={$this->location->id}"
         ."&from={$this->today}&to={$this->today}&group_by=tender",
         $this->headers,
-    )->assertStatus(422);
+    )->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });
 ```
 
