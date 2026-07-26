@@ -2199,6 +2199,7 @@ git commit -m "feat(reports): Z-report breaks tenders down by method and group"
 
 **Files:**
 - Create: `backend/app/Actions/Admin/PaymentMethods/ListPaymentMethodGroups.php`, `ListPaymentMethodGroupsInput.php`, `CreatePaymentMethodGroup.php`, `CreatePaymentMethodGroupInput.php`, `UpdatePaymentMethodGroup.php`, `UpdatePaymentMethodGroupInput.php`
+- Create: `backend/app/Http/Requests/Concerns/ScopesToPermittedLocation.php`
 - Create: `backend/app/Http/Requests/Admin/PaymentMethods/ListPaymentMethodGroupsRequest.php`, `CreatePaymentMethodGroupRequest.php`, `UpdatePaymentMethodGroupRequest.php`
 - Create: `backend/app/Http/Controllers/Admin/PaymentMethods/ListPaymentMethodGroupsController.php`, `CreatePaymentMethodGroupController.php`, `UpdatePaymentMethodGroupController.php`
 - Create: `backend/app/Http/Resources/Admin/AdminPaymentMethodGroupResource.php`
@@ -2548,7 +2549,55 @@ final class AdminPaymentMethodGroupResource extends JsonResource
 will fail to autoload — write Task 10's resource file first if you are running Task 9
 standalone, or accept that Step 8 below is the gate for both.)
 
-- [ ] **Step 6: Write the three FormRequests**
+- [ ] **Step 6a: Write the location-scoping concern**
+
+All six FormRequests in this task and Task 10 need the same check, so it lives in one
+trait beside `AuthorizesBackOffice` rather than being copy-pasted six times. Create
+`backend/app/Http/Requests/Concerns/ScopesToPermittedLocation.php`:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Requests\Concerns;
+
+use App\Domain\Rbac\AdminAccess;
+use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
+
+/**
+ * Refuse a location the caller does not hold the permission at.
+ *
+ * The back-office login gate (AdminAccess::holdsAnywhere) is deliberately "anywhere" —
+ * holding an admin-tier permission at one location is what gets a non-admin into the
+ * section at all. It is NOT a blank cheque over every location's data, which is why every
+ * location-scoped admin request re-checks the specific location (docs/05-rbac.md). Admins
+ * are exempt by definition: locationIdsWhere() returns null (all locations) for them.
+ *
+ * A `null` locationId — an unknown row id on an update — fails closed, which also avoids
+ * leaking whether the row exists.
+ */
+trait ScopesToPermittedLocation
+{
+    protected function assertLocationPermitted(?string $locationId, string $permission): void
+    {
+        $user = $this->user();
+
+        if (! $user instanceof User || $user->is_admin) {
+            return;
+        }
+
+        $allowed = app(AdminAccess::class)->locationIdsWhere($user, $permission) ?? [];
+
+        if ($locationId === null || ! in_array($locationId, $allowed, true)) {
+            throw new AuthorizationException;
+        }
+    }
+}
+```
+
+- [ ] **Step 6b: Write the three FormRequests**
 
 `backend/app/Http/Requests/Admin/PaymentMethods/ListPaymentMethodGroupsRequest.php`:
 
@@ -2560,17 +2609,15 @@ declare(strict_types=1);
 namespace App\Http\Requests\Admin\PaymentMethods;
 
 use App\Actions\Admin\PaymentMethods\ListPaymentMethodGroupsInput;
-use App\Domain\Rbac\AdminAccess;
 use App\Domain\Rbac\Permissions;
 use App\Http\Requests\Concerns\AuthorizesBackOffice;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
+use App\Http\Requests\Concerns\ScopesToPermittedLocation;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class ListPaymentMethodGroupsRequest extends FormRequest
 {
-    use AuthorizesBackOffice;
+    use AuthorizesBackOffice, ScopesToPermittedLocation;
 
     public function authorize(): bool
     {
@@ -2582,23 +2629,12 @@ final class ListPaymentMethodGroupsRequest extends FormRequest
         return ['location_id' => ['required', 'uuid', 'exists:locations,id']];
     }
 
-    /**
-     * Holding the permission SOMEWHERE gets a non-admin into the section; it is not a
-     * blank cheque over every store's tenders — same rule the two report endpoints
-     * already apply (docs/05-rbac.md). Admins skip it: locationIdsWhere() is null.
-     */
     public function withValidator(Validator $validator): void
     {
-        $validator->after(function (): void {
-            $user = $this->user();
-            if ($user instanceof User && ! $user->is_admin) {
-                $allowed = app(AdminAccess::class)
-                    ->locationIdsWhere($user, Permissions::PAYMENT_METHOD_MANAGE) ?? [];
-                if (! in_array($this->input('location_id'), $allowed, true)) {
-                    throw new AuthorizationException;
-                }
-            }
-        });
+        $validator->after(fn () => $this->assertLocationPermitted(
+            $this->string('location_id')->toString(),
+            Permissions::PAYMENT_METHOD_MANAGE,
+        ));
     }
 
     public function toInput(): ListPaymentMethodGroupsInput
@@ -2620,18 +2656,16 @@ declare(strict_types=1);
 namespace App\Http\Requests\Admin\PaymentMethods;
 
 use App\Actions\Admin\PaymentMethods\CreatePaymentMethodGroupInput;
-use App\Domain\Rbac\AdminAccess;
 use App\Domain\Rbac\Permissions;
 use App\Http\Requests\Concerns\AuthorizesBackOffice;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
+use App\Http\Requests\Concerns\ScopesToPermittedLocation;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 final class CreatePaymentMethodGroupRequest extends FormRequest
 {
-    use AuthorizesBackOffice;
+    use AuthorizesBackOffice, ScopesToPermittedLocation;
 
     public function authorize(): bool
     {
@@ -2668,16 +2702,10 @@ final class CreatePaymentMethodGroupRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        $validator->after(function (): void {
-            $user = $this->user();
-            if ($user instanceof User && ! $user->is_admin) {
-                $allowed = app(AdminAccess::class)
-                    ->locationIdsWhere($user, Permissions::PAYMENT_METHOD_MANAGE) ?? [];
-                if (! in_array($this->input('location_id'), $allowed, true)) {
-                    throw new AuthorizationException;
-                }
-            }
-        });
+        $validator->after(fn () => $this->assertLocationPermitted(
+            $this->string('location_id')->toString(),
+            Permissions::PAYMENT_METHOD_MANAGE,
+        ));
     }
 
     public function toInput(): CreatePaymentMethodGroupInput
@@ -2705,18 +2733,16 @@ declare(strict_types=1);
 namespace App\Http\Requests\Admin\PaymentMethods;
 
 use App\Actions\Admin\PaymentMethods\UpdatePaymentMethodGroupInput;
-use App\Domain\Rbac\AdminAccess;
 use App\Domain\Rbac\Permissions;
 use App\Http\Requests\Concerns\AuthorizesBackOffice;
+use App\Http\Requests\Concerns\ScopesToPermittedLocation;
 use App\Models\PaymentMethodGroup;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class UpdatePaymentMethodGroupRequest extends FormRequest
 {
-    use AuthorizesBackOffice;
+    use AuthorizesBackOffice, ScopesToPermittedLocation;
 
     public function authorize(): bool
     {
@@ -2740,20 +2766,11 @@ final class UpdatePaymentMethodGroupRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        $validator->after(function (): void {
-            $user = $this->user();
-            if (! $user instanceof User || $user->is_admin) {
-                return;
-            }
-            // Scoped against the ROW's location — an update names no location itself.
-            $locationId = PaymentMethodGroup::query()
-                ->whereKey((string) $this->route('group'))->value('location_id');
-            $allowed = app(AdminAccess::class)
-                ->locationIdsWhere($user, Permissions::PAYMENT_METHOD_MANAGE) ?? [];
-            if (! in_array($locationId, $allowed, true)) {
-                throw new AuthorizationException;
-            }
-        });
+        // Scoped against the ROW's location — an update names no location itself.
+        $validator->after(fn () => $this->assertLocationPermitted(
+            PaymentMethodGroup::query()->whereKey((string) $this->route('group'))->value('location_id'),
+            Permissions::PAYMENT_METHOD_MANAGE,
+        ));
     }
 
     public function toInput(): UpdatePaymentMethodGroupInput
@@ -3229,19 +3246,16 @@ declare(strict_types=1);
 namespace App\Http\Requests\Admin\PaymentMethods;
 
 use App\Actions\Admin\PaymentMethods\CreatePaymentMethodInput;
-use App\Domain\Rbac\AdminAccess;
 use App\Domain\Rbac\Permissions;
 use App\Http\Requests\Concerns\AuthorizesBackOffice;
-use App\Models\PaymentMethodGroup;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
+use App\Http\Requests\Concerns\ScopesToPermittedLocation;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 final class CreatePaymentMethodRequest extends FormRequest
 {
-    use AuthorizesBackOffice;
+    use AuthorizesBackOffice, ScopesToPermittedLocation;
 
     public function authorize(): bool
     {
@@ -3280,16 +3294,10 @@ final class CreatePaymentMethodRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        $validator->after(function (): void {
-            $user = $this->user();
-            if ($user instanceof User && ! $user->is_admin) {
-                $allowed = app(AdminAccess::class)
-                    ->locationIdsWhere($user, Permissions::PAYMENT_METHOD_MANAGE) ?? [];
-                if (! in_array($this->input('location_id'), $allowed, true)) {
-                    throw new AuthorizationException;
-                }
-            }
-        });
+        $validator->after(fn () => $this->assertLocationPermitted(
+            $this->string('location_id')->toString(),
+            Permissions::PAYMENT_METHOD_MANAGE,
+        ));
     }
 
     public function toInput(): CreatePaymentMethodInput
@@ -3317,18 +3325,16 @@ declare(strict_types=1);
 namespace App\Http\Requests\Admin\PaymentMethods;
 
 use App\Actions\Admin\PaymentMethods\UpdatePaymentMethodInput;
-use App\Domain\Rbac\AdminAccess;
 use App\Domain\Rbac\Permissions;
 use App\Http\Requests\Concerns\AuthorizesBackOffice;
+use App\Http\Requests\Concerns\ScopesToPermittedLocation;
 use App\Models\PaymentMethod;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class UpdatePaymentMethodRequest extends FormRequest
 {
-    use AuthorizesBackOffice;
+    use AuthorizesBackOffice, ScopesToPermittedLocation;
 
     public function authorize(): bool
     {
@@ -3350,19 +3356,11 @@ final class UpdatePaymentMethodRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        $validator->after(function (): void {
-            $user = $this->user();
-            if (! $user instanceof User || $user->is_admin) {
-                return;
-            }
-            $locationId = PaymentMethod::query()
-                ->whereKey((string) $this->route('method'))->value('location_id');
-            $allowed = app(AdminAccess::class)
-                ->locationIdsWhere($user, Permissions::PAYMENT_METHOD_MANAGE) ?? [];
-            if (! in_array($locationId, $allowed, true)) {
-                throw new AuthorizationException;
-            }
-        });
+        // Scoped against the ROW's location — an update names no location itself.
+        $validator->after(fn () => $this->assertLocationPermitted(
+            PaymentMethod::query()->whereKey((string) $this->route('method'))->value('location_id'),
+            Permissions::PAYMENT_METHOD_MANAGE,
+        ));
     }
 
     public function toInput(): UpdatePaymentMethodInput
@@ -3765,49 +3763,56 @@ right after the location row is created:
 
 ```php
     /**
-     * PH-realistic tenders. The provisioner's CASH/CARD defaults already exist by the
-     * time this runs (CreateLocation / the migration), so this fills in the variants a
-     * Manila store actually takes and leaves the defaults alone.
+     * PH-realistic tenders, written in full.
+     *
+     * This does NOT call PaymentMethodProvisioner: the seeder builds its location with
+     * Location::factory(), not CreateLocation, so no defaults exist here to reconcile
+     * with — and writing the intended set directly means nothing has to be deleted, which
+     * matters because this system archives rather than deletes everywhere else.
      */
     private function seedPaymentMethods(Location $location): void
     {
-        app(PaymentMethodProvisioner::class)->provisionForLocation($location->id);
+        $tenders = [
+            ['CASH', 'Cash', 'cash', 0, [['CASH', 'Cash', 0]]],
+            ['CARD', 'Cards', 'external_card', 1, [['VISA', 'Visa', 0], ['MASTERCARD', 'Mastercard', 1]]],
+            ['EWALLET', 'E-wallets', 'external_card', 2, [['GCASH', 'GCash', 0], ['MAYA', 'Maya', 1]]],
+        ];
 
-        $card = PaymentMethodGroup::query()
-            ->where('location_id', $location->id)->where('code', 'CARD')->firstOrFail();
-
-        // The default CARD/'Card' method becomes the named schemes a till actually shows.
-        PaymentMethod::query()
-            ->where('location_id', $location->id)->where('code', 'CARD')->delete();
-
-        foreach ([['VISA', 'Visa', 0], ['MASTERCARD', 'Mastercard', 1]] as [$code, $name, $sort]) {
-            PaymentMethod::create([
-                'location_id' => $location->id, 'group_id' => $card->id,
-                'code' => $code, 'name' => $name, 'sort_order' => $sort, 'is_active' => true,
+        foreach ($tenders as [$groupCode, $groupName, $driver, $groupSort, $methods]) {
+            $group = PaymentMethodGroup::create([
+                'location_id' => $location->id,
+                'code' => $groupCode,
+                'name' => $groupName,
+                'driver' => $driver,
+                'sort_order' => $groupSort,
+                'is_active' => true,
             ]);
-        }
 
-        $ewallet = PaymentMethodGroup::create([
-            'location_id' => $location->id,
-            'code' => 'EWALLET', 'name' => 'E-wallets',
-            'driver' => 'external_card', 'sort_order' => 2, 'is_active' => true,
-        ]);
-
-        foreach ([['GCASH', 'GCash', 0], ['MAYA', 'Maya', 1]] as [$code, $name, $sort]) {
-            PaymentMethod::create([
-                'location_id' => $location->id, 'group_id' => $ewallet->id,
-                'code' => $code, 'name' => $name, 'sort_order' => $sort, 'is_active' => true,
-            ]);
+            foreach ($methods as [$code, $name, $sort]) {
+                PaymentMethod::create([
+                    'location_id' => $location->id,
+                    'group_id' => $group->id,
+                    'code' => $code,
+                    'name' => $name,
+                    'sort_order' => $sort,
+                    'is_active' => true,
+                ]);
+            }
         }
     }
 ```
 
-Add `use App\Domain\Payments\PaymentMethodProvisioner;`, `use App\Models\PaymentMethod;`
-and `use App\Models\PaymentMethodGroup;` to that file's imports.
+Add `use App\Models\PaymentMethod;` and `use App\Models\PaymentMethodGroup;` to that
+file's imports.
 
-`->delete()` on the default `CARD` method is safe **only in a seeder**, which runs on a
-fresh database where no payment references it. Never do this at runtime — the whole system
-archives rather than deletes.
+**Verify the premise before writing this.** Run
+`grep -n "Location::create\|Location::factory\|CreateLocation" backend/database/seeders/*.php`.
+If a seeder ever routes location creation through `CreateLocation`, the provisioner's
+`CASH`/`CARD` defaults *would* already exist and this method would collide on the unique
+`(location_id, code)` index. Today `CatalogSeeder.php:55` uses `Location::factory()`, so
+there is no collision — if that has changed, call
+`app(PaymentMethodProvisioner::class)->provisionForLocation($location->id)` first and skip
+the `CASH` and `CARD` group creations here rather than deleting anything.
 
 - [ ] **Step 5: Run the seed test to verify it passes**
 
