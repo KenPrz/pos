@@ -85,7 +85,7 @@ it('reads the drawer\'s whole day off the ledgers — open (the running X) and t
 
     // Refund the whole 1000-cent line, cash — derived, not client-supplied.
     $refund = app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $cashOrder->id, registerId: $this->register->id, driver: 'cash',
+        originalOrderId: $cashOrder->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         reason: 'Customer return', lines: [new RefundLineInput($lineA->id, '1', restock: false)],
         actorId: $this->supervisor->id,
     ));

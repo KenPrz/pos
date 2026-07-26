@@ -93,8 +93,12 @@ it('reports sales by day, user and category off the ledgers — voided money and
     $orderB = reportsPay($this, $orderB->id, 'external_card', 500, $this->cashierB);
     $lineB = $orderB->lines->first();
 
+    // Refunded in cash, not card: external_card is not refundable
+    // (Capabilities::refundable), and the report assertions below are driver-agnostic —
+    // they only care that a 300¢ refund landed against this line, not which tender it
+    // came back on.
     $refund = app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $orderB->id, registerId: $this->register->id, driver: 'external_card',
+        originalOrderId: $orderB->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         reason: 'partial return', lines: [new RefundLineInput($lineB->id, '0.600', restock: false)],
         actorId: $this->cashierB->id,
     ));

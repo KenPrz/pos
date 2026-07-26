@@ -73,7 +73,7 @@ function t8Pay(object $t, string $orderId, int $amountCents): Order
 function t8Refund(object $t, array $lines, ?string $reason = null): Refund
 {
     return app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $t->order->id, registerId: $t->register->id, driver: 'cash',
+        originalOrderId: $t->order->id, registerId: $t->register->id, paymentMethodCode: 'CASH',
         reason: $reason ?? 'Customer return', lines: $lines, actorId: $t->supervisor->id,
     ));
 }
@@ -163,7 +163,7 @@ it('a taxed line refunds line_total + tax exactly', function (): void {
     expect($order->total_cents)->toBe(2178);
 
     $refund = app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $order->id, registerId: $this->register->id, driver: 'cash',
+        originalOrderId: $order->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         reason: 'Customer return', lines: [new RefundLineInput($line->id, '2', restock: true)],
         actorId: $this->supervisor->id,
     ));
@@ -192,14 +192,14 @@ it("piecewise refunds sum exactly to the line's total — no invented penny", fu
     expect($order->total_cents)->toBe(1089);
 
     $first = app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $order->id, registerId: $this->register->id, driver: 'cash',
+        originalOrderId: $order->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         reason: 'Customer return', lines: [new RefundLineInput($line->id, '1', restock: true)],
         actorId: $this->supervisor->id,
     ));
     expect($first->amount_cents)->toBe(545);
 
     $second = app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $order->id, registerId: $this->register->id, driver: 'cash',
+        originalOrderId: $order->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         reason: 'Customer return', lines: [new RefundLineInput($line->id, '1', restock: true)],
         actorId: $this->supervisor->id,
     ));
@@ -209,7 +209,7 @@ it("piecewise refunds sum exactly to the line's total — no invented penny", fu
         ->toBe(1089);
 
     expect(fn () => app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $order->id, registerId: $this->register->id, driver: 'cash',
+        originalOrderId: $order->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         reason: 'Customer return', lines: [new RefundLineInput($line->id, '1', restock: true)],
         actorId: $this->supervisor->id,
     )))->toThrow(RefundExceedsOriginal::class);
@@ -238,7 +238,7 @@ it("piecewise refunds sum exactly to the line's total — no lost penny", functi
     $amounts = [];
     foreach (range(1, 3) as $i) {
         $refund = app(RefundOrder::class)->execute(new RefundOrderInput(
-            originalOrderId: $order->id, registerId: $this->register->id, driver: 'cash',
+            originalOrderId: $order->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
             reason: 'Customer return', lines: [new RefundLineInput($line->id, '1', restock: true)],
             actorId: $this->supervisor->id,
         ));
@@ -287,7 +287,7 @@ it('at a tax-inclusive location, a refund is the gross line total — never gros
     expect($order->total_cents)->toBe(3000);
 
     $refund = app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $order->id, registerId: $register->id, driver: 'cash',
+        originalOrderId: $order->id, registerId: $register->id, paymentMethodCode: 'CASH',
         reason: 'Customer return', lines: [new RefundLineInput($line->id, '3', restock: true)],
         actorId: $supervisor->id,
     ));
@@ -311,7 +311,7 @@ it('at a tax-inclusive location, a refund is the gross line total — never gros
     ))->order;
 
     $partialRefund = app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $partialOrder->id, registerId: $register->id, driver: 'cash',
+        originalOrderId: $partialOrder->id, registerId: $register->id, paymentMethodCode: 'CASH',
         reason: 'Customer return', lines: [new RefundLineInput($partialLine->id, '1', restock: true)],
         actorId: $supervisor->id,
     ));
@@ -335,7 +335,7 @@ it('refuses to refund an order that is still open', function (): void {
     $line = $openOrder->lines->first();
 
     expect(fn () => app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $openOrder->id, registerId: $this->register->id, driver: 'cash',
+        originalOrderId: $openOrder->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         reason: 'x', lines: [new RefundLineInput($line->id, '1', restock: true)],
         actorId: $this->supervisor->id,
     )))->toThrow(OrderClosed::class);
@@ -345,7 +345,7 @@ it('is denied to a cashier and allowed to a supervisor over HTTP', function (): 
     $url = '/api/v1/refunds';
     $body = [
         'original_order_id' => $this->order->id,
-        'driver' => 'cash',
+        'payment_method_code' => 'CASH',
         'reason' => 'Customer return',
         'lines' => [['original_order_line_id' => $this->line->id, 'qty' => '2', 'restock' => true]],
     ];
@@ -364,7 +364,7 @@ it('is denied to a cashier and allowed to a supervisor over HTTP', function (): 
 it('requires the Idempotency-Key header', function (): void {
     $body = [
         'original_order_id' => $this->order->id,
-        'driver' => 'cash',
+        'payment_method_code' => 'CASH',
         'reason' => 'Customer return',
         'lines' => [['original_order_line_id' => $this->line->id, 'qty' => '2', 'restock' => true]],
     ];
@@ -377,7 +377,7 @@ it('a replayed idempotency key refunds once', function (): void {
     $headers = staffHeaders($this->register, $this->supervisor) + ['Idempotency-Key' => (string) Str::uuid()];
     $body = [
         'original_order_id' => $this->order->id,
-        'driver' => 'cash',
+        'payment_method_code' => 'CASH',
         'reason' => 'Customer return',
         'lines' => [['original_order_line_id' => $this->line->id, 'qty' => '2', 'restock' => true]],
     ];
@@ -395,12 +395,13 @@ it('a replayed idempotency key refunds once', function (): void {
 it('rejects external_card — that money never passed through us', function (): void {
     $body = [
         'original_order_id' => $this->order->id,
-        'driver' => 'external_card',
+        'payment_method_code' => 'CARD',
         'reason' => 'Customer return',
         'lines' => [['original_order_line_id' => $this->line->id, 'qty' => '2', 'restock' => true]],
     ];
 
     $this->postJson('/api/v1/refunds', $body, staffHeaders($this->register, $this->supervisor)
         + ['Idempotency-Key' => (string) Str::uuid()])
-        ->assertStatus(400);
+        ->assertStatus(422)
+        ->assertJsonPath('error.code', 'refund_method_not_refundable');
 });

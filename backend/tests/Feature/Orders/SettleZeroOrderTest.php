@@ -87,7 +87,7 @@ it('refunding a fully comped line is a clean 422, not a 500', function (): void 
 
     $this->postJson('/api/v1/refunds', [
         'original_order_id' => $order->id,
-        'driver' => 'cash',
+        'payment_method_code' => 'CASH',
         'reason' => 'comped anyway',
         'lines' => [['original_order_line_id' => $line->id, 'qty' => '1', 'restock' => false]],
     ], $refundHeaders)

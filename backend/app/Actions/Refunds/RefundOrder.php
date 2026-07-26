@@ -7,11 +7,14 @@ namespace App\Actions\Refunds;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Money\Money;
 use App\Domain\Money\Quantity;
+use App\Domain\Payments\DriverRegistry;
+use App\Domain\Payments\PaymentMethodResolver;
 use App\Domain\Stock\StockLedger;
 use App\Exceptions\Domain\NoOpenShift;
 use App\Exceptions\Domain\OrderClosed;
 use App\Exceptions\Domain\RefundAmountZero;
 use App\Exceptions\Domain\RefundExceedsOriginal;
+use App\Exceptions\Domain\RefundMethodNotRefundable;
 use App\Models\Order;
 use App\Models\OrderStatus;
 use App\Models\ProductVariant;
@@ -33,6 +36,8 @@ final class RefundOrder
 {
     public function __construct(
         private readonly StockLedger $stock,
+        private readonly PaymentMethodResolver $methods,
+        private readonly DriverRegistry $drivers,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -54,6 +59,15 @@ final class RefundOrder
             }
 
             $shift = Shift::openFor($in->registerId) ?? throw new NoOpenShift($in->registerId);
+
+            $method = $this->methods->resolve($register->location_id, $in->paymentMethodCode);
+
+            // Refundability is a DRIVER capability, not a validation string: a driver
+            // that cannot return money must not be refundable no matter what an admin
+            // named the method.
+            if (! $this->drivers->driver($method->driver)->capabilities()->refundable) {
+                throw new RefundMethodNotRefundable($method->code, $method->driver);
+            }
 
             // Pass 1: validate every line and derive its amount, without writing
             // anything yet — refunds.amount_cents > 0 is a DB check constraint, so the
@@ -151,7 +165,10 @@ final class RefundOrder
                 'shift_id' => $shift->id,
                 // The local calendar day at the store issuing the refund.
                 'business_date' => now($register->location->timezone)->toDateString(),
-                'driver' => $in->driver,
+                'driver' => $method->driver,
+                'payment_method_id' => $method->id,
+                'payment_method_code' => $method->code,
+                'payment_method_name' => $method->name,
                 'amount_cents' => $total->cents,
                 'reason' => $in->reason,
                 'user_id' => $in->actorId,
@@ -185,6 +202,7 @@ final class RefundOrder
 
             $this->audit->record('refund.create', $refund, $in->actorId, [
                 'original_order_id' => $order->id,
+                'payment_method_code' => $method->code,
                 'amount_cents' => $total->cents,
             ], registerId: $in->registerId);
 

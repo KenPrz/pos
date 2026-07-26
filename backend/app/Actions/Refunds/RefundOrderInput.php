@@ -10,7 +10,7 @@ final readonly class RefundOrderInput
     public function __construct(
         public string $originalOrderId,
         public string $registerId,
-        public string $driver,
+        public string $paymentMethodCode,
         public string $reason,
         public array $lines,
         public string $actorId,
