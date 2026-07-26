@@ -14,5 +14,6 @@ final readonly class CatalogSnapshot
         public array $modifiers,
         public array $taxRates,
         public array $discounts,
+        public array $paymentMethods,
     ) {}
 }

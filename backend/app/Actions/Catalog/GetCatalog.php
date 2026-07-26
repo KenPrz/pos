@@ -58,6 +58,22 @@ final class GetCatalog
             discounts: DB::table('discounts')->where('is_active', true)
                 ->get(['id', 'name', 'kind', 'percent_micros', 'amount_cents', 'scope', 'requires_supervisor'])
                 ->map(fn ($r): array => (array) $r)->all(),
+            // The tender buttons the till renders. Location-scoped like prices above;
+            // active methods in ACTIVE groups only. A total order (group sort, group
+            // code, method sort, method code) so two rows sharing a sort value never
+            // render in a different sequence per request.
+            paymentMethods: DB::table('payment_methods as pm')
+                ->join('payment_method_groups as g', 'g.id', '=', 'pm.group_id')
+                ->where('pm.location_id', $locationId)
+                ->where('pm.is_active', true)
+                ->where('g.is_active', true)
+                ->orderBy('g.sort_order')->orderBy('g.code')
+                ->orderBy('pm.sort_order')->orderBy('pm.code')
+                ->get([
+                    'pm.id', 'pm.code', 'pm.name', 'pm.sort_order',
+                    'g.code as group_code', 'g.name as group_name', 'g.driver',
+                ])
+                ->map(fn ($r): array => (array) $r)->all(),
         );
     }
 }
