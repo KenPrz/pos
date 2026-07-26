@@ -258,7 +258,7 @@ async function boLeg() {
   await page.locator('#admin-password').fill(ADMIN.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  const nav = (name) => page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name });
+  const nav = (name) => page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name });
 
   await page.getByText('Today').first().waitFor();
   await page.waitForTimeout(800);
@@ -284,6 +284,26 @@ async function boLeg() {
   await page.getByRole('tab', { name: 'Registers' }).click();
   await page.waitForTimeout(400);
   await shot(page, '028-bo-registers');
+
+  // Payment methods are per-location — the sidebar still reads Manila Cafe (the default
+  // after login, below) — switch to Manila Restaurant so the figure caption's location
+  // matches what's on screen. Every seeded location gets the same tender set (Cash,
+  // Cards, E-wallets — 3 groups, 5 methods), so Restaurant is just the one photographed.
+  await page.getByRole('combobox', { name: 'Location' }).click();
+  await page.getByRole('option', { name: /Manila Restaurant/ }).click();
+  await page.waitForTimeout(400);
+
+  await nav('Payment methods').click();
+  await page.waitForTimeout(600);
+  await shot(page, '035-bo-payment-methods');
+
+  // Navigate back to the Registers tab the next capture expects — Payment methods above
+  // replaced it in the main panel, and the location switch stays on Manila Restaurant,
+  // which is fine (Till 2 there is exactly the row the next step is about to edit).
+  await nav('Locations & Registers').click();
+  await page.waitForTimeout(600);
+  await page.getByRole('tab', { name: 'Registers' }).click();
+  await page.waitForTimeout(400);
 
   // RST Till 2 only ever gets a headless shift opened by the register leg (to give
   // Transfer a target) — no UI capture of its own — so reissuing its code here and

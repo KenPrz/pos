@@ -1,4 +1,4 @@
-# 16. Troubleshooting
+# 17. Troubleshooting
 
 Most of what looks like a bug traces back to one of two boundaries covered earlier in
 this manual: the split between a device token and a staff session (Chapter 2), or the
@@ -32,10 +32,10 @@ symptom you're actually looking at.
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| **Open drawer** is refused with **"The business day is closed. Reopen it before opening a shift."** — and it's happening on every till at this store at once | A manager closed this location's business day for that date. It's scoped to one location and one date, blocks *only* opening a shift, and no override at the till can lift it | An **admin** reopens it from **End of Day** → pick the date → type a **Reason for reopening** → **Reopen day** (Chapter 14). Shifts open again immediately |
-| **Close day** is greyed out and won't respond | A blocker is still standing — the amber pills name it: **"N open shift(s) — close them first"** or **"N open order(s)"**. Both must be clear before the day can close | Close the named drawers, and close or transfer any open tab, then come back. An **unapproved variance** pill is blue, not amber — that one is a warning and never blocks the close (Chapter 14) |
-| No **Reopen day** button on a closed day, even though the day clearly needs reopening | Reopening is **admin only**. Holding **Close business day** lets you close a day but deliberately not reopen one — the button doesn't render for a non-admin at all | Ask an admin. If that's you, sign in with the admin account rather than the manager one (Chapter 14) |
-| Closing a day is refused with **"That day is already closed."** | The day was already closed — most often a double-tap, or someone else closed it first. The system refuses rather than overwriting the filed record, so the deposit figure already on file can't be silently rewritten | Nothing to fix. If the filed record genuinely needs changing, an admin reopens the day and closes it again; both actions are logged (Chapter 14) |
+| **Open drawer** is refused with **"The business day is closed. Reopen it before opening a shift."** — and it's happening on every till at this store at once | A manager closed this location's business day for that date. It's scoped to one location and one date, blocks *only* opening a shift, and no override at the till can lift it | An **admin** reopens it from **End of Day** → pick the date → type a **Reason for reopening** → **Reopen day** (Chapter 15). Shifts open again immediately |
+| **Close day** is greyed out and won't respond | A blocker is still standing — the amber pills name it: **"N open shift(s) — close them first"** or **"N open order(s)"**. Both must be clear before the day can close | Close the named drawers, and close or transfer any open tab, then come back. An **unapproved variance** pill is blue, not amber — that one is a warning and never blocks the close (Chapter 15) |
+| No **Reopen day** button on a closed day, even though the day clearly needs reopening | Reopening is **admin only**. Holding **Close business day** lets you close a day but deliberately not reopen one — the button doesn't render for a non-admin at all | Ask an admin. If that's you, sign in with the admin account rather than the manager one (Chapter 15) |
+| Closing a day is refused with **"That day is already closed."** | The day was already closed — most often a double-tap, or someone else closed it first. The system refuses rather than overwriting the filed record, so the deposit figure already on file can't be silently rewritten | Nothing to fix. If the filed record genuinely needs changing, an admin reopens the day and closes it again; both actions are logged (Chapter 15) |
 
 ## Catalog at the till
 
@@ -47,5 +47,5 @@ symptom you're actually looking at.
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| **Print** in the desktop shell doesn't put any paper through the printer | Only a **mock** printer driver ships in this version — it writes the receipt out to a file instead of driving real hardware | Expected in this version, not a fault to chase; use an ordinary browser tab if paper is actually needed right now (Chapter 15) |
-| **Print** opens the browser's own print dialog instead of going straight to a receipt printer | Running in an ordinary browser tab rather than the desktop shell — a browser tab has no hardware bridge to a printer at all | By design — the browser's print dialog is the one path here that already produces real paper (Chapter 15) |
+| **Print** in the desktop shell doesn't put any paper through the printer | Only a **mock** printer driver ships in this version — it writes the receipt out to a file instead of driving real hardware | Expected in this version, not a fault to chase; use an ordinary browser tab if paper is actually needed right now (Chapter 16) |
+| **Print** opens the browser's own print dialog instead of going straight to a receipt printer | Running in an ordinary browser tab rather than the desktop shell — a browser tab has no hardware bridge to a printer at all | By design — the browser's print dialog is the one path here that already produces real paper (Chapter 16) |
