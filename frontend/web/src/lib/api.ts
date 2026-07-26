@@ -283,7 +283,16 @@ export type LookedUpVariant = {
 }
 
 export type PaymentOutcome = {
-  payment: { id: string; driver: string; status: string; amount_cents: number; tendered_cents: number | null; change_cents: number | null }
+  payment: {
+    id: string
+    driver: string
+    payment_method_code: string
+    payment_method_name: string
+    status: string
+    amount_cents: number
+    tendered_cents: number | null
+    change_cents: number | null
+  }
   order: Order
 }
 
@@ -329,6 +338,25 @@ export type ModifierGroup = { id: string; name: string; min_select: number; max_
 export type Modifier = { id: string; group_id: string; name: string; price_delta_cents: number; position: number }
 export type TaxRate = { id: string; name: string; rate_micros: number }
 
+/**
+ * A tender button. Verified against GetCatalog.php / CatalogResource.php: active methods
+ * in ACTIVE groups only, already ordered (group sort, group code, method sort, method
+ * code) — the till renders this list as given and never re-sorts it.
+ *
+ * `driver` is the GROUP's, and it decides the input the till shows: `cash` takes an
+ * amount handed over and gets a server-computed change; `external_card` takes an
+ * optional reference and tenders nothing.
+ */
+export type CatalogPaymentMethod = {
+  id: string
+  code: string
+  name: string
+  group_code: string
+  group_name: string
+  driver: 'cash' | 'external_card'
+  sort_order: number
+}
+
 export type Catalog = {
   categories: CatalogCategory[]
   products: CatalogProduct[]
@@ -337,6 +365,7 @@ export type Catalog = {
   modifiers: Modifier[]
   tax_rates: TaxRate[]
   discounts: Discount[]
+  payment_methods: CatalogPaymentMethod[]
   currency: string
 }
 
@@ -352,20 +381,26 @@ export type Refund = {
   id: string
   original_order_id: string
   driver: string
+  payment_method_code: string
+  payment_method_name: string
   amount_cents: number
   reason: string
   business_date: string
   lines: RefundLine[]
 }
 
-// Verified against ZReportResource.php / GetZReport.php: sales_by_driver and
-// refunds_by_driver are `driver => cents` maps (only drivers with activity are present);
+// Verified against ZReportResource.php / GetZReport.php: all four are `code => cents`
+// maps (only codes with activity are present). Methods are keyed by the SNAPSHOT code, so
+// a renamed method still reports under the code it was sold as; groups are keyed by the
+// group's code — CARD and EWALLET stay apart even though both drive external_card.
 // movements always has all three kinds, zero-filled. orders_voided excludes a split's
 // original order (voided with void_reason "split into ..."); that count is orders_split.
 export type ZReport = {
   shift: Shift
-  sales_by_driver: Record<string, number>
-  refunds_by_driver: Record<string, number>
+  sales_by_method: Record<string, number>
+  sales_by_group: Record<string, number>
+  refunds_by_method: Record<string, number>
+  refunds_by_group: Record<string, number>
   movements: { paid_in: number; payout: number; drop: number }
   orders_closed: number
   orders_voided: number
@@ -550,21 +585,24 @@ export const api = {
       { 'If-Match': String(order.version), 'Idempotency-Key': idempotencyKey },
     ).then((r) => r.orders),
   // idempotencyKey is minted once by the caller (when the tender phase is entered) and
-  // reused across retries — see closeShift's note. tenderedCents/reference are options
-  // because they're driver-specific: cash tenders (and gets a computed change_cents);
-  // external_card supplies a reference instead, and tenders nothing (TakePaymentRequest
-  // treats tendered_cents as absent when null, not literally zero).
+  // reused across retries — see closeShift's note. The METHOD CODE is what the till
+  // sends; the server resolves it to a driver via the method's group, so a client can no
+  // longer name a tender behaviour at all (422 payment_method_unknown / _inactive).
+  // tenderedCents/reference stay options because they're driver-specific: a cash-driver
+  // method tenders and gets a computed change_cents; an external_card one supplies a
+  // reference instead and tenders nothing (the server treats tendered_cents as absent
+  // when null, not literally zero).
   takePayment: (
     order: Order,
     amountCents: number,
-    driver: 'cash' | 'external_card',
+    paymentMethodCode: string,
     idempotencyKey: string,
     options?: { tenderedCents?: number; reference?: string },
   ) =>
     post<PaymentOutcome>(
       `/orders/${order.id}/payments`,
       {
-        driver,
+        payment_method_code: paymentMethodCode,
         amount_cents: amountCents,
         tendered_cents: options?.tenderedCents ?? null,
         reference: options?.reference ?? null,
@@ -579,16 +617,18 @@ export const api = {
 
   // original_order_id + lines derive the amount server-side from the original lines'
   // frozen price/tax snapshot (RefundOrder.php) — the client only chooses qty/restock.
+  // A method whose driver cannot return money is refused with
+  // 422 refund_method_not_refundable, sourced from Capabilities::refundable.
   refund: (
     originalOrderId: string,
-    driver: 'cash',
+    paymentMethodCode: string,
     reason: string,
     lines: Array<{ original_order_line_id: string; qty: string; restock: boolean }>,
     idempotencyKey: string,
   ) =>
     post<{ refund: Refund }>(
       '/refunds',
-      { original_order_id: originalOrderId, driver, reason, lines },
+      { original_order_id: originalOrderId, payment_method_code: paymentMethodCode, reason, lines },
       { 'Idempotency-Key': idempotencyKey },
     ).then((r) => r.refund),
 
