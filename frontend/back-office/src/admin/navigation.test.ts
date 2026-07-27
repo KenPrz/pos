@@ -58,4 +58,9 @@ describe('resolveSection', () => {
   it('maps the payment-methods section back to its path', () => {
     expect(pathForSection('payment-methods')).toBe('/payment-methods')
   })
+
+  it('resolves /variances for a holder and falls back to today without it', () => {
+    expect(resolveSection('/variances', ['shift.approve_variance'])).toBe('variances')
+    expect(resolveSection('/variances', ['catalog.manage'])).toBe('today')
+  })
 })

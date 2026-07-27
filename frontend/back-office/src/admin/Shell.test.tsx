@@ -33,6 +33,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       reports: { ...actual.api.reports, sales: vi.fn(), stock: vi.fn() },
       registers: { ...actual.api.registers, list: vi.fn() },
       audit: { ...actual.api.audit, list: vi.fn() },
+      variances: { ...actual.api.variances, list: vi.fn() },
     },
   }
 })
@@ -86,6 +87,7 @@ function renderShell(
   vi.mocked(api.reports.stock).mockResolvedValue({ rows: stockRows })
   vi.mocked(api.registers.list).mockResolvedValue([])
   vi.mocked(api.audit.list).mockResolvedValue({ rows: [], page: 1, has_more: false })
+  vi.mocked(api.variances.list).mockResolvedValue([])
   const onNavigate = vi.fn()
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
@@ -220,5 +222,19 @@ describe('Shell', () => {
     renderShell([], vi.fn(), ['catalog.manage'])
 
     expect(screen.queryByRole('link', { name: /payment methods/i })).not.toBeInTheDocument()
+  })
+
+  // Task 2 (pending variances): gated on shift.approve_variance, same one-item-per-
+  // permission pattern as every other section above.
+  it('shows Variances only to a holder of shift.approve_variance', () => {
+    renderShell([], vi.fn(), ['shift.approve_variance'])
+
+    expect(screen.getByRole('link', { name: /variances/i })).toBeInTheDocument()
+  })
+
+  it('hides Variances without the permission', () => {
+    renderShell([], vi.fn(), ['catalog.manage'])
+
+    expect(screen.queryByRole('link', { name: /variances/i })).not.toBeInTheDocument()
   })
 })

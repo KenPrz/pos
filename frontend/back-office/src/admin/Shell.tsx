@@ -13,6 +13,7 @@ import { ReportsSection } from './reports/ReportsSection'
 import { SettingsSection } from './settings/SettingsSection'
 import { TodaySection } from './today/TodaySection'
 import { UsersSection } from './users/UsersSection'
+import { VariancesSection } from './variances/VariancesSection'
 
 // The section-permission mapping now lives in the registry (./navigation.ts —
 // SECTION_DEFS), which also owns each section's URL. `today` needs no permission.
@@ -55,6 +56,7 @@ export function Shell({
   const canManageUsers = sections.includes('user.manage')
   const canManageRoles = sections.includes('role.manage')
   const canManageLocations = holdsSection('locations', sections)
+  const canApproveVariance = holdsSection('variances', sections)
   const canManagePaymentMethods = holdsSection('payment-methods', sections)
   const canViewSalesReport = sections.includes('report.sales.view')
   const canViewStockReport = sections.includes('report.stock.view')
@@ -76,6 +78,15 @@ export function Shell({
   })
   const lowStockCount = stockQuery.data?.rows.length ?? 0
 
+  // Same badge idiom as the low-stock count above: a count off the list's own length,
+  // gated on the permission so a session that can't approve never fires the request.
+  const variancesQuery = useQuery({
+    queryKey: ['admin', 'variances'],
+    queryFn: () => api.variances.list(),
+    enabled: canApproveVariance,
+  })
+  const pendingVarianceCount = variancesQuery.data?.length ?? 0
+
   // Today is unconditional; everything else is filtered against `sections` per
   // `SECTION_RULES` — an item simply never renders when its permission isn't held, which
   // is what makes navigating to a hidden section impossible (there's no button to click).
@@ -93,6 +104,16 @@ export function Shell({
         ...(canManageUsers || canManageRoles ? [{ key: 'users', label: 'Users', href: pathForSection('users') }] : []),
         ...(canManageLocations
           ? [{ key: 'locations', label: 'Locations & Registers', href: pathForSection('locations') }]
+          : []),
+        ...(canApproveVariance
+          ? [
+              {
+                key: 'variances',
+                label: 'Variances',
+                href: pathForSection('variances'),
+                count: pendingVarianceCount > 0 ? pendingVarianceCount : undefined,
+              },
+            ]
           : []),
         ...(canManagePaymentMethods
           ? [{ key: 'payment-methods', label: 'Payment methods', href: pathForSection('payment-methods') }]
@@ -138,6 +159,7 @@ export function Shell({
           />
         )}
         {section === 'locations' && <PlacesSection onUnauthorized={onUnauthorized} />}
+        {section === 'variances' && <VariancesSection onUnauthorized={onUnauthorized} />}
         {section === 'payment-methods' && (
           <PaymentMethodsSection location={location} onUnauthorized={onUnauthorized} />
         )}
