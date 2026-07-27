@@ -250,6 +250,18 @@ describe('SaleScreen tender methods', () => {
 
     await enterTender()
 
-    expect(screen.getByText(/no payment methods/i)).toBeInTheDocument()
+    expect(screen.getByText(/no payment methods are set up/i)).toBeInTheDocument()
+  })
+
+  it('blames the connection, not the configuration, when the catalog fails to load', async () => {
+    // Both cases render an empty method list, but they are different problems: sending a
+    // cashier to the back office to fix a configuration that was never wrong wastes a
+    // trip. Payment is correctly blocked either way.
+    vi.mocked(api.catalog).mockRejectedValue(new Error('network down'))
+
+    await enterTender()
+
+    expect(await screen.findByText(/could not be loaded/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no payment methods are set up/i)).not.toBeInTheDocument()
   })
 })

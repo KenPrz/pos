@@ -80,7 +80,13 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
     if (!chosen) return setError('Pick at least one line quantity to refund.')
     if (!reason.trim()) return setError('A refund needs a reason.')
     if (refundMethod === null) {
-      return setError('This location has no cash payment method, so refunds cannot be issued here.')
+      // "No cash method" is only true once the catalog loaded; before that it is just a
+      // failed fetch, and blaming the configuration sends staff to the wrong place.
+      return setError(
+        catalog.isSuccess
+          ? 'This location has no cash payment method, so refunds cannot be issued here.'
+          : 'Payment methods could not be loaded. Check this terminal’s connection and try again.',
+      )
     }
     setError(null)
     refund.mutate()

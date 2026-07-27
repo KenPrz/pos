@@ -129,4 +129,23 @@ describe('RefundScreen — payment method code', () => {
     expect(await screen.findByText(/no cash payment method/i)).toBeInTheDocument()
     expect(api.refund).not.toHaveBeenCalled()
   })
+
+  it('blames the connection, not the configuration, when the catalog fails to load', async () => {
+    // Same distinction the tender screen draws: an unreachable catalog is not a
+    // misconfigured location, and telling staff otherwise sends them to fix the wrong
+    // thing. The refund is correctly refused either way.
+    vi.mocked(api.catalog).mockRejectedValue(new Error('network down'))
+    vi.mocked(api.findOrders).mockResolvedValue([order])
+
+    renderRefund()
+    await findOrder()
+
+    fireEvent.change(screen.getByLabelText(/quantity of widget to refund/i), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText(/reason/i), { target: { value: 'Faulty' } })
+    fireEvent.click(screen.getByRole('button', { name: /refund cash/i }))
+
+    expect(await screen.findByText(/could not be loaded/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no cash payment method/i)).not.toBeInTheDocument()
+    expect(api.refund).not.toHaveBeenCalled()
+  })
 })

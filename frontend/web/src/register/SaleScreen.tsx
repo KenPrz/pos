@@ -465,7 +465,15 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
   // zone's Take payment button — one guard path, exactly the old submitPay behavior.
   const doPay = () => {
     if (!order || phase.name !== 'tender' || pay.isPending) return
-    if (selected === null) return setError('This location has no payment methods. Add one in the back office.')
+    // Same split as the tender zone's empty state: only blame the configuration once we
+    // know the catalog loaded.
+    if (selected === null) {
+      return setError(
+        paymentMethods.isSuccess
+          ? 'This location has no payment methods. Add one in the back office.'
+          : 'Payment methods could not be loaded. Check this terminal’s connection and try again.',
+      )
+    }
     if (selected.driver === 'cash' && parseCentsOrNull(tendered) === null) {
       return setError('Enter the cash handed over, like 50.00')
     }
@@ -648,9 +656,14 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
         {order && phase.name === 'tender' && !splitPromptOpen && (
           <form onSubmit={submitPay} className="flex flex-col gap-md">
             {methods.length === 0 ? (
+              // Two different problems, two different answers. An empty list is only
+              // "nobody configured this" once the catalog actually LOADED — until then
+              // the same screen would send a cashier to the back office to fix a
+              // configuration that was never wrong. Payment is blocked either way.
               <p className="type-body-sm text-ink-muted">
-                No payment methods are set up for this location. Add one in the back
-                office before taking payment.
+                {paymentMethods.isSuccess
+                  ? 'No payment methods are set up for this location. Add one in the back office before taking payment.'
+                  : 'Payment methods could not be loaded. Check this terminal’s connection and try again.'}
               </p>
             ) : (
               <>

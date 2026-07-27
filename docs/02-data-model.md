@@ -961,5 +961,8 @@ Worth stating plainly, since these are the reasons for the constraints above:
 - Stock cannot go negative on a tracked variant. (`FOR UPDATE` + domain check.)
 - A receipt cannot be rewritten by a later catalog edit. (Snapshot columns.)
 - A payment method cannot belong to another location's group. (Composite foreign key.)
+- A refund cannot be recorded against another location's payment method. (Composite
+  foreign key, same shape — `RefundOrder` already resolves the method against the acting
+  register's location, so this is what stops a future writer forgetting that rule.)
 - Two methods, or two groups, cannot share a code at one location — while the same code at
   two different locations is legal and expected. (Unique index on `(location_id, code)`.)

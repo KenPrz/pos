@@ -174,13 +174,28 @@ final class SalesReport
         // max() over the group is deliberate: a code renamed mid-window carries two
         // snapshot names and one row per code must pick one — the later name is the less
         // surprising label.
-        $snapshotNames = DB::table('payments as p')
+        //
+        // Both ledgers, not just payments: a code can appear in this window solely via a
+        // refund whose original payment was captured in an earlier one. Reading payments
+        // alone left those rows labelled with their raw code instead of their name.
+        $paymentNames = DB::table('payments as p')
             ->join('orders as o', 'o.id', '=', 'p.order_id')
             ->where('o.location_id', $in->locationId)
             ->whereBetween('o.business_date', [$in->from, $in->to])
             ->groupBy('p.payment_method_code')
             ->selectRaw('p.payment_method_code as code, max(p.payment_method_name) as name')
             ->pluck('name', 'code');
+
+        $refundNames = DB::table('refunds')
+            ->where('location_id', $in->locationId)
+            ->whereBetween('business_date', [$in->from, $in->to])
+            ->groupBy('payment_method_code')
+            ->selectRaw('payment_method_code as code, max(payment_method_name) as name')
+            ->pluck('name', 'code');
+
+        // Payments win on a collision: a tender's own sale is the more authoritative
+        // record of what it was called than a refund against it.
+        $snapshotNames = $refundNames->merge($paymentNames);
 
         $rows = $codes->map(fn (string $code): array => [
             'bucket' => $code,
