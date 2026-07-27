@@ -211,6 +211,17 @@ describe('tokens.registerInfo', () => {
 
     expect(tokens.registerInfo()).toEqual({ id: 'register-1', name: 'Bar 1', mode: 'food', screen_keyboard_enabled: false })
   })
+
+  it('treats a non-object stored value as absent rather than spreading it', () => {
+    // JSON.parse happily succeeds on `"null"`, `"3"`, `'"a string"'` — none of those can be
+    // spread into an object. Any of them getting this far would previously have produced
+    // `{ 0: '...', screen_keyboard_enabled: false }` or similar nonsense cast as RegisterInfo.
+    localStorage.setItem('pos.register_info', 'null')
+    expect(tokens.registerInfo()).toBeNull()
+
+    localStorage.setItem('pos.register_info', '"just a string"')
+    expect(tokens.registerInfo()).toBeNull()
+  })
 })
 
 describe('openOrder', () => {

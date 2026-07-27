@@ -96,12 +96,17 @@ export const tokens = {
     const raw = localStorage.getItem(REGISTER_INFO_KEY)
     if (!raw) return null
     try {
-      const parsed = JSON.parse(raw) as Partial<RegisterInfo>
+      const parsed: unknown = JSON.parse(raw)
+      // JSON.parse succeeds on plenty of things that aren't a stored RegisterInfo at all
+      // (`null`, a bare string, a number) — none of those can be spread into an object, so
+      // guard the shape before doing so.
+      if (typeof parsed !== 'object' || parsed === null) return null
+      const info = parsed as Partial<RegisterInfo>
       // A session stored before screen_keyboard_enabled shipped has no such key at all.
       // That must not log the terminal out or drop the rest of the stored info — read it
       // tolerantly and default to false (the same default the column itself has server-side)
       // rather than letting `undefined` leak out as a stand-in for a boolean.
-      return { ...parsed, screen_keyboard_enabled: parsed.screen_keyboard_enabled ?? false } as RegisterInfo
+      return { ...info, screen_keyboard_enabled: info.screen_keyboard_enabled ?? false } as RegisterInfo
     } catch {
       return null
     }

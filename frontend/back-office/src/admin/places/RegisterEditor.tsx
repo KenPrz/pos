@@ -187,10 +187,15 @@ export function RegisterEditor({
         )}
         {register && (
           <FieldRow label="On-screen keyboard">
-            <Checkbox
-              checked={screenKeyboardEnabled}
-              onCheckedChange={(checked) => setScreenKeyboardEnabled(Boolean(checked))}
-            />
+            <>
+              <Checkbox
+                checked={screenKeyboardEnabled}
+                onCheckedChange={(checked) => setScreenKeyboardEnabled(Boolean(checked))}
+              />
+              <p className="type-caption mt-xxs text-ink-muted">
+                Show a touch keyboard on this till. For terminals with no physical keyboard.
+              </p>
+            </>
           </FieldRow>
         )}
         <div>
