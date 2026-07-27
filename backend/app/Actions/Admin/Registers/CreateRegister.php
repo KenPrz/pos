@@ -33,6 +33,7 @@ final class CreateRegister
 
             $this->audit->record('admin.register.create', $register, $in->actorId, [
                 'location_id' => $in->locationId, 'name' => $in->name, 'mode' => $in->mode,
+                'screen_keyboard_enabled' => $in->screenKeyboardEnabled,
             ]);
 
             return $register;

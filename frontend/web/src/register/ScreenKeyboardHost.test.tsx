@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { ScreenKeyboardHost } from './ScreenKeyboardHost'
+import { Input } from '@/components/ui/input'
 
 afterEach(cleanup)
 
@@ -137,5 +138,52 @@ describe('ScreenKeyboardHost', () => {
     fireEvent.focusIn(screen.getByLabelText('Amount'))
 
     expect(document.body.style.paddingBottom).not.toBe('')
+  })
+
+  // jsdom has no layout engine, so `offsetHeight` is always 0 here — this cannot pin the
+  // actual pixel value ActionZone rides up by (that needs a real browser). What it CAN
+  // prove: the property that ActionZone.tsx reads (`bottom-[var(--screen-keyboard-h,0px)]`)
+  // is genuinely set on the document root while the dock is open, and genuinely removed
+  // (not just zeroed) once it closes — the two states ActionZone's fallback depends on.
+  it('sets --screen-keyboard-h on the document root while open and removes it on Done', () => {
+    render(<Harness enabled layout="numeric" />)
+    expect(document.documentElement.style.getPropertyValue('--screen-keyboard-h')).toBe('')
+
+    fireEvent.focusIn(screen.getByLabelText('Amount'))
+    expect(document.documentElement.style.getPropertyValue('--screen-keyboard-h')).not.toBe('')
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: /done/i }))
+    expect(document.documentElement.style.getPropertyValue('--screen-keyboard-h')).toBe('')
+  })
+
+  // Every other test in this file drives the host through a bare <input> harness, which
+  // pins the host's own logic but never proves that `data-screen-keyboard` actually
+  // reaches the DOM through the shared, byte-identical src/components/ui/input.tsx that
+  // every real till field is built on — that component spreads {...props} onto a native
+  // <input>, but nothing else in this suite would notice if a future rewrite stopped
+  // forwarding unknown props.
+  it('raises the dock from the real shared Input component when data-screen-keyboard is set', () => {
+    render(
+      <>
+        <Input data-screen-keyboard="numeric" aria-label="Real amount" />
+        <ScreenKeyboardHost enabled />
+      </>,
+    )
+    const input = screen.getByLabelText('Real amount')
+    expect(input).toHaveAttribute('data-screen-keyboard', 'numeric')
+
+    fireEvent.focusIn(input)
+
+    expect(screen.getByRole('button', { name: '7' })).toBeInTheDocument()
+  })
+
+  it('removes --screen-keyboard-h on unmount', () => {
+    const { unmount } = render(<Harness enabled layout="numeric" />)
+    fireEvent.focusIn(screen.getByLabelText('Amount'))
+    expect(document.documentElement.style.getPropertyValue('--screen-keyboard-h')).not.toBe('')
+
+    unmount()
+
+    expect(document.documentElement.style.getPropertyValue('--screen-keyboard-h')).toBe('')
   })
 })

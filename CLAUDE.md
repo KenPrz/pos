@@ -417,7 +417,10 @@ trigger that would revive each (monitoring, load test, runbook, registry/CD, and
   containers carry their own — so the app 500s with `Module not found` while every unit
   test, typecheck and `npm run build` still passes, because those all run against the
   host's copy. Refresh with `docker compose -f compose.dev.yml exec --user node web npm
-  install`, or recreate the container (`up -d --force-recreate web`) — the dev stage
-  installs from its `CMD`, so *rebuilding the image alone does nothing*; the deps live in
-  a named volume that only the container's own boot command populates. Production is
-  unaffected: `make build` runs `npm ci` inside the image.
+  install`, or just restart the container (`docker compose -f compose.dev.yml restart
+  web`, or `make dev-down && make dev`) — compose's `command:` (not the Dockerfile's
+  `CMD`) runs `npm install && npm run dev` on every container *start*, not only first
+  boot, so `--force-recreate` isn't required. *Rebuilding the image alone does nothing*,
+  though: the deps live in a named volume that only the container's own boot command
+  populates, and an image rebuild never touches a volume. Production is unaffected:
+  `make build` runs `npm ci` inside the image.

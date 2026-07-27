@@ -60,12 +60,15 @@ export function ScreenKeyboardHost({ enabled }: { enabled: boolean }) {
   const [target, setTarget] = useState<HTMLInputElement | null>(null)
   const [layout, setLayout] = useState<Layout>('numeric')
   const [shifted, setShifted] = useState(false)
-  // `press` (below) is a plain function recreated every render, but react-simple-keyboard
-  // diffs its `onKeyPress` option with `changedOptions`' JSON.stringify comparison — which
-  // always reports two functions as equal — so a re-render's fresh `onKeyPress` closure may
-  // never actually reach the library's internal instance. Reading the live target through a
-  // ref sidesteps that: `press` itself can stay a stable-enough closure while still always
-  // acting on whichever input is currently focused.
+  // `press` (below) is a plain function recreated every render and closes over `target`.
+  // For the installed react-simple-keyboard, the React wrapper's `setOptions` call
+  // assigns `this.options` (including the fresh `onKeyPress`) BEFORE it ever consults
+  // `changedOptions`, so a stale-closure bug isn't actually reachable today — every
+  // render's `press` does reach the library's instance. `targetRef` is defence against
+  // that stopping being true: if the wrapper's diffing logic changes (e.g. to skip
+  // reassigning options it considers unchanged), reading the live target through a ref
+  // means `press` still acts on whichever input is currently focused even if a stale
+  // `onKeyPress` closure is what's installed.
   const targetRef = useRef<HTMLInputElement | null>(null)
   targetRef.current = target
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -109,17 +112,26 @@ export function ScreenKeyboardHost({ enabled }: { enabled: boolean }) {
 
   // The dock is `position: fixed` (see screen-keyboard.css) so it never reflows the cart —
   // but that means it would otherwise sit on top of whatever is already at the bottom of
-  // the screen, including the field that raised it. Pad the real scroll container (not
-  // always the body — see findScrollParent) by the dock's measured height (numeric and
-  // full layouts differ by a row, so a guessed constant would drift), and bring the
-  // focused field back into view inside that container the moment the dock appears, since
-  // it may already be scrolled out of view when it was focused.
+  // the screen, including the field that raised it AND the register's fixed ActionZone
+  // action bar (also `position: fixed; bottom: 0`, so document flow padding can't move
+  // it — a sibling fixed element isn't affected by another element's padding). Pad the
+  // real scroll container (not always the body — see findScrollParent) by the dock's
+  // measured height (numeric and full layouts differ by a row, so a guessed constant
+  // would drift) to handle content scrolled under the dock, bring the focused field back
+  // into view inside that container the moment the dock appears (it may already be
+  // scrolled out of view when it was focused), AND publish that same height as a CSS
+  // custom property on the document root so ActionZone.tsx can ride up above the dock —
+  // this is the one source of truth for the dock's height, cleared on dismiss/unmount so
+  // the action bar falls back to sitting flush with the bottom of the screen.
   useEffect(() => {
     const dock = containerRef.current
     if (target === null || dock === null) return
     const scrollParent = findScrollParent(target)
+    const root = document.documentElement
     const apply = () => {
-      scrollParent.style.paddingBottom = `${dock.offsetHeight}px`
+      const h = `${dock.offsetHeight}px`
+      scrollParent.style.paddingBottom = h
+      root.style.setProperty('--screen-keyboard-h', h)
     }
     apply()
     target.scrollIntoView({ block: 'nearest' })
@@ -128,6 +140,7 @@ export function ScreenKeyboardHost({ enabled }: { enabled: boolean }) {
     return () => {
       observer.disconnect()
       scrollParent.style.paddingBottom = ''
+      root.style.removeProperty('--screen-keyboard-h')
     }
   }, [target, layout, shifted])
 
@@ -138,6 +151,13 @@ export function ScreenKeyboardHost({ enabled }: { enabled: boolean }) {
     if (el === null) return
     if (button === '{shift}') return setShifted((s) => !s)
     if (button === '{done}') return setTarget(null)
+    // Deliberate simplification: caret position is ignored. Every key always appends to
+    // (and {bksp} always trims from) the END of el.value, regardless of where the caret
+    // sits. Consequence: tapping into the middle of already-typed text and then pressing
+    // a key jumps the edit to the end instead of inserting at the caret. Till fields are
+    // short (amounts, reasons) and edited start-to-finish, so this is an acceptable trade
+    // against tracking/restoring selection through a native-value-setter dispatch — not
+    // an oversight.
     if (button === '{bksp}') return setNativeValue(el, el.value.slice(0, -1))
     setNativeValue(el, el.value + (button === '{space}' ? ' ' : button))
   }
@@ -156,6 +176,16 @@ export function ScreenKeyboardHost({ enabled }: { enabled: boolean }) {
         // <button> elements instead: correct semantics and a real accessible name for a
         // touch UI, and it's what makes `data-screen-keyboard`'s consumers (Task 4) and
         // this file's own tests able to select keys by role rather than by CSS hook.
+        //
+        // The library keeps its own copy of what's typed regardless of useButtonTag or
+        // onKeyPress-only usage: it calls setInput() internally on every press (this file
+        // never reads it back, but the library still tracks it) and registers this
+        // instance at window.SimpleKeyboardInstances[...] for as long as it's mounted —
+        // so a PIN typed here is sitting in that global while the dock is open. Not a new
+        // exposure (the same characters are already in React state and the input's DOM
+        // node), and this host unmounts <Keyboard> on dismiss, which clears both. Noted so
+        // nobody later assumes onKeyPress-only means the library retains nothing — it
+        // does, for exactly as long as the dock stays mounted.
         useButtonTag={true}
         // A real <button> would otherwise take focus on pointerdown by default browser
         // behavior — stealing it from the field the keyboard is meant to be typing into,
