@@ -32,6 +32,7 @@ final class StaffSessionResource extends JsonResource
                 'id' => $session->register->id,
                 'name' => $session->register->name,
                 'mode' => $session->register->mode,
+                'screen_keyboard_enabled' => $session->register->screen_keyboard_enabled,
             ],
         ];
     }

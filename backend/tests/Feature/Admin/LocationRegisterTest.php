@@ -184,6 +184,46 @@ it('a non-admin token gets 403 on register routes', function (): void {
     $this->getJson('/api/v1/admin/registers', $headers)->assertStatus(403);
 });
 
+it('defaults the on-screen keyboard off and round-trips a toggle', function (): void {
+    $location = provisionedLocation(['code' => 'AAA']);
+
+    $created = $this->postJson('/api/v1/admin/registers', [
+        'location_id' => $location->id, 'name' => 'Kiosk 1',
+    ], $this->headers)->assertCreated();
+
+    // Off by default: a terminal WITH a keyboard is the common case, and defaulting on
+    // would put a keyboard on every till already in service.
+    expect($created->json('data.register.screen_keyboard_enabled'))->toBeFalse();
+
+    $id = $created->json('data.register.id');
+    $this->patchJson("/api/v1/admin/registers/{$id}", [
+        'screen_keyboard_enabled' => true,
+    ], $this->headers)
+        ->assertOk()
+        ->assertJsonPath('data.register.screen_keyboard_enabled', true);
+
+    expect(Register::findOrFail($id)->screen_keyboard_enabled)->toBeTrue();
+    $this->assertDatabaseHas('audit_log', ['action' => 'admin.register.update', 'entity_id' => $id]);
+});
+
+it('carries the keyboard flag to the till on activation', function (): void {
+    $location = provisionedLocation(['code' => 'AAA']);
+    $register = registerAt($location);
+    $register->update(['screen_keyboard_enabled' => true]);
+
+    $code = $this->postJson("/api/v1/admin/registers/{$register->id}/activation-code", [], $this->headers)
+        ->assertCreated()
+        ->json('data.activation_code');
+
+    // The activation response is the one that matters for PIN entry: the client persists
+    // register info from it BEFORE any staff session exists. The staff-login half of this
+    // (StaffSessionResource) is covered in tests/Feature/Schema/M5ColumnsTest.php, right
+    // beside the existing "register with its mode on staff login" case.
+    $this->postJson('/api/v1/registers/activate', ['activation_code' => $code])
+        ->assertCreated()
+        ->assertJsonPath('data.register.screen_keyboard_enabled', true);
+});
+
 it('reports activation state on the admin register list', function (): void {
     $location = Location::factory()->create();
     $register = Register::factory()->create(['location_id' => $location->id]);

@@ -350,6 +350,7 @@ export type Register = {
   name: string
   mode: 'retail' | 'food'
   is_active: boolean
+  screen_keyboard_enabled: boolean
   activation: RegisterActivation
 }
 

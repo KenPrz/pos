@@ -31,6 +31,8 @@ it('redeems an activation code for a working device token', function (): void {
 
     expect($response->json('data.register'))->toEqual([
         'id' => $register->id, 'name' => $register->name, 'mode' => $register->mode,
+        // freshRegister() never sets this, so the column default is what's under test.
+        'screen_keyboard_enabled' => false,
     ]);
 
     $token = $response->json('data.device_token');

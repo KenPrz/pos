@@ -126,6 +126,7 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
             autoFocus placeholder="DT-20260716-0001"
             value={number} onChange={(e) => setNumber(e.target.value)}
             className="mt-xs h-[56px]"
+            data-screen-keyboard="full"
           />
         </label>
         <div>
@@ -151,6 +152,7 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
                     value={pick.qty}
                     onChange={(e) => setPicks({ ...picks, [l.id]: { ...pick, qty: e.target.value } })}
                     className="type-money min-h-[48px] w-[72px] shrink-0 text-right"
+                    data-screen-keyboard="numeric"
                   />
                   <span className="flex min-h-[48px] shrink-0 items-center gap-xs px-xs">
                     <Checkbox
@@ -166,7 +168,7 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
           </div>
           <label className="block">
             <span className="type-body-sm text-ink-muted">Reason</span>
-            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Faulty" className="mt-xs min-h-[48px]" />
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Faulty" className="mt-xs min-h-[48px]" data-screen-keyboard="full" />
           </label>
           <div>
             <Button type="submit" size="lg" disabled={refund.isPending}>
