@@ -43,13 +43,35 @@ describe('VariancesSection', () => {
     expect(screen.getByText('Alice')).toBeInTheDocument()
   })
 
-  it('tells the supervisor to approve from a DIFFERENT register', async () => {
+  it('shows the threshold so a supervisor can tell why a row qualifies', async () => {
     vi.spyOn(api.variances, 'list').mockResolvedValue(rows)
     renderSection()
 
-    // The whole point of the view: closing a shift signs its own register out, so the
-    // listed register is the one place approval 401s.
-    expect(await screen.findByText(/any register other than the one listed/i)).toBeInTheDocument()
+    expect(await screen.findByText('Threshold')).toBeInTheDocument()
+    // threshold_cents: 500, formatted through the same money helper as every other column.
+    expect(screen.getByText('$5.00')).toBeInTheDocument()
+  })
+
+  it('tells the supervisor to approve from a DIFFERENT, still-open register', async () => {
+    vi.spyOn(api.variances, 'list').mockResolvedValue(rows)
+    renderSection()
+
+    // The instruction: closing a shift revokes its own sessions, so approval has to come
+    // from another still-open register at the same location.
+    expect(
+      await screen.findByText(/another still-open register.s session at the same location/i),
+    ).toBeInTheDocument()
+  })
+
+  it('explains WHY: no till screen offers approval for a shift other than its own', async () => {
+    vi.spyOn(api.variances, 'list').mockResolvedValue(rows)
+    renderSection()
+
+    // The reason the instruction above matters at all — without this clause the
+    // guidance reads as a UI flow that doesn't exist. Deleting it should fail this test.
+    expect(
+      await screen.findByText(/no till screen anywhere offers an approve button for a shift other than its own/i),
+    ).toBeInTheDocument()
   })
 
   it('shows an empty state when nothing is pending', async () => {

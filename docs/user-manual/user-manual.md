@@ -562,17 +562,21 @@ something any single till can tell you — you'd have to sign in at each one
 in turn to find out. The back office's **Variances** section (Chapter 8)
 answers that without the walk: every closed shift, at every location you
 cover, whose variance is still over threshold and unsigned, newest close
-first — register, who opened it, when it closed, and the expected,
-counted, and variance figures.
+first — register, who opened it, when it closed, the expected, counted,
+and variance figures, and the threshold it was measured against (each
+location can set its own, so the same variance can qualify at one store
+and not another).
 
 It's a list, not a shortcut past the rule above — there's no **Approve**
-button in the back office. The page says so right above the table
-("Variances are approved at a till. Sign in at any register other than the
-one listed…") and deliberately leaves the offending register unlinked,
-because that's the one place the approval fails. Use the queue to see
-which shift and location need attention, then approve it the way the
-section above describes, from a **different, still-open** register at that
-same location.
+button in the back office. The page says so right above the table: this is
+where to find which shifts need sign-off, approval is scoped to the
+location and never to the till that closed (closing already revoked that
+till's own sessions), and today that means calling the API directly from
+another still-open register's session at the same location — no till
+screen anywhere offers an Approve button for a shift other than its own.
+Use the queue to see which shift and location need attention, then approve
+it exactly as the section above describes: an API call from that other,
+still-open till's session, not a screen at any till.
 
 # 8. The back office
 

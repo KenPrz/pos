@@ -19,9 +19,13 @@ const fm = (n: number) => formatMoney(cents(n), getCurrency())
  *
  * Deliberately carries no link to the offending register: `CloseShift` revokes every
  * staff session bound to the register that just closed, so approving from THAT till
- * 401s. `ApproveVariance` scopes by location, so any OTHER till at the same location
- * works. The standing guidance line below is the feature — without it the queue tells a
- * supervisor where to walk and lets them find the dead end themselves.
+ * 401s. `ApproveVariance` scopes by location, not by terminal — but no register screen
+ * anywhere renders an Approve control for a shift other than its own (the only one that
+ * exists is on the close-result plate of the shift that just closed, which is exactly
+ * the dead session). So today, approving is an API call made from another still-open
+ * register's session, not a UI flow at any till. The standing guidance line below is the
+ * feature — without it the queue tells a supervisor which shift needs attention and
+ * leaves them no way to find out how approval actually happens.
  */
 export function VariancesSection({ onUnauthorized }: { onUnauthorized: () => void }) {
   const variances = useQuery({
@@ -44,9 +48,11 @@ export function VariancesSection({ onUnauthorized }: { onUnauthorized: () => voi
 
       <Card>
         <p className="type-body-sm text-ink">
-          Variances are approved at a till. Sign in at <strong>any register other than the one listed</strong> —
-          closing a shift signs its own register out, so approval must come from another terminal at the same
-          location.
+          This list is where to find which shifts still need a supervisor&rsquo;s sign-off. Approval is scoped to
+          the location, never to the till that closed it — closing already revoked that till&rsquo;s own sessions.
+          Today that means calling the API directly from{' '}
+          <strong>another still-open register&rsquo;s session at the same location</strong> — no till screen
+          anywhere offers an Approve button for a shift other than its own.
         </p>
       </Card>
 
@@ -59,6 +65,7 @@ export function VariancesSection({ onUnauthorized }: { onUnauthorized: () => voi
           { key: 'expected', header: 'Expected', render: (r) => fm(r.expected_cash_cents) },
           { key: 'counted', header: 'Counted', render: (r) => fm(r.counted_cash_cents) },
           { key: 'variance', header: 'Variance', render: (r) => fm(r.variance_cents) },
+          { key: 'threshold', header: 'Threshold', render: (r) => fm(r.threshold_cents) },
         ]}
         rows={rows}
         rowKey={(r) => r.shift_id}

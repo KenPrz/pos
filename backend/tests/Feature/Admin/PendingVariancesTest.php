@@ -2,10 +2,20 @@
 
 declare(strict_types=1);
 
+use App\Domain\Rbac\AdminAccess;
 use App\Domain\Rbac\Permissions;
 use App\Models\Shift;
 use App\Models\User;
 use Spatie\Permission\PermissionRegistrar;
+
+it('registers shift.approve_variance as a back-office section', function (): void {
+    // Pins the SECTIONS entry itself: allowsBackOffice/holdsAnywhere check the permission
+    // directly, so deleting this from SECTIONS leaves the endpoint fully working and every
+    // other test green while sectionsFor() silently stops returning it — the sidebar item
+    // disappears for every non-admin, the entire intended audience. Same guard as
+    // PaymentMethodPermissionTest and DayPermissionTest for their own sections.
+    expect(AdminAccess::SECTIONS)->toContain(Permissions::SHIFT_APPROVE_VARIANCE);
+});
 
 beforeEach(function (): void {
     $this->location = provisionedLocation(['code' => 'AAA', 'variance_approval_threshold_cents' => 500]);

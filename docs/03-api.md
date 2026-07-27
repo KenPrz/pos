@@ -86,7 +86,8 @@ POST /api/v1/admin/logout
 **Permission-based, not admin-only (RBAC v2).** Through M6 this tier was `is_admin`-only;
 now any active user holding at least one admin-tier permission — `catalog.manage`,
 `user.manage`, `location.manage`, `register.enroll`, `audit.view`, `report.sales.view`,
-`report.stock.view`, `settings.manage`, `role.manage`, `day.close` — anywhere, via a role or a direct
+`report.stock.view`, `settings.manage`, `role.manage`, `day.close`,
+`payment_method.manage`, `shift.approve_variance` — anywhere, via a role or a direct
 grant, may sign in. Wrong email, wrong password, deactivated, and
 zero-admin-tier-permissions all still answer identically (`401 invalid_credentials`) —
 the same user-enumeration defense as PIN login, now covering a wider set of users who can
