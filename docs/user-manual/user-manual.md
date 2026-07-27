@@ -581,10 +581,11 @@ same location.
 Everything in the back office sits behind one sign-in. Once you're in, a
 rail down the left holds every section your permissions unlock, under two
 headings — **Operations**: **Today**, **Catalog**, **Users**, **Locations &
-Registers**, **Settings**, **End of Day**; **Insights**: **Reports**,
-**Audit**. **Today** always shows; every other section only appears if you
-hold a permission that unlocks it — an admin sees all eight, a manager
-granted only sales reporting sees **Today** and **Reports**. A **location
+Registers**, **Variances**, **Payment methods**, **Settings**, **End of
+Day**; **Insights**: **Reports**, **Audit**. **Today** always shows; every
+other section only appears if you hold a permission that unlocks it — an
+admin sees all ten, a manager granted only sales reporting sees **Today**
+and **Reports**. A **location
 switcher** sits above
 the rail, and your name plus a **Sign out** button sit at the bottom.
 
