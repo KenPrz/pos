@@ -12,6 +12,7 @@ operator who installs the system. Covers the register and the back office.
 | 1.2 | 2026-07-23 | Chapter 14: explained why the next business date stays unavailable until the store's midnight, even after closing. |
 | 1.3 | 2026-07-27 | Added Chapter 12, Payment methods (per-location tender groups and methods, what's archivable, and what reading the Z-report back can and can't tell you). Rewrote Chapter 5's tender passage for configurable payment methods. Later chapters renumbered. |
 | 1.4 | 2026-07-27 | Chapter 11: added the On-screen keyboard toggle, the fields it covers, and why first-time activation of a keyboard-less terminal still needs a keyboard attached once. |
+| 1.5 | 2026-07-27 | Chapter 7: added the back office's Variances queue — where to find which shifts need approval, and that it lists only, never approves. |
 
 # 1. Introduction
 
@@ -555,6 +556,29 @@ purpose, not a bug waiting to be routed around.
 Tap **Print** for a paper copy of the Z-report, then **Done**. Closing signs
 you out of this till completely — you land back at **Enter PIN**.
 
+## Finding what needs approval: the Variances queue
+
+With more than one register, "which shift needs a variance approved" isn't
+something any single till can tell you — you'd have to sign in at each one
+in turn to find out. The back office's **Variances** section (Chapter 8)
+answers that without the walk: every closed shift, at every location you
+cover, whose variance is still over threshold and unsigned, newest close
+first — register, who opened it, when it closed, the expected, counted,
+and variance figures, and the threshold it was measured against (each
+location can set its own, so the same variance can qualify at one store
+and not another).
+
+It's a list, not a shortcut past the rule above — there's no **Approve**
+button in the back office. The page says so right above the table: this is
+where to find which shifts need sign-off, approval is scoped to the
+location and never to the till that closed (closing already revoked that
+till's own sessions), and today that means calling the API directly from
+another still-open register's session at the same location — no till
+screen anywhere offers an Approve button for a shift other than its own.
+Use the queue to see which shift and location need attention, then approve
+it exactly as the section above describes: an API call from that other,
+still-open till's session, not a screen at any till.
+
 # 8. The back office
 
 ## Layout
@@ -562,10 +586,11 @@ you out of this till completely — you land back at **Enter PIN**.
 Everything in the back office sits behind one sign-in. Once you're in, a
 rail down the left holds every section your permissions unlock, under two
 headings — **Operations**: **Today**, **Catalog**, **Users**, **Locations &
-Registers**, **Settings**, **End of Day**; **Insights**: **Reports**,
-**Audit**. **Today** always shows; every other section only appears if you
-hold a permission that unlocks it — an admin sees all eight, a manager
-granted only sales reporting sees **Today** and **Reports**. A **location
+Registers**, **Variances**, **Payment methods**, **Settings**, **End of
+Day**; **Insights**: **Reports**, **Audit**. **Today** always shows; every
+other section only appears if you hold a permission that unlocks it — an
+admin sees all ten, a manager granted only sales reporting sees **Today**
+and **Reports**. A **location
 switcher** sits above
 the rail, and your name plus a **Sign out** button sit at the bottom.
 

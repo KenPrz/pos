@@ -12,13 +12,18 @@ use Illuminate\Support\Facades\DB;
  * global, so access is granted when the user holds the permission at ANY location,
  * via a role or a direct grant. Direct table joins on purpose — spatie's relations
  * scope to the current team and answer the wrong question silently (CLAUDE.md).
+ *
+ * SECTIONS now includes one register-tier permission (SHIFT_APPROVE_VARIANCE):
+ * membership here means "an admin-tier surface exists for this", not "this is an
+ * admin-only capability" — supervisors hold it at their registers and are precisely
+ * the audience for the back-office variance queue it gates.
  */
 final class AdminAccess
 {
     public const array SECTIONS = [
         Permissions::CATALOG_MANAGE, Permissions::USER_MANAGE, Permissions::LOCATION_MANAGE,
         Permissions::REGISTER_ENROLL, Permissions::AUDIT_VIEW, Permissions::REPORT_SALES_VIEW,
-        Permissions::REPORT_STOCK_VIEW, Permissions::PAYMENT_METHOD_MANAGE,
+        Permissions::REPORT_STOCK_VIEW, Permissions::SHIFT_APPROVE_VARIANCE, Permissions::PAYMENT_METHOD_MANAGE,
         Permissions::SETTINGS_MANAGE, Permissions::ROLE_MANAGE, Permissions::DAY_CLOSE,
     ];
 

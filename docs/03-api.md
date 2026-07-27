@@ -102,7 +102,8 @@ POST /api/v1/admin/logout
 **Permission-based, not admin-only (RBAC v2).** Through M6 this tier was `is_admin`-only;
 now any active user holding at least one admin-tier permission — `catalog.manage`,
 `user.manage`, `location.manage`, `register.enroll`, `audit.view`, `report.sales.view`,
-`report.stock.view`, `settings.manage`, `role.manage`, `day.close` — anywhere, via a role or a direct
+`report.stock.view`, `settings.manage`, `role.manage`, `day.close`,
+`payment_method.manage`, `shift.approve_variance` — anywhere, via a role or a direct
 grant, may sign in. Wrong email, wrong password, deactivated, and
 zero-admin-tier-permissions all still answer identically (`401 invalid_credentials`) —
 the same user-enumeration defense as PIN login, now covering a wider set of users who can
@@ -276,8 +277,10 @@ close is how you end up with terminals unplugged mid-count and no data at all.
 **Approving from the register that just closed 401s.** `CloseShift` revokes every staff
 session bound to that register the moment it closes, and approval needs a staff session
 like any other write. In practice this means a supervisor approves from a *different*
-register at the same location — the check is on location, not on the specific register —
-or, later, from the M6 back office. This is expected behaviour, not a bug to route around.
+register at the same location — the check is on location, not on the specific register.
+`GET /admin/variances` (below) is where a supervisor finds out *which* shift needs this,
+without logging into every register in turn to look — it only lists; approval itself is
+still done here, from another till. This is expected behaviour, not a bug to route around.
 
 Closing a shift with open orders → `409` listing them in `details`. Those orders must be
 closed or transferred first; a tab cannot outlive the drawer that's accountable for it.
@@ -812,6 +815,42 @@ The one write-path effect outside this section: `POST /shifts/open` now checks f
 closed, un-reopened `business_days` row at the register's location and today's date,
 refusing with `409 day_closed` if one exists. Nothing else changes — approving a
 variance, refunds, and reports all stay legal on a closed day.
+
+### Variances
+
+```
+GET /api/v1/admin/variances                                  # gated shift.approve_variance
+  → { items: [ { shift_id, register_id, register_name, location_id, location_name,
+      opened_by_name, opened_at, closed_at, expected_cash_cents, counted_cash_cents,
+      variance_cents, threshold_cents } ] }
+```
+
+A queue, not a report: closed shifts whose drawer variance is over threshold and not yet
+signed off, so a supervisor can see **which** drawers need approval without logging into
+each register in turn to find out. **No `location_id` parameter** — the list is already
+scoped to every location where the caller holds `shift.approve_variance`, the same "holds
+it anywhere" rule as back-office login itself (`is_admin`: every location; `05-rbac.md`).
+Unpaginated, ordered by `closed_at` descending — the most recent close is the one a
+supervisor is most likely acting on.
+
+A row is pending under exactly the three conditions `ApproveVariance` itself guards on
+(above), so there is one definition of "needs approval" rather than two that can drift:
+`closed_at` is set (an open shift has no count yet), `abs(variance_cents)` is **strictly
+greater than** `threshold_cents`, and `variance_approved_at` is still null. The boundary
+is deliberate — `POST /shifts/{shift}/approve-variance` rejects `abs(...) <= threshold`
+with `422 variance_approval_not_required`, so listing an at-threshold row would offer an
+approval the API refuses. `threshold_cents` is
+`locations.variance_approval_threshold_cents`, falling back to
+`config('pos.shifts.variance_approval_threshold_cents')` — resolved **per row**, because
+unlike `GET .../day` above this list spans locations, each of which may override the
+threshold differently.
+
+Read-only, gated `shift.approve_variance` (now in `AdminAccess::SECTIONS` — `05-rbac.md`).
+Approval itself is unchanged and stays the register action above, `POST
+/shifts/{shift}/approve-variance` — not ported to the back office, because the audit trail
+is register-attributed (`ApproveVariance` audits with a `registerId`, and an admin session
+has no register to attribute to). This endpoint only answers *which* shift; it never
+approves one.
 
 ## Reports
 

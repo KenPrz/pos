@@ -46,6 +46,7 @@ use App\Http\Controllers\Admin\Registers\ListRegistersController;
 use App\Http\Controllers\Admin\Registers\UpdateRegisterController;
 use App\Http\Controllers\Admin\Reports\SalesReportController;
 use App\Http\Controllers\Admin\Reports\StockReportController;
+use App\Http\Controllers\Admin\Shifts\ListPendingVariancesController;
 use App\Http\Controllers\Admin\Roles\CreateRoleController;
 use App\Http\Controllers\Admin\Roles\DeleteRoleController;
 use App\Http\Controllers\Admin\Roles\ListPermissionsController;
@@ -238,6 +239,11 @@ Route::prefix('v1')->group(function (): void {
         // orders, joined to the live catalog) — see SalesReportResource's `basis` field.
         Route::get('/reports/sales', SalesReportController::class)->name('admin.reports.sales');
         Route::get('/reports/stock', StockReportController::class)->name('admin.reports.stock');
+
+        // Closed shifts needing variance sign-off. Read-only — approval itself stays a
+        // register action (POST /shifts/{shift}/approve-variance), because the audit trail
+        // is register-attributed.
+        Route::get('/variances', ListPendingVariancesController::class)->name('admin.variances.list');
 
         // Audit-log viewer (M6 task 7). Read-only — no audit-of-the-audit.
         Route::get('/audit', ListAuditLogController::class)->name('admin.audit.list');

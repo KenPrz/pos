@@ -342,6 +342,20 @@ need a physical keyboard, because at that point the client has no device token a
 register to read the flag from — first setup of a keyboard-less terminal needs a
 keyboard attached once. Suites: 619 backend / 135 register / 225 back-office.
 
+**Pending variances complete** — a read-only back-office queue (`GET /admin/variances`,
+gated `shift.approve_variance`) listing closed shifts whose drawer variance is over
+threshold and not yet signed off, scoped server-side to every location the caller holds
+that permission at, no `location_id` parameter. "Pending" is the same three conditions
+`ApproveVariance` itself guards on — closed, `abs(variance_cents)` strictly over the
+location's threshold, not yet approved — so there is one definition, not two that can
+drift. `shift.approve_variance` is now in `AdminAccess::SECTIONS`, the first
+register-tier permission there; no new permission, no role change, since supervisors
+already hold it and are exactly the queue's audience. The view deliberately does not
+link to the offending register — see the gotcha below — and approval stays a register
+action, not ported to the back office, because the audit trail is register-attributed
+(`ApproveVariance` audits with a `registerId`). Suites: 628 backend / 138 register / 233
+back-office.
+
 Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
 trigger that would revive each (monitoring, load test, runbook, registry/CD, and more).
 
@@ -390,6 +404,10 @@ trigger that would revive each (monitoring, load test, runbook, registry/CD, and
   revokes every staff session bound to that register, and approval needs a session like
   any other write. Approve from a *different* register at the same location instead (the
   check is on location, not the specific terminal) — see `scripts/e2e-lunch-service.sh`.
+  The back office's **Variances** section (`GET /admin/variances`) is where a supervisor
+  finds out *which* shift needs this without logging into every register in turn — it
+  only lists, and deliberately doesn't link to the offending register, since that's the
+  one place approval fails; approval is still done from another till.
 - **Idempotency keys are a global primary key, not scoped per route or per order.**
   Reusing one on a genuinely different request anywhere in the system is
   `409 idempotency_key_reused`, even across unrelated endpoints. Don't assume "different

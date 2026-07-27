@@ -462,6 +462,29 @@ export type AuditLogEntry = {
 export type AuditPage = { rows: AuditLogEntry[]; page: number; has_more: boolean }
 
 // ---------------------------------------------------------------------------
+// Pending variances (Task 2, pending-variances) — verified against
+// AdminPendingVarianceResource.php. A "pending" variance is a CLOSED shift whose
+// |variance| exceeds its location's threshold and which nobody has signed off — the
+// server owns that rule; `threshold_cents` is returned so the client can show why a row
+// qualifies without re-deriving it.
+// ---------------------------------------------------------------------------
+
+export type PendingVariance = {
+  shift_id: string
+  register_id: string
+  register_name: string
+  location_id: string
+  location_name: string
+  opened_by_name: string
+  opened_at: string
+  closed_at: string
+  expected_cash_cents: number
+  counted_cash_cents: number
+  variance_cents: number
+  threshold_cents: number
+}
+
+// ---------------------------------------------------------------------------
 // Settings (Task 11) — verified against Settings::all()/GetSettingsController.php.
 // Database-first with a config fallback: `source` says which one an effective value
 // actually came from. There is no way to write an explicit `null` — a PATCH value of
@@ -697,6 +720,13 @@ export const api = {
     get: (): Promise<Setting[]> => request<{ settings: Setting[] }>('/admin/settings').then((r) => r.settings),
     update: (settings: Record<string, string | null>): Promise<Setting[]> =>
       patch<{ settings: Setting[] }>('/admin/settings', { settings }).then((r) => r.settings),
+  },
+
+  // No location_id parameter: the list is already scoped to everywhere the caller holds
+  // shift.approve_variance (admins see all).
+  variances: {
+    list: (): Promise<PendingVariance[]> =>
+      request<{ items: PendingVariance[] }>('/admin/variances').then((r) => r.items),
   },
 
   // The Today landing (Task 2) used to compose these four calls into one `today.overview`
