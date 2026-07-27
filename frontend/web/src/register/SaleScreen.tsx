@@ -504,7 +504,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
         <div className="flex flex-col gap-lg">
           <h2 className="type-headline">Payment complete — order {phase.outcome.order.number}</h2>
           <div className="flex flex-col items-center gap-xs border border-hairline bg-surface-1 px-lg py-xl print:border-0 print:bg-transparent">
-            <p className="type-caption text-ink-muted">{paidCash ? 'Change' : 'Card'}</p>
+            <p className="type-caption text-ink-muted">{paidCash ? 'Change' : payment.payment_method_name}</p>
             {paidCash ? (
               <MoneyText cents={payment.change_cents ?? 0} currency={getCurrency()} size="total" className="hero-amount" />
             ) : (

@@ -164,7 +164,7 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
           </label>
           <div>
             <Button type="submit" size="lg" disabled={refund.isPending}>
-              {refund.isPending ? 'Refunding…' : 'Refund cash'}
+              {refund.isPending ? 'Refunding…' : `Refund ${refundMethod?.name ?? 'cash'}`}
             </Button>
           </div>
         </form>

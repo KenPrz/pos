@@ -120,4 +120,16 @@ it('scopes a non-admin holder to the locations they hold it at', function (): vo
         ->assertOk();
     $this->getJson("/api/v1/admin/payment-method-groups?location_id={$other->id}", $headers)
         ->assertStatus(403);
+
+    // The two PATCH/POST routes take a DIFFERENT path than the list above: PATCH sources
+    // the location from the row (not the request body), and POST names it directly. Both
+    // must refuse the same manager against $other's data, not just the list endpoint.
+    $groupAtOther = PaymentMethodGroup::query()->where('location_id', $other->id)->firstOrFail();
+    $this->patchJson("/api/v1/admin/payment-method-groups/{$groupAtOther->id}", ['name' => 'Nope'], $headers)
+        ->assertStatus(403);
+
+    $this->postJson('/api/v1/admin/payment-method-groups', [
+        'location_id' => $other->id,
+        'code' => 'EWALLET', 'name' => 'E-wallets', 'driver' => 'external_card',
+    ], $headers)->assertStatus(403);
 });

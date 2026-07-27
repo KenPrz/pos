@@ -770,9 +770,11 @@ actually offers), full story in `02-data-model.md`.
   permissions are.
 - **All three e2e scripts updated**: `e2e-retail-day.sh` and `e2e-lunch-service.sh` tender
   on method codes instead of `driver` strings; `e2e-admin-day.sh` exercises the new admin
-  CRUD and the Z-report's method/group breakdown.
+  CRUD and asserts the Z-report's `sales_by_method`/`sales_by_group` for the sale it made
+  (`CASH`, both `= 510`) — the script's own new `VOUCHER` group takes no payment, so that
+  half of the rollup isn't asserted anywhere yet.
 
-**Status: complete.** Suites: 613 backend / 121 register / 222 back-office.
+**Status: complete.** Suites: 614 backend / 123 register / 224 back-office.
 
 ---
 
@@ -805,6 +807,7 @@ Not "maybe someday" — each has a specific condition that should promote it.
 | Runbook (register won't connect, drawer won't reconcile, restore from backup) | First operator who isn't us. |
 | Registry + CD pipeline | First remote host to deploy to. |
 | FrankenPHP worker mode (Octane) | Measured latency need — off by default; the image already supports it. |
+| `refunds` composite `(payment_method_id, location_id)` FK | Defence-in-depth for a refund's tender belonging to the refund's own location, the same way `payment_methods.group_id` already ties a method to its group's location. Nothing is wrong today — `RefundOrder` resolves the method against the acting register's location — but the migration `000100`'s `(id, location_id)` unique index on `payment_method_groups`/`payment_methods` is already there to hang a matching FK off of, if a cross-location refund ever becomes reachable another way. |
 | Delta-based `e2e-admin-day.sh` assertions | The e2e scripts need to compose without `make e2e`'s double-reseed — today its sales-report checks are absolute counts that only hold against its own fresh seed. |
 | `COMPOSE_VAR` hardening against a typo'd `COMPOSE=` | A destructive `backup`/`restore`/`restore-drill` target is run with a mistyped `COMPOSE=prod` and silently falls back to the dev stack instead of failing loudly. |
 | `make e2e`'s device-token extraction guard checks non-empty, not token-shaped | The seeder's printed table format shifts in a way `test -s` still passes (e.g. a column reflow) but the extracted string isn't a real `id\|hash` token — today's guard would wave through garbage instead of failing at extraction. |

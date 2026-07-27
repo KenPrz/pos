@@ -250,7 +250,12 @@ Z=$(req GET "/reports/z?shift_id=$SHIFT_ID" -H "$D" -H "$S")
 EXPECTED=$(echo "$Z" | jq .data.expected_cash_cents)
 [ "$EXPECTED" = "5510" ] || fail "expected cash should be 5510 (5000 float + 510 sale), got $EXPECTED"
 [ "$(echo "$Z" | jq .data.orders_closed)" = "1" ] || fail "Z-report should show 1 closed order"
-echo "36. Z-report: expected_cash=5510, orders_closed=1"
+# The one sale tendered on CASH, which sits in the CASH group — the actual method/group
+# breakdown, not just the drawer total. MEALVOUCHER's own VOUCHER group never took a
+# payment in this script, so it is deliberately not asserted here.
+echo "$Z" | jq -e '.data.sales_by_method.CASH == 510' > /dev/null || fail "Z-report sales_by_method.CASH should be 510"
+echo "$Z" | jq -e '.data.sales_by_group.CASH == 510' > /dev/null || fail "Z-report sales_by_group.CASH should be 510"
+echo "36. Z-report: expected_cash=5510, orders_closed=1, sales_by_method.CASH=510, sales_by_group.CASH=510"
 
 CLOSE=$(req POST "/shifts/$SHIFT_ID/close" -H "$D" -H "$S" -H "Idempotency-Key: $(uuidgen)" -d '{"counted_cash_cents":5510}')
 VARIANCE=$(echo "$CLOSE" | jq .data.variance_cents)

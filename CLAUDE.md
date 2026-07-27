@@ -320,7 +320,7 @@ no money, taking one is still `payment.take`) backs six routes under
 `group_by=payment_method` (ledger-basis, keyed on the snapshot columns, like `day`/
 `user`). `PaymentMethodProvisioner` closes the same bug class RBAC v2 closed for roles —
 a location created in the back office now gets a working `CASH`/`CARD` pair instead of
-422ing on its first tender. Suites: 613 backend / 121 register / 222 back-office.
+422ing on its first tender. Suites: 614 backend / 123 register / 224 back-office.
 
 Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
 trigger that would revive each (monitoring, load test, runbook, registry/CD, and more).

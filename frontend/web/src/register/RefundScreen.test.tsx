@@ -101,7 +101,11 @@ describe('RefundScreen — payment method code', () => {
 
     fireEvent.change(screen.getByLabelText(/quantity of widget to refund/i), { target: { value: '1' } })
     fireEvent.change(screen.getByLabelText(/reason/i), { target: { value: 'Faulty' } })
-    fireEvent.click(screen.getByRole('button', { name: /refund cash/i }))
+    // Regression: the button used to hardcode 'Refund cash' — a location whose
+    // cash-driver method is PETTYCASH would show a button naming a tender it doesn't
+    // use. It must read the resolved method's NAME ("Petty cash"), not a literal.
+    expect(screen.queryByRole('button', { name: /^refund cash$/i })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /refund petty cash/i }))
 
     await screen.findByText(/Refund complete/i)
     expect(api.refund).toHaveBeenCalledWith(

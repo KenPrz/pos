@@ -215,7 +215,7 @@ describe('SaleScreen tender methods', () => {
     expect(screen.queryByLabelText(/cash tendered/i)).not.toBeInTheDocument()
   })
 
-  it('posts the selected method code', async () => {
+  it('posts the selected method code, and the outcome screen names the method rather than a generic "Card"', async () => {
     vi.mocked(api.takePayment).mockResolvedValue({
       payment: {
         id: 'p-1', driver: 'external_card', payment_method_code: 'VISA',
@@ -233,6 +233,13 @@ describe('SaleScreen tender methods', () => {
     await waitFor(() => expect(api.takePayment).toHaveBeenCalledWith(
       expect.anything(), expect.any(Number), 'VISA', expect.any(String), expect.anything(),
     ))
+
+    // Regression: this caption used to hardcode 'Card' for any non-cash tender, so a
+    // GCash sale showed "Card" directly above "recorded on GCash". It must name the
+    // ACTUAL method, not assume every non-cash payment is a card.
+    await screen.findByText('Payment complete — order N-0001')
+    expect(screen.getByText('Visa')).toBeInTheDocument()
+    expect(screen.queryByText('Card')).not.toBeInTheDocument()
   })
 
   it('names the back office when the location has no methods', async () => {

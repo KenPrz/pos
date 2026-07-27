@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Domain\Rbac\Permissions;
 use App\Models\PaymentMethod;
 use App\Models\PaymentMethodGroup;
 use App\Models\User;
+use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function (): void {
     $this->location = provisionedLocation(['code' => 'AAA']);
@@ -110,6 +112,35 @@ it('refuses a session without the permission', function (): void {
     $headers = ['Authorization' => 'Bearer '.$nobody->createToken('t')->plainTextToken];
 
     $this->getJson("/api/v1/admin/payment-methods?location_id={$this->location->id}", $headers)
+        ->assertStatus(403);
+});
+
+it('scopes a non-admin holder to the locations they hold it at', function (): void {
+    $other = provisionedLocation(['code' => 'BBB']);
+    $manager = User::factory()->create(['email' => 'm@pos.test', 'password_hash' => 'pw']);
+
+    // Direct grant at ONE location — mirrors PaymentMethodGroupCrudTest's case.
+    $registrar = app(PermissionRegistrar::class);
+    $registrar->setPermissionsTeamId($this->location->id);
+    $manager->givePermissionTo(Permissions::PAYMENT_METHOD_MANAGE);
+    $registrar->forgetCachedPermissions();
+
+    $headers = ['Authorization' => 'Bearer '.$manager->createToken('t')->plainTextToken];
+
+    $this->getJson("/api/v1/admin/payment-methods?location_id={$this->location->id}", $headers)
+        ->assertOk();
+    $this->getJson("/api/v1/admin/payment-methods?location_id={$other->id}", $headers)
+        ->assertStatus(403);
+
+    $groupAtOther = PaymentMethodGroup::query()
+        ->where('location_id', $other->id)->where('code', 'CARD')->firstOrFail();
+    $this->postJson('/api/v1/admin/payment-methods', [
+        'location_id' => $other->id, 'group_id' => $groupAtOther->id,
+        'code' => 'VISA', 'name' => 'Visa',
+    ], $headers)->assertStatus(403);
+
+    $methodAtOther = PaymentMethod::query()->where('location_id', $other->id)->firstOrFail();
+    $this->patchJson("/api/v1/admin/payment-methods/{$methodAtOther->id}", ['name' => 'Nope'], $headers)
         ->assertStatus(403);
 });
 
