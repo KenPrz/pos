@@ -1,4 +1,4 @@
-# 17. FAQ
+# 18. FAQ
 
 ## Why don't the day and category reports reconcile?
 
@@ -8,7 +8,7 @@ individual order lines, joined to current category names. A payment covers a who
 order at once; a category breakdown has to attribute individual lines within it. They
 answer different questions — "how much cash and card came in" versus "what sold" — so
 the Day total and the sum of the Category totals aren't expected to match to the cent.
-See Chapter 12.
+See Chapter 13.
 
 ## Do I have to close the business day every night?
 
@@ -16,7 +16,7 @@ No. Nothing breaks if you don't — orders, shifts, and reports all carry on reg
 Closing is a reconciliation milestone you choose to record: it freezes that date's totals
 onto a permanent record, captures the bank deposit and the checklist, and stops anyone
 opening a fresh drawer on a date you've already signed off. Skip it and you simply have
-no frozen record for that day. See Chapter 14.
+no frozen record for that day. See Chapter 15.
 
 ## Why does a refund change net sales on a closed day but not the tax?
 
@@ -26,7 +26,7 @@ closed that day, and a refund doesn't rewrite the original order (nothing in thi
 mutates a closed order — Chapter 5). So a refund lowers net sales while the tax figure
 stays where it was. It's the same split as the day-versus-category question above, and
 the same answer: the two are answering different questions and aren't meant to reconcile
-to the cent. See Chapter 14.
+to the cent. See Chapter 15.
 
 ## What does VAT-inclusive pricing mean for my totals and receipts?
 

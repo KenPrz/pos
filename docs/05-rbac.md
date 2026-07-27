@@ -88,11 +88,11 @@ short-circuits the gate. The one capability that is genuinely global is the one 
 cannot be modelled per-location — which is a coherent line, not an exception.
 
 Consequence worth knowing: `catalog.manage`, `user.manage`, `location.manage`,
-`register.enroll`, `audit.view`, `settings.manage`, `role.manage`, and `day.close` are
-granted by **no role**. That is correct — only admins do those things by default, and
-admins bypass. The permission names still exist because the endpoints still name what
-they require, and (RBAC v2, below) an admin can hand any one of them out as a direct
-per-location grant without inventing a role for it.
+`register.enroll`, `audit.view`, `settings.manage`, `role.manage`, `day.close`, and
+`payment_method.manage` are granted by **no role**. That is correct — only admins do
+those things by default, and admins bypass. The permission names still exist because the
+endpoints still name what they require, and (RBAC v2, below) an admin can hand any one of
+them out as a direct per-location grant without inventing a role for it.
 
 ## Verified integration notes
 
@@ -205,6 +205,17 @@ resolved in the action rather than a policy class.
 | `register.enroll` | Enroll a terminal |
 | `settings.manage` | Business identity + per-location thresholds (RBAC v2) |
 | `role.manage` | Role-template CRUD (RBAC v2) |
+| `payment_method.manage` | Payment method group/method CRUD |
+
+`payment_method.manage` is admin-tier — granted by no default role, doubling as its own
+back-office section — and is deliberately **not** in `moneyLeaves()`. Naming a tender
+moves no money: creating a `GCASH` method changes nothing until someone actually takes a
+payment on it, and every payment taken is still gated by `payment.take` and recorded
+against a user and a shift regardless of what methods exist. Its `location_id` scoping
+follows the same rule as the report permissions below: holding it *somewhere* is what
+gets a non-admin into the section, not a blank check to edit every store's tenders — see
+`ScopesToPermittedLocation`, the trait every payment-method `FormRequest` shares with
+`AuthorizesBackOffice`.
 
 **Stock**
 
@@ -347,7 +358,7 @@ granted the moment a user holds at least one **admin-tier permission** at *any*
 location, via a role or a direct grant. `App\Domain\Rbac\AdminAccess::SECTIONS` is the
 admin-tier set: `catalog.manage`, `user.manage`, `location.manage`, `register.enroll`,
 `audit.view`, `report.sales.view`, `report.stock.view`, `settings.manage`,
-`role.manage`, `day.close`. `holdsAnywhere($user, $permission)` is `is_admin || in_array($permission,
+`role.manage`, `day.close`, `payment_method.manage`. `holdsAnywhere($user, $permission)` is `is_admin || in_array($permission,
 $this->allHeld($user))`, where `allHeld()` is the union of every role-derived and direct
 permission across every location — direct table joins on `model_has_roles` and
 `model_has_permissions`, for the same reason `PermissionAssignments` and

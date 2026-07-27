@@ -64,7 +64,7 @@ it('voids an open order, restocks every tracked line, and stores the reason', fu
 
 it('refuses to void an order that has been paid, over HTTP', function (): void {
     app(TakePayment::class)->execute(new TakePaymentInput(
-        orderId: $this->order->id, registerId: $this->register->id, driver: 'cash',
+        orderId: $this->order->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         amountCents: 500, tenderedCents: 500, reference: null,
         expectedVersion: $this->order->version, actorId: $this->cashier->id,
     ));

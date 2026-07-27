@@ -6,9 +6,10 @@
 # mode and issues it a fresh activation code (killing the old device token and every
 # staff session bound to it mid-script), redeems that code for a new device token, a
 # register sale runs on the new token, the admin reprices the sold variant and proves
-# the paid order's receipt didn't move (snapshot), the three sales-report slices
-# attribute the same sale by day/category/user, the audit log turns up every write, and
-# the shift closes clean.
+# the paid order's receipt didn't move (snapshot), a new payment method group/method
+# created in the back office reaches the till's catalog without a deploy and then stops
+# appearing once archived, the three sales-report slices attribute the same sale by
+# day/category/user, the audit log turns up every write, and the shift closes clean.
 # Set POS_ADMIN_EMAIL / POS_ADMIN_PASSWORD (back-office login), POS_DEVICE_TOKEN (GRC /
 # Till 1 at the Manila Grocery — printed by php artisan migrate:fresh --seed) and
 # POS_E2E_PIN (any 4-6 digit PIN for the cashier this script hires) first. Never a
@@ -164,7 +165,7 @@ LINE=$(req POST "/orders/$ORDER_ID/lines" -H "$D" -H "$S" -H 'If-Match: 0' \
 echo "21. Flat White + Oat added: total=510 (server-verified)"
 
 PAY=$(req POST "/orders/$ORDER_ID/payments" -H "$D" -H "$S" -H 'If-Match: 1' -H "Idempotency-Key: $(uuidgen)" \
-  -d '{"driver":"cash","amount_cents":510,"tendered_cents":510}')
+  -d '{"payment_method_code":"CASH","amount_cents":510,"tendered_cents":510}')
 [ "$(echo "$PAY" | jq -r .data.order.status)" = "closed" ] || fail "order did not close on cash 510"
 echo "22. paid cash 510, order closed"
 
@@ -183,21 +184,40 @@ RECEIPT2=$(req GET "/orders/$ORDER_ID/receipt" -H "$D" -H "$S")
 [ "$(echo "$RECEIPT2" | jq .data.lines[0].line_total_cents)" = "510" ] || fail "the paid order's receipt drifted after reprice — snapshot broken"
 echo "25. paid order's receipt still reads 510 — the reprice never touched it (snapshot proof)"
 
+# --- payment methods: configure a tender in the back office, see the till offer it, take it ---
+
+GRP=$(req POST "/admin/payment-method-groups" -H "$AD" \
+  -d "{\"location_id\":\"$GROCERY_ID\",\"code\":\"VOUCHER\",\"name\":\"Vouchers\",\"driver\":\"external_card\",\"sort_order\":9}" \
+  | jq -r .data.payment_method_group.id)
+MTH=$(req POST "/admin/payment-methods" -H "$AD" \
+  -d "{\"location_id\":\"$GROCERY_ID\",\"group_id\":\"$GRP\",\"code\":\"MEALVOUCHER\",\"name\":\"Meal voucher\"}" \
+  | jq -r .data.payment_method.id)
+echo "26. payment method created: group=VOUCHER method=MEALVOUCHER id=$MTH"
+
+# The till sees it without a deploy — that is the whole point of the taxonomy being data.
+CAT=$(req GET /catalog -H "$D")
+echo "27. till offers it: $(echo "$CAT" | jq -r '[.data.payment_methods[].code] | join(",")')"
+
+# Archive it and watch the till stop offering it.
+req PATCH "/admin/payment-methods/$MTH" -H "$AD" -d '{"is_active":false}' > /dev/null
+CAT2=$(req GET /catalog -H "$D")
+echo "28. archived, till no longer offers it: $(echo "$CAT2" | jq -r '[.data.payment_methods[].code] | join(",")')"
+
 SALES_DAY=$(req GET "/admin/reports/sales?location_id=$GROCERY_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=day" -H "$AD")
 [ "$(echo "$SALES_DAY" | jq -r .data.basis)" = "ledger" ] || fail "day report should be ledger-basis"
 [ "$(echo "$SALES_DAY" | jq .data.totals.gross_cents)" = "510" ] || fail "day gross should be exactly 510 on a fresh seed, got $(echo "$SALES_DAY" | jq .data.totals.gross_cents)"
-echo "26. sales report (day, ledger-basis): gross=510"
+echo "29. sales report (day, ledger-basis): gross=510"
 
 SALES_CATEGORY=$(req GET "/admin/reports/sales?location_id=$GROCERY_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=category" -H "$AD")
 [ "$(echo "$SALES_CATEGORY" | jq -r .data.basis)" = "lines" ] || fail "category report should be line-basis"
 DRINKS_CENTS=$(echo "$SALES_CATEGORY" | jq '[.data.rows[] | select(.bucket=="Drinks") | .line_total_cents] | add')
 [ "$DRINKS_CENTS" = "510" ] || fail "Drinks category total should be 510, got $DRINKS_CENTS"
-echo "27. sales report (category, line-basis): Drinks=510"
+echo "30. sales report (category, line-basis): Drinks=510"
 
 SALES_USER=$(req GET "/admin/reports/sales?location_id=$GROCERY_ID&from=$BUSINESS_DATE&to=$BUSINESS_DATE&group_by=user" -H "$AD")
 EVE_CENTS=$(echo "$SALES_USER" | jq '[.data.rows[] | select(.bucket=="Eve") | .gross_cents] | add')
 [ "$EVE_CENTS" = "510" ] || fail "Eve's user-report gross should be 510, got $EVE_CENTS"
-echo "28. sales report (user, ledger-basis): Eve=510"
+echo "31. sales report (user, ledger-basis): Eve=510"
 echo "    (day/user are ledger-basis — payments and refunds; category is line-basis — order lines. They don't reconcile by design.)"
 
 # --- 7. audit viewer ---
@@ -205,24 +225,24 @@ echo "    (day/user are ledger-basis — payments and refunds; category is line-
 AUDIT_PRODUCT=$(req GET "/admin/audit?action=admin.product.create" -H "$AD")
 FOUND_PRODUCT=$(echo "$AUDIT_PRODUCT" | jq -r --arg id "$PRODUCT_ID" '[.data.rows[] | select(.entity_id==$id)] | length')
 [ "$FOUND_PRODUCT" != "0" ] || fail "audit log missing admin.product.create for Flat White"
-echo "29. audit: admin.product.create found for Flat White"
+echo "32. audit: admin.product.create found for Flat White"
 
 AUDIT_VARIANT=$(req GET "/admin/audit?entity_type=ProductVariant&entity_id=$VARIANT_ID" -H "$AD")
 REPRICE_ROW=$(echo "$AUDIT_VARIANT" | jq -c '[.data.rows[] | select(.action=="admin.variant.update")][0]')
 [ "$REPRICE_ROW" != "null" ] || fail "audit log missing the reprice event for the variant"
 [ "$(echo "$REPRICE_ROW" | jq .payload.price_cents.from)" = "450" ] || fail "reprice audit 'from' should be 450"
 [ "$(echo "$REPRICE_ROW" | jq .payload.price_cents.to)" = "500" ] || fail "reprice audit 'to' should be 500"
-echo "30. audit: reprice logged with price_cents from=450 to=500"
+echo "33. audit: reprice logged with price_cents from=450 to=500"
 
 AUDIT_ISSUE=$(req GET "/admin/audit?action=admin.register.code_issue" -H "$AD")
 FOUND_ISSUE=$(echo "$AUDIT_ISSUE" | jq -r --arg id "$TILL1_ID" '[.data.rows[] | select(.entity_id==$id)] | length')
 [ "$FOUND_ISSUE" != "0" ] || fail "audit log missing admin.register.code_issue for Till 1"
-echo "31. audit: admin.register.code_issue found for Till 1"
+echo "34. audit: admin.register.code_issue found for Till 1"
 
 AUDIT_ACTIVATE=$(req GET "/admin/audit?action=register.activate" -H "$AD")
 FOUND_ACTIVATE=$(echo "$AUDIT_ACTIVATE" | jq -r --arg id "$TILL1_ID" '[.data.rows[] | select(.entity_id==$id)] | length')
 [ "$FOUND_ACTIVATE" != "0" ] || fail "audit log missing register.activate for Till 1"
-echo "32. audit: register.activate found for Till 1"
+echo "35. audit: register.activate found for Till 1"
 
 # --- 8. close the shift ---
 
@@ -230,12 +250,17 @@ Z=$(req GET "/reports/z?shift_id=$SHIFT_ID" -H "$D" -H "$S")
 EXPECTED=$(echo "$Z" | jq .data.expected_cash_cents)
 [ "$EXPECTED" = "5510" ] || fail "expected cash should be 5510 (5000 float + 510 sale), got $EXPECTED"
 [ "$(echo "$Z" | jq .data.orders_closed)" = "1" ] || fail "Z-report should show 1 closed order"
-echo "33. Z-report: expected_cash=5510, orders_closed=1"
+# The one sale tendered on CASH, which sits in the CASH group — the actual method/group
+# breakdown, not just the drawer total. MEALVOUCHER's own VOUCHER group never took a
+# payment in this script, so it is deliberately not asserted here.
+echo "$Z" | jq -e '.data.sales_by_method.CASH == 510' > /dev/null || fail "Z-report sales_by_method.CASH should be 510"
+echo "$Z" | jq -e '.data.sales_by_group.CASH == 510' > /dev/null || fail "Z-report sales_by_group.CASH should be 510"
+echo "36. Z-report: expected_cash=5510, orders_closed=1, sales_by_method.CASH=510, sales_by_group.CASH=510"
 
 CLOSE=$(req POST "/shifts/$SHIFT_ID/close" -H "$D" -H "$S" -H "Idempotency-Key: $(uuidgen)" -d '{"counted_cash_cents":5510}')
 VARIANCE=$(echo "$CLOSE" | jq .data.variance_cents)
 [ "$VARIANCE" = "0" ] || fail "shift should reconcile clean, got variance $VARIANCE"
-echo "34. shift closed clean: counted=5510 variance=0"
+echo "37. shift closed clean: counted=5510 variance=0"
 
 # --- 9. End of Day: close, prove day_closed blocks a new shift, reopen, prove it lifts ---
 
@@ -243,33 +268,33 @@ DAY_CLOSE=$(req POST "/admin/locations/$GROCERY_ID/day/close" -H "$AD" \
   -d '{"deposit_cents":5000,"checklist":{"cash_drop_confirmed":true,"spoilage_note":"","next_day_note":"e2e"},"note":null}')
 [ "$(echo "$DAY_CLOSE" | jq .data.shift_count)" = "1" ] || fail "day close should report shift_count=1, got $(echo "$DAY_CLOSE" | jq .data.shift_count)"
 [ "$(echo "$DAY_CLOSE" | jq .data.expected_cash_cents)" = "5510" ] || fail "day close expected_cash_cents should be 5510, got $(echo "$DAY_CLOSE" | jq .data.expected_cash_cents)"
-echo "35. business day closed: shift_count=1, expected_cash=5510"
+echo "38. business day closed: shift_count=1, expected_cash=5510"
 
 # Closing the shift above revoked every staff session bound to Till 1, so Eve's $S
 # token is dead — re-login her to get a live one before proving the day_closed guard.
 LOGIN_EVE2=$(req POST /staff/login -H "$D" -d "{\"pin\":\"$E2E_PIN\"}")
 EVE_TOKEN2=$(echo "$LOGIN_EVE2" | jq -r .data.staff_token)
 S2="X-Staff-Token: $EVE_TOKEN2"
-echo "36. Eve re-logged in at Till 1 (her prior session died with the shift close) for a live staff token"
+echo "39. Eve re-logged in at Till 1 (her prior session died with the shift close) for a live staff token"
 
 GUARD_BODY=$(curl -s -X POST "$API/shifts/open" -H "$J" -H "$D" -H "$S2" -d '{"opening_float_cents":5000}')
 GUARD_CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/shifts/open" -H "$J" -H "$D" -H "$S2" -d '{"opening_float_cents":5000}')
 [ "$GUARD_CODE" = "409" ] || fail "expected 409 opening a shift on a closed day, got $GUARD_CODE"
 [ "$(echo "$GUARD_BODY" | jq -r .error.code)" = "day_closed" ] || fail "expected error.code=day_closed, got $(echo "$GUARD_BODY" | jq -r .error.code)"
-echo "37. OpenShift on the closed day correctly refused: 409 day_closed"
+echo "40. OpenShift on the closed day correctly refused: 409 day_closed"
 
 REOPEN=$(req POST "/admin/locations/$GROCERY_ID/day/reopen" -H "$AD" -d '{"reason":"e2e reopen"}')
 [ "$(echo "$REOPEN" | jq -r .data.reopened_at)" != "null" ] || fail "reopen did not set reopened_at"
-echo "38. business day reopened: reopened_at=$(echo "$REOPEN" | jq -r .data.reopened_at)"
+echo "41. business day reopened: reopened_at=$(echo "$REOPEN" | jq -r .data.reopened_at)"
 
 NEW_SHIFT=$(req POST /shifts/open -H "$D" -H "$S2" -d '{"opening_float_cents":5000}')
 NEW_SHIFT_ID=$(echo "$NEW_SHIFT" | jq -r .data.shift.id)
 [ -n "$NEW_SHIFT_ID" ] && [ "$NEW_SHIFT_ID" != "null" ] || fail "expected a shift to open once the day was reopened"
-echo "39. OpenShift succeeds again once reopened: new shift $NEW_SHIFT_ID"
+echo "42. OpenShift succeeds again once reopened: new shift $NEW_SHIFT_ID"
 
 CLOSE2=$(req POST "/shifts/$NEW_SHIFT_ID/close" -H "$D" -H "$S2" -H "Idempotency-Key: $(uuidgen)" -d '{"counted_cash_cents":5000}')
 [ "$(echo "$CLOSE2" | jq -r .data.shift.closed_at)" != "null" ] || fail "the reopened-day shift should close cleanly"
-echo "40. reopened-day shift closed clean, stack left tidy"
+echo "43. reopened-day shift closed clean, stack left tidy"
 
 echo
 echo "=== Admin day summary ==="

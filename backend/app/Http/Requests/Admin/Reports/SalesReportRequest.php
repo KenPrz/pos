@@ -32,7 +32,7 @@ final class SalesReportRequest extends FormRequest
             'location_id' => ['required', 'uuid', 'exists:locations,id'],
             'from' => ['required', 'date_format:Y-m-d'],
             'to' => ['required', 'date_format:Y-m-d'],
-            'group_by' => ['required', 'string', 'in:day,category,user'],
+            'group_by' => ['required', 'string', 'in:day,category,user,payment_method'],
         ];
     }
 

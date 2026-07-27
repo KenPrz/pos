@@ -22,21 +22,44 @@ pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
 
+use App\Domain\Payments\PaymentMethodProvisioner;
 use App\Domain\Rbac\RoleProvisioner;
 use App\Models\Location;
+use App\Models\PaymentMethod;
 use App\Models\Register;
 use App\Models\User;
 use Spatie\Permission\PermissionRegistrar;
 
-/** A location with the role/permission catalog provisioned. */
+/** A location with the role/permission catalog AND its default tenders provisioned. */
 function provisionedLocation(array $attrs = []): Location
 {
     $location = Location::factory()->create($attrs);
     $provisioner = app(RoleProvisioner::class);
     $provisioner->provisionGlobal();
     $provisioner->provisionForLocation($location);
+    // Task 4 makes payments.payment_method_id NOT NULL — every location a test takes a
+    // payment at needs its default CASH/CARD set, same as it needs roles.
+    app(PaymentMethodProvisioner::class)->provisionForLocation($location->id);
 
     return $location;
+}
+
+/**
+ * The three not-null tender columns a directly-created Payment/Refund row needs.
+ * Spread it: `Payment::create([... , ...tenderColumns($location)])`.
+ */
+function tenderColumns(Location $location, string $code = 'CASH'): array
+{
+    $method = PaymentMethod::query()
+        ->where('location_id', $location->id)
+        ->where('code', $code)
+        ->firstOrFail();
+
+    return [
+        'payment_method_id' => $method->id,
+        'payment_method_code' => $method->code,
+        'payment_method_name' => $method->name,
+    ];
 }
 
 function registerAt(Location $location): Register

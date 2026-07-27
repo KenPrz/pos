@@ -40,7 +40,7 @@ function t9cTakeCash(object $t, int $amount, ?int $tendered = null): Payment
     return app(TakePayment::class)->execute(new TakePaymentInput(
         orderId: $t->order->id,
         registerId: $t->register->id,
-        driver: 'cash',
+        paymentMethodCode: 'CASH',
         amountCents: $amount,
         tenderedCents: $tendered,
         reference: null,
@@ -54,7 +54,7 @@ function t9cTakeCard(object $t, int $amount, ?string $reference = 'auth 004321')
     return app(TakePayment::class)->execute(new TakePaymentInput(
         orderId: $t->order->id,
         registerId: $t->register->id,
-        driver: 'external_card',
+        paymentMethodCode: 'CARD',
         amountCents: $amount,
         tenderedCents: null,
         reference: $reference,

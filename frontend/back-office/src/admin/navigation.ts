@@ -18,6 +18,7 @@ export const SECTION_DEFS = {
   catalog: { path: '/catalog', permissions: ['catalog.manage'] },
   users: { path: '/users', permissions: ['user.manage', 'role.manage'] },
   locations: { path: '/locations', permissions: ['location.manage', 'register.enroll'] },
+  'payment-methods': { path: '/payment-methods', permissions: ['payment_method.manage'] },
   settings: { path: '/settings', permissions: ['settings.manage'] },
   day: { path: '/day', permissions: ['day.close'] },
   reports: { path: '/reports', permissions: ['report.sales.view', 'report.stock.view'] },

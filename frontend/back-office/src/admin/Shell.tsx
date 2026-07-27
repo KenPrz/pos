@@ -7,6 +7,7 @@ import { holdsSection, pathForSection, type Section } from './navigation'
 import { AuditSection } from './audit/AuditSection'
 import { CatalogSection } from './catalog/CatalogSection'
 import { EndOfDaySection } from './day/EndOfDaySection'
+import { PaymentMethodsSection } from './payments/PaymentMethodsSection'
 import { PlacesSection } from './places/PlacesSection'
 import { ReportsSection } from './reports/ReportsSection'
 import { SettingsSection } from './settings/SettingsSection'
@@ -54,6 +55,7 @@ export function Shell({
   const canManageUsers = sections.includes('user.manage')
   const canManageRoles = sections.includes('role.manage')
   const canManageLocations = holdsSection('locations', sections)
+  const canManagePaymentMethods = holdsSection('payment-methods', sections)
   const canViewSalesReport = sections.includes('report.sales.view')
   const canViewStockReport = sections.includes('report.stock.view')
   const canViewAudit = holdsSection('audit', sections)
@@ -91,6 +93,9 @@ export function Shell({
         ...(canManageUsers || canManageRoles ? [{ key: 'users', label: 'Users', href: pathForSection('users') }] : []),
         ...(canManageLocations
           ? [{ key: 'locations', label: 'Locations & Registers', href: pathForSection('locations') }]
+          : []),
+        ...(canManagePaymentMethods
+          ? [{ key: 'payment-methods', label: 'Payment methods', href: pathForSection('payment-methods') }]
           : []),
         ...(canManageSettings ? [{ key: 'settings', label: 'Settings', href: pathForSection('settings') }] : []),
         ...(canCloseDay ? [{ key: 'day', label: 'End of Day', href: pathForSection('day') }] : []),
@@ -133,6 +138,9 @@ export function Shell({
           />
         )}
         {section === 'locations' && <PlacesSection onUnauthorized={onUnauthorized} />}
+        {section === 'payment-methods' && (
+          <PaymentMethodsSection location={location} onUnauthorized={onUnauthorized} />
+        )}
         {section === 'reports' && (
           <ReportsSection
             locationId={location?.id ?? null}

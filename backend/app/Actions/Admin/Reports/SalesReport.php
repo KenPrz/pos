@@ -8,14 +8,14 @@ use App\Domain\Money\Quantity;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Sales report, three ways to slice the same window — see docs/02-data-model.md.
+ * Sales report, four ways to slice the same window — see docs/02-data-model.md.
  *
- * `day` and `user` are LEDGER-basis: money that actually moved, read from `payments`
- * (captured only) and `refunds`, keyed by the location's `business_date` or by whoever
- * took the tender / issued the refund. A voided order never contributes: its captured
- * payment was voided along with it (a voided payment's status leaves `captured`, so the
- * join simply stops matching it), and an order split into children carries no payments
- * of its own to begin with.
+ * `day`, `user` and `payment_method` are LEDGER-basis: money that actually moved, read
+ * from `payments` (captured only) and `refunds`, keyed by the location's `business_date`,
+ * by whoever took the tender / issued the refund, or by the tender itself. A voided order
+ * never contributes: its captured payment was voided along with it (a voided payment's
+ * status leaves `captured`, so the join simply stops matching it), and an order split
+ * into children carries no payments of its own to begin with.
  *
  * `category` is LINE-basis: the sales mix off non-voided lines of CLOSED orders, joined
  * to the LIVE catalog (variant -> product -> category) for a human-readable category
@@ -37,6 +37,7 @@ final class SalesReport
             'day' => $this->byDay($in),
             'user' => $this->byUser($in),
             'category' => $this->byCategory($in),
+            'payment_method' => $this->byPaymentMethod($in),
         };
     }
 
@@ -119,6 +120,78 @@ final class SalesReport
             'refunds_cents' => (int) ($refunds[$id] ?? 0),
             'net_cents' => (int) ($gross[$id] ?? 0) - (int) ($refunds[$id] ?? 0),
         ])->sortBy('bucket')->values()->all();
+
+        return (object) [
+            'rows' => $rows,
+            'totals' => [
+                'gross_cents' => array_sum(array_column($rows, 'gross_cents')),
+                'refunds_cents' => array_sum(array_column($rows, 'refunds_cents')),
+                'net_cents' => array_sum(array_column($rows, 'net_cents')),
+            ],
+            'basis' => 'ledger',
+        ];
+    }
+
+    /**
+     * LEDGER-basis, like day and user: captured payments and refunds, i.e. money that
+     * actually moved, bucketed by the tender it moved on.
+     *
+     * Grouped on the SNAPSHOT columns so a method renamed since the sale does not
+     * retroactively rewrite last month's rows. The group name is joined from the live
+     * tables — a method's group_id is immutable, so that join is stable, and a report
+     * (unlike a receipt) is read fresh every time and may show today's group label.
+     */
+    private function byPaymentMethod(SalesReportInput $in): object
+    {
+        $gross = DB::table('payments as p')
+            ->join('orders as o', 'o.id', '=', 'p.order_id')
+            ->where('p.status', 'captured')
+            ->where('o.location_id', $in->locationId)
+            ->whereBetween('o.business_date', [$in->from, $in->to])
+            ->groupBy('p.payment_method_code')
+            ->selectRaw('p.payment_method_code as bucket, sum(p.amount_cents) as gross_cents')
+            ->pluck('gross_cents', 'bucket');
+
+        $refunds = DB::table('refunds')
+            ->where('location_id', $in->locationId)
+            ->whereBetween('business_date', [$in->from, $in->to])
+            ->groupBy('payment_method_code')
+            ->selectRaw('payment_method_code as bucket, sum(amount_cents) as refunds_cents')
+            ->pluck('refunds_cents', 'bucket');
+
+        $codes = collect($gross->keys())->merge($refunds->keys())->unique()->values();
+
+        // One query maps every code in the report to its current group — never an N+1 per
+        // bucket. Keyed by code, which is unique per location.
+        $labels = DB::table('payment_methods as pm')
+            ->join('payment_method_groups as g', 'g.id', '=', 'pm.group_id')
+            ->where('pm.location_id', $in->locationId)
+            ->whereIn('pm.code', $codes)
+            ->get(['pm.code', 'g.code as group_code', 'g.name as group_name'])
+            ->keyBy('code');
+
+        // The name each tender was SOLD as, off the snapshot, one query for all buckets.
+        // max() over the group is deliberate: a code renamed mid-window carries two
+        // snapshot names and one row per code must pick one — the later name is the less
+        // surprising label.
+        $snapshotNames = DB::table('payments as p')
+            ->join('orders as o', 'o.id', '=', 'p.order_id')
+            ->where('o.location_id', $in->locationId)
+            ->whereBetween('o.business_date', [$in->from, $in->to])
+            ->groupBy('p.payment_method_code')
+            ->selectRaw('p.payment_method_code as code, max(p.payment_method_name) as name')
+            ->pluck('name', 'code');
+
+        $rows = $codes->map(fn (string $code): array => [
+            'bucket' => $code,
+            'method_code' => $code,
+            'method_name' => (string) ($snapshotNames[$code] ?? $code),
+            'group_code' => $labels[$code]->group_code ?? null,
+            'group_name' => $labels[$code]->group_name ?? null,
+            'gross_cents' => (int) ($gross[$code] ?? 0),
+            'refunds_cents' => (int) ($refunds[$code] ?? 0),
+            'net_cents' => (int) ($gross[$code] ?? 0) - (int) ($refunds[$code] ?? 0),
+        ])->sortBy('method_code')->values()->all();
 
         return (object) [
             'rows' => $rows,

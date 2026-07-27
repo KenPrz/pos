@@ -20,6 +20,13 @@ import { setCurrency } from '../lib/currency'
 
 afterEach(cleanup)
 
+// Module scope, above beforeEach: read by the api.catalog mock set up there.
+const PAYMENT_METHODS = [
+  { id: 'm-cash', code: 'CASH', name: 'Cash', group_code: 'CASH', group_name: 'Cash', driver: 'cash' as const, sort_order: 0 },
+  { id: 'm-visa', code: 'VISA', name: 'Visa', group_code: 'CARD', group_name: 'Cards', driver: 'external_card' as const, sort_order: 0 },
+  { id: 'm-gcash', code: 'GCASH', name: 'GCash', group_code: 'EWALLET', group_name: 'E-wallets', driver: 'external_card' as const, sort_order: 0 },
+]
+
 // Mocked api.* fns are module-scoped (the vi.mock factory below runs once); clear call
 // history between tests the same way FloorScreen.test.tsx does.
 beforeEach(() => {
@@ -28,6 +35,14 @@ beforeEach(() => {
   // here (foodMode is off, so MenuGrid — the only thing that calls it — never mounts),
   // so nothing else in this file would set it for real.
   setCurrency('USD')
+  // SaleScreen now reads its tender buttons from the catalog, ungated (Task 16) — so
+  // this must be mocked for every case in this file, not just the tender ones, or every
+  // test fires a real api.catalog(), gets a rejection, resolves methods to [], and
+  // renders the no-methods empty state instead of a tender form.
+  vi.mocked(api.catalog).mockResolvedValue({
+    categories: [], products: [], variants: [], modifier_groups: [], modifiers: [],
+    tax_rates: [], discounts: [], payment_methods: PAYMENT_METHODS, currency: 'USD',
+  })
 })
 
 // Same idiom as FloorScreen.test.tsx: keep everything real except the endpoints
@@ -42,6 +57,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       splitOrder: vi.fn(),
       takePayment: vi.fn(),
       receipt: vi.fn(),
+      catalog: vi.fn(),
     },
   }
 })
@@ -104,11 +120,11 @@ describe('SaleScreen split flow', () => {
     vi.mocked(api.splitOrder).mockResolvedValue([childA, childB])
     vi.mocked(api.takePayment)
       .mockResolvedValueOnce({
-        payment: { id: 'pay-a', driver: 'cash', status: 'captured', amount_cents: 500, tendered_cents: 500, change_cents: 0 },
+        payment: { id: 'pay-a', driver: 'cash', payment_method_code: 'CASH', payment_method_name: 'Cash', status: 'captured', amount_cents: 500, tendered_cents: 500, change_cents: 0 },
         order: { ...childA, paid_cents: 500, due_cents: 0, status: 'closed' },
       })
       .mockResolvedValueOnce({
-        payment: { id: 'pay-b', driver: 'cash', status: 'captured', amount_cents: 500, tendered_cents: 500, change_cents: 0 },
+        payment: { id: 'pay-b', driver: 'cash', payment_method_code: 'CASH', payment_method_name: 'Cash', status: 'captured', amount_cents: 500, tendered_cents: 500, change_cents: 0 },
         order: { ...childB, paid_cents: 500, due_cents: 0, status: 'closed' },
       })
     vi.mocked(api.receipt).mockRejectedValue(new Error('receipt unavailable in this test'))
@@ -166,5 +182,74 @@ describe('SaleScreen split flow', () => {
 
     await screen.findByText('Order N-0002')
     expect(screen.queryByRole('button', { name: 'Split bill' })).not.toBeInTheDocument()
+  })
+})
+
+describe('SaleScreen tender methods', () => {
+  // Getting to the tender phase is the same click the split cases above use: resume an
+  // order, then press the Pay button (labelled `Pay — <amount>`).
+  async function enterTender() {
+    vi.mocked(api.findOrders).mockResolvedValue([])
+    renderSale(order)
+    fireEvent.click(await screen.findByRole('button', { name: /^Pay — / }))
+  }
+
+  it('renders one tender button per method, under its group name', async () => {
+    await enterTender()
+
+    expect(screen.getByRole('button', { name: 'Cash' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Visa' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'GCash' })).toBeInTheDocument()
+    // Group headings appear because this location has more than one group.
+    expect(screen.getByText('E-wallets')).toBeInTheDocument()
+  })
+
+  it('shows the cash field for a cash-driver method and a reference field otherwise', async () => {
+    await enterTender()
+
+    // Cash is selected first — it is the first method in the (server-sorted) list.
+    expect(screen.getByLabelText(/cash tendered/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'GCash' }))
+    expect(screen.getByLabelText(/reference/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/cash tendered/i)).not.toBeInTheDocument()
+  })
+
+  it('posts the selected method code, and the outcome screen names the method rather than a generic "Card"', async () => {
+    vi.mocked(api.takePayment).mockResolvedValue({
+      payment: {
+        id: 'p-1', driver: 'external_card', payment_method_code: 'VISA',
+        payment_method_name: 'Visa', status: 'captured',
+        amount_cents: 1300, tendered_cents: null, change_cents: null,
+      },
+      order: { ...order, paid_cents: 1300, due_cents: 0, status: 'closed', version: 2 },
+    })
+    vi.mocked(api.receipt).mockResolvedValue(null as never)
+
+    await enterTender()
+    fireEvent.click(screen.getByRole('button', { name: 'Visa' }))
+    fireEvent.click(screen.getByRole('button', { name: /take payment/i }))
+
+    await waitFor(() => expect(api.takePayment).toHaveBeenCalledWith(
+      expect.anything(), expect.any(Number), 'VISA', expect.any(String), expect.anything(),
+    ))
+
+    // Regression: this caption used to hardcode 'Card' for any non-cash tender, so a
+    // GCash sale showed "Card" directly above "recorded on GCash". It must name the
+    // ACTUAL method, not assume every non-cash payment is a card.
+    await screen.findByText('Payment complete — order N-0001')
+    expect(screen.getByText('Visa')).toBeInTheDocument()
+    expect(screen.queryByText('Card')).not.toBeInTheDocument()
+  })
+
+  it('names the back office when the location has no methods', async () => {
+    vi.mocked(api.catalog).mockResolvedValue({
+      categories: [], products: [], variants: [], modifier_groups: [], modifiers: [],
+      tax_rates: [], discounts: [], payment_methods: [], currency: 'USD',
+    })
+
+    await enterTender()
+
+    expect(screen.getByText(/no payment methods/i)).toBeInTheDocument()
   })
 })

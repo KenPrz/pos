@@ -27,7 +27,12 @@ final class TakePaymentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'driver' => ['required', 'in:cash,external_card'],
+            // The set of legal codes is per-location DATA, so it is not an `in:` list —
+            // PaymentMethodResolver is the gate, and it answers 422 unknown/inactive.
+            // `required` here is the structural gate: a request naming no tender at all is
+            // malformed, and this codebase answers malformed with 400 validation_failed
+            // (ApiErrorEnvelope), reserving 422 for structurally-fine-but-rejected.
+            'payment_method_code' => ['required', 'string', 'max:32'],
             'amount_cents' => ['required', 'integer', 'min:1'],
             'tendered_cents' => ['nullable', 'integer', 'min:1'],   // absent = exact tender
             'reference' => ['nullable', 'string', 'max:100'],
@@ -41,7 +46,7 @@ final class TakePaymentRequest extends FormRequest
         return new TakePaymentInput(
             orderId: (string) $this->route('order'),
             registerId: $this->attributes->get(EnsureDeviceToken::REGISTER)->id,
-            driver: $this->string('driver')->toString(),
+            paymentMethodCode: $this->string('payment_method_code')->toString(),
             amountCents: $this->integer('amount_cents'),
             tenderedCents: $this->filled('tendered_cents') ? $this->integer('tendered_cents') : null,
             reference: $this->string('reference')->toString() ?: null,

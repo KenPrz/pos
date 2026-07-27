@@ -49,4 +49,13 @@ describe('resolveSection', () => {
     expect(resolveSection('/reports', ['report.stock.view'])).toBe('reports')
     expect(resolveSection('/locations', ['register.enroll'])).toBe('locations')
   })
+
+  it('resolves /payment-methods for a holder and falls back to today without it', () => {
+    expect(resolveSection('/payment-methods', ['payment_method.manage'])).toBe('payment-methods')
+    expect(resolveSection('/payment-methods', ['catalog.manage'])).toBe('today')
+  })
+
+  it('maps the payment-methods section back to its path', () => {
+    expect(pathForSection('payment-methods')).toBe('/payment-methods')
+  })
 })

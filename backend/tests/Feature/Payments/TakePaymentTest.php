@@ -35,7 +35,7 @@ function t9TakeCash(object $t, int $amount, ?int $tendered = null, ?int $version
     return app(TakePayment::class)->execute(new TakePaymentInput(
         orderId: $t->order->id,
         registerId: $t->register->id,
-        driver: 'cash',
+        paymentMethodCode: 'CASH',
         amountCents: $amount,
         tenderedCents: $tendered,
         reference: null,
@@ -92,7 +92,7 @@ it('rejects payment on a closed order', function (): void {
 it('a replayed idempotency key charges once', function (): void {
     $headers = staffHeaders($this->register, $this->cashier)
         + ['If-Match' => '0', 'Idempotency-Key' => (string) Str::uuid()];
-    $body = ['driver' => 'cash', 'amount_cents' => 5000, 'tendered_cents' => 6000];
+    $body = ['payment_method_code' => 'CASH', 'amount_cents' => 5000, 'tendered_cents' => 6000];
 
     $first = $this->postJson("/api/v1/orders/{$this->order->id}/payments", $body, $headers);
     $second = $this->postJson("/api/v1/orders/{$this->order->id}/payments", $body, $headers);
@@ -112,5 +112,5 @@ it('requires the Idempotency-Key header', function (): void {
     $headers = staffHeaders($this->register, $this->cashier) + ['If-Match' => '0'];
 
     $this->postJson("/api/v1/orders/{$this->order->id}/payments",
-        ['driver' => 'cash', 'amount_cents' => 5000], $headers)->assertStatus(400);
+        ['payment_method_code' => 'CASH', 'amount_cents' => 5000], $headers)->assertStatus(400);
 });

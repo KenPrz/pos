@@ -19,6 +19,7 @@ final class CatalogResource extends JsonResource
             'modifiers' => $this->modifiers,
             'tax_rates' => $this->taxRates,
             'discounts' => $this->discounts,
+            'payment_methods' => $this->paymentMethods,
             'currency' => config('pos.currency'),
         ];
     }

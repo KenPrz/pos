@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 use App\Actions\Orders\AddLineInput;
 use App\Actions\Orders\AddLineToOrder;
+use App\Actions\Payments\TakePayment;
+use App\Actions\Payments\TakePaymentInput;
 use App\Domain\Rbac\Roles;
 use App\Models\Order;
+use App\Models\PaymentMethod;
 use App\Models\ProductVariant;
 
 beforeEach(function (): void {
@@ -46,4 +49,34 @@ it('excludes voided lines', function (): void {
     $this->getJson("/api/v1/orders/{$this->order->id}/receipt", staffHeaders($this->register, $this->cashier))
         ->assertOk()
         ->assertJsonCount(0, 'data.lines');
+});
+
+it('prints the method a tender was taken on, from the snapshot', function (): void {
+    $headers = staffHeaders($this->register, $this->cashier);
+    $order = Order::findOrFail($this->order->id);
+
+    app(TakePayment::class)->execute(new TakePaymentInput(
+        orderId: $order->id,
+        registerId: $this->register->id,
+        paymentMethodCode: 'CASH',
+        amountCents: $order->total_cents,
+        tenderedCents: $order->total_cents,
+        reference: null,
+        expectedVersion: $order->version,
+        actorId: $this->cashier->id,
+    ));
+
+    $receipt = $this->getJson("/api/v1/orders/{$order->id}/receipt", $headers)
+        ->assertOk()->json('data');
+
+    expect($receipt['payments'][0]['payment_method_code'])->toBe('CASH');
+    expect($receipt['payments'][0]['payment_method_name'])->toBe('Cash');
+
+    // A receipt reprints identically forever — it reads the snapshot, never the live row.
+    PaymentMethod::query()->where('location_id', $this->location->id)
+        ->where('code', 'CASH')->update(['name' => 'Cash (peso)']);
+
+    $again = $this->getJson("/api/v1/orders/{$order->id}/receipt", $headers)
+        ->assertOk()->json('data');
+    expect($again['payments'][0]['payment_method_name'])->toBe('Cash');
 });

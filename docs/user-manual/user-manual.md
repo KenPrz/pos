@@ -10,6 +10,7 @@ operator who installs the system. Covers the register and the back office.
 | 1.0 | 2026-07-22 | First edition: register, back office, troubleshooting, FAQ, glossary. |
 | 1.1 | 2026-07-23 | Added Chapter 14, End of Day (close, reopen, and what a closed day blocks). Later chapters renumbered. |
 | 1.2 | 2026-07-23 | Chapter 14: explained why the next business date stays unavailable until the store's midnight, even after closing. |
+| 1.3 | 2026-07-27 | Added Chapter 12, Payment methods (per-location tender groups and methods, what's archivable, and what reading the Z-report back can and can't tell you). Rewrote Chapter 5's tender passage for configurable payment methods. Later chapters renumbered. |
 
 # 1. Introduction
 
@@ -27,8 +28,8 @@ reader, and you don't need to read the parts that aren't yours:
 
 The chapters are ordered the way the system is actually used: the overview
 comes first (Chapters 2–3), then the register — the till a cashier or
-supervisor stands at (Chapters 4–7, 14), then the back office a manager signs
-into from a laptop (Chapters 8–13). Troubleshooting, an FAQ, and a glossary
+supervisor stands at (Chapters 4–7, 15), then the back office a manager signs
+into from a laptop (Chapters 8–14). Troubleshooting, an FAQ, and a glossary
 sit at the back for when something goes wrong or a term is unfamiliar.
 
 A few conventions hold throughout:
@@ -311,23 +312,29 @@ itself still renders for a supervisor's PIN session only.
 
 Tap **Pay — [amount]** (the button shows exactly what's owed).
 
-- **Cash:** type what the customer handed you into **Cash tendered (owed:
-  …)**, then tap **Take payment**. The next screen works out **Change** for
-  you — never do that math yourself.
+The tender buttons are whatever your store set up (Chapter 12) — often **Cash**, a
+card scheme or two, and an e-wallet — grouped under headings like **Cards** or
+**E-wallets**. What you type next depends on which one you tap:
+
+- **A cash method:** type what the customer handed you into **Cash tendered (owed:
+  …)**, then tap **Take payment**. The next screen works out **Change** for you —
+  never do that math yourself.
 
 ![Figure 5.5 — Cash tender: ₱500.00 tendered against ₱405.00 owed](assets/screenshots/008-retail-tender.png)
 
 ![Figure 5.6 — Payment complete: ₱95.00 change, receipt ready to print](assets/screenshots/009-retail-receipt.png)
 
-- **Card:** type the terminal's own authorization into **Card terminal
-  reference (owed: …)** instead, then tap **Take payment**. This till only
-  *records* what the card terminal already did — it doesn't talk to a card
-  terminal itself.
+- **Anything else** (a card, an e-wallet, a voucher): type the reference the other
+  machine gave you into **[method] reference (owed: …)**, then tap **Take payment**.
+  This till only *records* what that machine already did — it doesn't talk to it.
+
+If the tender step says there are no payment methods, nobody has set any up for this
+location yet; an admin fixes that in Chapter 12.
 
 Tap **Print** for a paper receipt, or **New sale** to move on. In the
 desktop shell, **Print** sends the receipt to the till's receipt printer; in
 an ordinary browser tab, it opens the browser's own print dialog — Chapter
-14 covers both.
+16 covers both.
 
 ## Refund a closed sale
 
@@ -477,7 +484,7 @@ you skip this screen entirely.
 
 One thing can refuse an otherwise valid open: **"The business day is closed.
 Reopen it before opening a shift."** That means a manager has already closed
-this location's business day for that date (Chapter 14). It isn't a fault
+this location's business day for that date (Chapter 15). It isn't a fault
 with the till, the PIN, or the float, and retyping won't clear it — only an
 admin can reopen the day, and the drawer opens normally the moment they do.
 
@@ -661,7 +668,7 @@ badge and an **Unarchive** button.
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | I archived an item and it's still on the till | The register's menu caches the catalog for 5 minutes | Normal — wait it out, or scan the barcode instead (a scan always hits the server) |
-| A receipt from last month shows the old price after I repriced the variant | Every order line snapshots its price when it's added — receipts never look up the live catalog | Expected behavior, not a bug — see Chapter 12 for how this is proven |
+| A receipt from last month shows the old price after I repriced the variant | Every order line snapshots its price when it's added — receipts never look up the live catalog | Expected behavior, not a bug — see Chapter 2 for how this is proven |
 | A new product has no Modifier groups panel | The panel only appears once the product has been saved once (so it has an id) | Save the product first, then open it again |
 
 # 10. Users and roles
@@ -822,15 +829,74 @@ the old terminal is locked out immediately, not eventually, and can get back
 in the moment the new code is typed in. A code that expires unused (7 days)
 shows **Code expired** instead — issue a fresh one the same way.
 
-# 12. Reports
+# 12. Payment methods
+
+Every location decides for itself what it accepts. A **payment method group** is a
+kind of tender — Cash, Cards, E-wallets — and a **payment method** is a name inside
+it: Visa and Mastercard under Cards, GCash and Maya under E-wallets.
+
+The split matters because the *group* is what decides behaviour. A cash group opens
+the drawer and works out change. Every other group records what another machine
+already did, and money taken on it can't be refunded through this till — the money
+never came through here.
+
+## Add a method
+
+Pick the location in the sidebar first: these are that location's tenders, and two
+locations can use the same codes for different things.
+
+**New group** asks for a code (like `EWALLET`), a name customers would recognise, and
+which of the two behaviours it has. **New method** inside a group asks only for a code
+and a name — it inherits the group's behaviour, which is the point.
+
+![Figure 12.1 — Payment methods for the Manila Restaurant: three groups, five methods](assets/screenshots/035-bo-payment-methods.png)
+
+Codes are letters, digits and underscores, and they're what your reports are grouped
+by, so pick them once and keep them.
+
+## What you can change later, and what you can't
+
+Names and order can change whenever you like — they're what staff read.
+
+Codes can't, and neither can a method's group. A code is what the till sends and what
+your reports are keyed on; a group is the behaviour. Changing either after money has
+moved would quietly rewrite history. If one is wrong, archive it and add the right one.
+
+## Archive, never delete
+
+Archiving a method takes it off the till and leaves every past sale intact. Archiving
+a whole *group* takes all of its methods off the till at once — one switch for "we've
+stopped taking cards" — and reactivating it brings back exactly the ones that were
+live before.
+
+A location with nothing active can't take payment at all. That's allowed (a card-only
+kiosk is a real thing), so nothing stops you — the till just says so.
+
+## Reading it back
+
+The Z-report at the till (Chapter 7) breaks sales and refunds down by individual
+payment method — every method gets its own line, so Visa and GCash always show up
+separately from each other and from Cash. When the location has more than one group
+active, it also rolls those same lines up by group — CARD and EWALLET both drive
+`external_card`, so the group rollup is the only place a supervisor counting the
+drawer sees GCash apart from Visa. A location with only one group active skips the
+rollup; it would just repeat the method lines above.
+
+The back office's **Reports → Sales** (Chapter 13) also offers a **Payment method**
+grouping, alongside **Day**, **Category**, and **User**. "How much came in on GCash
+last month" is answered directly by that one report screen, picking **Payment
+method** and the range in question — not by adding up a figure across a range of
+Z-reports.
+
+# 13. Reports
 
 ## Sales
 
 **Reports** → **Sales** tab: pick a **From**/**To** date range, then a
-group-by tab — **Day**, **Category**, or **User**. The location comes from
-the sidebar's location switcher.
+group-by tab — **Day**, **Category**, **User**, or **Payment method**. The
+location comes from the sidebar's location switcher.
 
-![Figure 12.1 — Sales by day, Manila Grocery, one closed order](assets/screenshots/031-bo-report-sales.png)
+![Figure 13.1 — Sales by day, Manila Grocery, one closed order](assets/screenshots/031-bo-report-sales.png)
 
 **Day** and **User** are **ledger-basis** — summed from actual payments and
 refunds that moved money, with columns **Orders closed**, **Gross**,
@@ -841,12 +907,18 @@ refunds that moved money, with columns **Orders closed**, **Gross**,
 **Category** is **line-basis** instead — summed from order lines, joined to
 *current* category names, with columns **Qty sold** and **Line total**.
 
-These two bases are **not required to reconcile**, and that's by design, not
-a bug to chase down. A payment covers a whole order at once; a category
-breakdown has to attribute individual lines. They're answering different
-questions — "how much cash and card came in" versus "what sold" — so don't
-expect the Day total and the sum of the Category totals to match to the
-cent.
+**Payment method** is ledger-basis too, one row per method that had activity in
+the range, with columns **Method**, **Code**, **Group**, **Gross**, **Refunds**,
+**Net** — the method's name and its group are shown side by side with the code
+the ledger is actually keyed on, so "how much came in on GCash last month" is one
+row, not an addition exercise.
+
+These bases are **not required to reconcile** with each other, and that's by
+design, not a bug to chase down. A payment covers a whole order at once; a
+category breakdown has to attribute individual lines. They're answering
+different questions — "how much cash and card came in" versus "what sold" —
+so don't expect the Day total and the sum of the Category totals to match to
+the cent.
 
 Tap **Export CSV** on the **Sales** tab to download the report exactly as
 displayed, with money figures as plain decimal strings rather than
@@ -858,15 +930,15 @@ currency-formatted text.
 running short. The table shows **SKU**, **Name**, **Qty** — a row under
 threshold is highlighted and marked **— LOW**.
 
-![Figure 12.2 — Stock levels at Manila Grocery](assets/screenshots/032-bo-report-stock.png)
+![Figure 13.2 — Stock levels at Manila Grocery](assets/screenshots/032-bo-report-stock.png)
 
-# 13. Audit log
+# 14. Audit log
 
 **Audit** shows every write anywhere in the system — the register and the
 back office alike — one row per change: **When**, **Action**, **Entity**,
 **User**, **Register**, **Payload**.
 
-![Figure 13.1 — The audit log showing demo day activity at Manila Grocery](assets/screenshots/033-bo-audit.png)
+![Figure 14.1 — The audit log showing demo day activity at Manila Grocery](assets/screenshots/033-bo-audit.png)
 
 The figure above shows what a shift's worth of activity looks like end to
 end: a manager issuing an activation code (`admin.register.code_issue`) and
@@ -894,7 +966,7 @@ shows up as `admin.variant.update`, an activation-code issue as
 on for every entity in the system — not a separate history screen per
 entity.
 
-# 14. End of Day
+# 15. End of Day
 
 Chapter 7 closed one drawer. This closes the whole store.
 
@@ -904,7 +976,7 @@ one location for one date, records the cash going to the bank, and freezes
 the result. It is the only thing in the system that can stop a shift from
 opening.
 
-![Figure 14.1 — End of Day for Manila Grocery: one till is still open, so the amber blocker shows and Close day stays disabled](assets/screenshots/034-bo-end-of-day.png)
+![Figure 15.1 — End of Day for Manila Grocery: one till is still open, so the amber blocker shows and Close day stays disabled](assets/screenshots/034-bo-end-of-day.png)
 
 ## The date is the store's, not yours
 
@@ -942,7 +1014,7 @@ an earlier date; you can't pick a later one.
    record.
 5. Tap **Close day** and confirm.
 
-> **Why cash can read zero while sales don't.** In Figure 14.1 the day has
+> **Why cash can read zero while sales don't.** In Figure 15.1 the day has
 > ₱405.00 of net sales but **Expected cash**, **Counted cash**, and **Shifts**
 > all read zero. That's not a fault: the cash columns only count drawers that
 > have actually been *closed and counted*, and the one till here is still
@@ -981,7 +1053,7 @@ somebody already signed off on.
 > **On the totals:** **Net sales** is ledger-basis — actual payments less
 > actual refunds — while **Tax** is read off the orders closed that day. A
 > refund therefore lowers net sales but not tax. It's the same split behind
-> the day-versus-category question in Chapter 17, and for the same reason:
+> the day-versus-category question in Chapter 13, and for the same reason:
 > the two numbers answer different questions and aren't meant to reconcile to
 > the cent.
 
@@ -1000,9 +1072,9 @@ that was already signed off.
 Shifts can open on that date again immediately. When the day is closed a
 second time the totals are re-snapshotted from scratch, so the record
 reflects whatever happened in between. Every close and every reopen, with its
-reason, lands in the audit log (Chapter 13).
+reason, lands in the audit log (Chapter 14).
 
-# 15. The desktop shell and printing
+# 16. The desktop shell and printing
 
 The register also ships as a desktop app — a Tauri v2 shell that hosts the
 very same SPA covered in Chapters 4–7, not a third frontend with its own
@@ -1044,4 +1116,4 @@ nothing being sold — making change for another till, say.
 
 The server records who opened it, at which register, and when, before the
 drawer actually pops — that entry shows up in the back office's audit log
-(Chapter 13) exactly like a void or a discount does.
+(Chapter 14) exactly like a void or a discount does.

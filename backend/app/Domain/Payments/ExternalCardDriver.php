@@ -38,10 +38,10 @@ final class ExternalCardDriver implements PaymentDriver
         return new PaymentResult(status: 'captured', tender: null, reference: null);
     }
 
-    // Unreachable in practice: POST /refunds validates driver against `in:cash`, so no
-    // request ever reaches a driver's refund() with external_card. A driver that
-    // silently claimed refundability anyway would corrupt reconciliation — better to
-    // fail loudly here than let capabilities() and refund() disagree.
+    // Unreachable in practice: RefundOrder checks Capabilities::refundable before it
+    // ever reaches a driver's refund(), so no request gets here. A driver that silently
+    // claimed refundability anyway would corrupt reconciliation — better to fail loudly
+    // here than let capabilities() and refund() disagree.
     public function refund(Payment $payment, Money $amount): PaymentResult
     {
         throw new LogicException('external_card is not refundable — this call is unreachable.');

@@ -19,12 +19,13 @@ import { cents, formatMoney } from '../../lib/money'
 // display only; the server owns all arithmetic
 const fm = (n: number) => formatMoney(cents(n), getCurrency())
 
-type GroupBy = 'day' | 'category' | 'user'
+type GroupBy = 'day' | 'category' | 'user' | 'payment_method'
 
 const GROUP_BY_TABS: Array<{ id: GroupBy; label: string }> = [
   { id: 'day', label: 'Day' },
   { id: 'category', label: 'Category' },
   { id: 'user', label: 'User' },
+  { id: 'payment_method', label: 'Payment method' },
 ]
 
 /** Last 7 days (inclusive), the brief's default range. */
@@ -69,13 +70,19 @@ export function SalesReportView({
   const rows = query.data?.rows ?? []
   const basis = query.data?.basis
   const isLines = basis === 'lines'
+  // basis alone can't distinguish this one: payment_method is ledger-basis exactly like
+  // day/user, so it needs its own branch rather than folding into the generic ledger set —
+  // a payment-method row has no orders_closed and would otherwise render a column of dashes.
+  const isMethods = groupBy === 'payment_method'
 
   const exportCsv = () => {
     if (!query.data) return
     const headers = isLines
       ? ['Category', 'Qty sold', 'Line total']
-      : ['Bucket', 'Orders closed', 'Gross', 'Refunds', 'Net']
-    const csvRows: Array<Array<string | number>> = rows.map((r) => rowToCsv(r, isLines))
+      : isMethods
+        ? ['Method', 'Code', 'Group', 'Gross', 'Refunds', 'Net']
+        : ['Bucket', 'Orders closed', 'Gross', 'Refunds', 'Net']
+    const csvRows: Array<Array<string | number>> = rows.map((r) => rowToCsv(r, isLines, isMethods))
     downloadCsv(`sales-report-${groupBy}-${from}-to-${to}.csv`, toCsv(headers, csvRows))
   }
 
@@ -85,25 +92,38 @@ export function SalesReportView({
         { key: 'qty_sold', header: 'Qty sold', render: (r) => r.qty_sold },
         { key: 'line_total_cents', header: 'Line total', render: (r) => fm(r.line_total_cents ?? 0) },
       ]
-    : [
-        { key: 'bucket', header: 'Bucket', render: (r) => r.bucket },
-        { key: 'orders_closed', header: 'Orders closed', render: (r) => r.orders_closed ?? '—' },
-        { key: 'gross_cents', header: 'Gross', render: (r) => fm(r.gross_cents ?? 0) },
-        { key: 'refunds_cents', header: 'Refunds', render: (r) => fm(r.refunds_cents ?? 0) },
-        { key: 'net_cents', header: 'Net', render: (r) => fm(r.net_cents ?? 0) },
-      ]
+    : isMethods
+      ? [
+          // The name is what a human recognises; the code is what the ledger is keyed on,
+          // so both are shown rather than making the reader guess which they're looking at.
+          { key: 'method_name', header: 'Method', render: (r) => r.method_name ?? r.bucket },
+          { key: 'method_code', header: 'Code', render: (r) => r.method_code ?? r.bucket },
+          { key: 'group_name', header: 'Group', render: (r) => r.group_name ?? '—' },
+          { key: 'gross_cents', header: 'Gross', render: (r) => fm(r.gross_cents ?? 0) },
+          { key: 'refunds_cents', header: 'Refunds', render: (r) => fm(r.refunds_cents ?? 0) },
+          { key: 'net_cents', header: 'Net', render: (r) => fm(r.net_cents ?? 0) },
+        ]
+      : [
+          { key: 'bucket', header: 'Bucket', render: (r) => r.bucket },
+          { key: 'orders_closed', header: 'Orders closed', render: (r) => r.orders_closed ?? '—' },
+          { key: 'gross_cents', header: 'Gross', render: (r) => fm(r.gross_cents ?? 0) },
+          { key: 'refunds_cents', header: 'Refunds', render: (r) => fm(r.refunds_cents ?? 0) },
+          { key: 'net_cents', header: 'Net', render: (r) => fm(r.net_cents ?? 0) },
+        ]
 
   const totals = query.data?.totals
   const footer = totals
     ? isLines
       ? ['Total', totals.qty_sold, fm(totals.line_total_cents ?? 0)]
-      : [
-          'Total',
-          totals.orders_closed ?? '—',
-          fm(totals.gross_cents ?? 0),
-          fm(totals.refunds_cents ?? 0),
-          fm(totals.net_cents ?? 0),
-        ]
+      : isMethods
+        ? ['Total', '', '', fm(totals.gross_cents ?? 0), fm(totals.refunds_cents ?? 0), fm(totals.net_cents ?? 0)]
+        : [
+            'Total',
+            totals.orders_closed ?? '—',
+            fm(totals.gross_cents ?? 0),
+            fm(totals.refunds_cents ?? 0),
+            fm(totals.net_cents ?? 0),
+          ]
     : undefined
 
   return (
@@ -171,14 +191,23 @@ export function SalesReportView({
   )
 }
 
-function rowToCsv(r: SalesReportRow, isLines: boolean): Array<string | number> {
-  return isLines
-    ? [r.bucket, r.qty_sold ?? '0', centsToDecimalString(r.line_total_cents ?? 0)]
-    : [
-        r.bucket,
-        r.orders_closed ?? '',
-        centsToDecimalString(r.gross_cents ?? 0),
-        centsToDecimalString(r.refunds_cents ?? 0),
-        centsToDecimalString(r.net_cents ?? 0),
-      ]
+function rowToCsv(r: SalesReportRow, isLines: boolean, isMethods: boolean): Array<string | number> {
+  if (isLines) return [r.bucket, r.qty_sold ?? '0', centsToDecimalString(r.line_total_cents ?? 0)]
+  if (isMethods) {
+    return [
+      r.method_name ?? r.bucket,
+      r.method_code ?? r.bucket,
+      r.group_name ?? '',
+      centsToDecimalString(r.gross_cents ?? 0),
+      centsToDecimalString(r.refunds_cents ?? 0),
+      centsToDecimalString(r.net_cents ?? 0),
+    ]
+  }
+  return [
+    r.bucket,
+    r.orders_closed ?? '',
+    centsToDecimalString(r.gross_cents ?? 0),
+    centsToDecimalString(r.refunds_cents ?? 0),
+    centsToDecimalString(r.net_cents ?? 0),
+  ]
 }

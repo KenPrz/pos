@@ -17,6 +17,8 @@ final class RefundResource extends JsonResource
                 'id' => $this->id,
                 'original_order_id' => $this->original_order_id,
                 'driver' => $this->driver,
+                'payment_method_code' => $this->payment_method_code,
+                'payment_method_name' => $this->payment_method_name,
                 'amount_cents' => $this->amount_cents,
                 'reason' => $this->reason,
                 'business_date' => $this->business_date,

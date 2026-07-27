@@ -750,32 +750,98 @@ discount_needs_supervisor` on a `true`-flagged discount attempted below the floo
 permission — see `05-rbac.md`. A discount explicitly flipped to `false` is what makes a
 cashier-safe discount real.
 
+### Payment methods
+
+```sql
+create table payment_method_groups (
+  id          uuid primary key default uuidv7(),
+  location_id uuid not null references locations(id),
+  code        text not null,                -- 'CASH','CARD','EWALLET' — immutable
+  name        text not null,                -- display copy — editable
+  driver      text not null check (driver in ('cash','external_card')),
+  sort_order  integer not null default 0,
+  is_active   boolean not null default true,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create unique index payment_method_groups_code on payment_method_groups (location_id, code);
+
+-- Exists only so payment_methods can carry a composite FK onto (id, location_id).
+create unique index payment_method_groups_id_location on payment_method_groups (id, location_id);
+
+create table payment_methods (
+  id          uuid primary key default uuidv7(),
+  location_id uuid not null references locations(id),
+  group_id    uuid not null,
+  code        text not null,                -- 'CASH','VISA','GCASH' — immutable
+  name        text not null,
+  sort_order  integer not null default 0,
+  is_active   boolean not null default true,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+
+  foreign key (group_id, location_id) references payment_method_groups (id, location_id)
+);
+
+create index payment_methods_group on payment_methods (group_id);
+create unique index payment_methods_code on payment_methods (location_id, code);
+```
+
+The group is the behavioural bucket: it names one driver, and its methods are variants
+that behave identically. `CARD` and `EWALLET` may both drive `external_card` and still be
+separate groups, because a drawer count needs GCash apart from Visa.
+
+`location_id` is on both tables because the uniqueness rule is per-location — the same
+code at two different locations is legal and expected. The composite foreign key
+`(group_id, location_id) → payment_method_groups (id, location_id)` is what keeps that
+duplicate honest: "a method's group is at the method's location" is enforced in the
+schema rather than trusted of the application.
+
+`code` on both, and a method's `group_id`, are immutable after create: a code is a wire
+identifier and a report key, and the group *is* the behaviour, so moving a method between
+groups would silently change what it does and re-bucket every payment already taken on
+it. Names are editable. Archiving a group hides its methods without touching their rows —
+a receipt printed against an archived method still reprints identically.
+
 ### Payments
 
 ```sql
 create table payments (
-  id             uuid primary key default uuidv7(),
-  order_id       uuid not null references orders(id),
-  shift_id       uuid not null references shifts(id),
-  driver         text not null,             -- 'cash', 'external_card'
-  status         text not null check (status in
-                   ('pending','authorized','captured','voided','failed')),
+  id                  uuid primary key default uuidv7(),
+  order_id            uuid not null references orders(id),
+  shift_id            uuid not null references shifts(id),
+  driver              text not null,             -- 'cash', 'external_card'
+  status              text not null check (status in
+                        ('pending','authorized','captured','voided','failed')),
 
-  amount_cents   bigint not null check (amount_cents > 0),
-  tendered_cents bigint,                    -- cash only
-  change_cents   bigint,                    -- cash only
+  amount_cents        bigint not null check (amount_cents > 0),
+  tendered_cents      bigint,                    -- cash only
+  change_cents        bigint,                    -- cash only
 
-  reference      text,                      -- external terminal reference
-  driver_payload jsonb,
+  reference           text,                      -- external terminal reference
+  driver_payload      jsonb,
 
-  user_id        uuid not null references users(id),
-  created_at     timestamptz not null default now(),
-  captured_at    timestamptz
+  payment_method_id   uuid not null references payment_methods(id),
+  payment_method_code text not null,         -- snapshot
+  payment_method_name text not null,         -- snapshot
+
+  user_id             uuid not null references users(id),
+  created_at          timestamptz not null default now(),
+  captured_at         timestamptz
 );
 
 create index payments_order on payments (order_id);
 create index payments_shift on payments (shift_id) where status = 'captured';
+create index payments_payment_method on payments (payment_method_id);
 ```
+
+`payment_method_code`/`payment_method_name` are snapshots — the same rule as order lines
+snapshotting name and price, applied to tenders: renaming or archiving a method must not
+change what a receipt printed last year says. `driver` stays a plain, non-FK column,
+derived from the method's group at write time rather than joined at read time — that is
+why `ShiftTotals` and the `payments_change_balances` check constraint, both written
+against `driver`, needed no change at all when methods shipped.
 
 Append-only in the way that matters: **`amount_cents` is immutable once written.**
 `status` must transition (that's what `authorize`/`capture` means), but a payment's
@@ -796,17 +862,20 @@ A refund is **new rows, never a mutation** — principle 2.
 
 ```sql
 create table refunds (
-  id                uuid primary key default uuidv7(),
-  original_order_id uuid not null references orders(id),
-  location_id       uuid not null references locations(id),
-  register_id       uuid not null references registers(id),
-  shift_id          uuid not null references shifts(id),
-  business_date     date not null,
-  driver            text not null,
-  amount_cents      bigint not null check (amount_cents > 0),
-  reason            text not null,
-  user_id           uuid not null references users(id),
-  created_at        timestamptz not null default now()
+  id                  uuid primary key default uuidv7(),
+  original_order_id   uuid not null references orders(id),
+  location_id         uuid not null references locations(id),
+  register_id         uuid not null references registers(id),
+  shift_id            uuid not null references shifts(id),
+  business_date       date not null,
+  driver              text not null,
+  payment_method_id   uuid not null references payment_methods(id),
+  payment_method_code text not null,         -- snapshot
+  payment_method_name text not null,         -- snapshot
+  amount_cents        bigint not null check (amount_cents > 0),
+  reason              text not null,
+  user_id             uuid not null references users(id),
+  created_at          timestamptz not null default now()
 );
 
 create table refund_lines (
@@ -827,9 +896,20 @@ not back on the shelf — so the cashier can decline the restock, and when they 
 `stock_movement` is written.
 
 Over-refunding is prevented by checking the sum of prior `refund_lines` for each original
-line inside the refund transaction. `external_card` payments cannot be refunded through
-us at all — the money never passed through this system, and pretending otherwise would
+line inside the refund transaction. Refundability is a property of the method's driver,
+not the method: a method whose group drives `external_card` cannot be refunded through us
+at all, because the money never passed through this system and pretending otherwise would
 corrupt both the drawer count and the card reconciliation.
+
+The three `payment_method_*` columns landed in two migrations, not one, and the gap
+between them is worth a sentence: the columns were added and backfilled onto both
+`payments` and `refunds` together, but `refunds` was left **nullable** because
+`RefundOrder` couldn't yet write them — only `payments` was tightened to `not null`
+immediately. A later migration tightened `refunds` once its writer existed. Tightening a
+column before the code that writes it exists would have left the refund path either
+writing nulls into a supposedly-required column or throwing a raw `23502` on every
+refund for however long that gap lasted — a dead financial write path, not a task
+boundary.
 
 ---
 
@@ -880,3 +960,6 @@ Worth stating plainly, since these are the reasons for the constraints above:
 - A movement cannot exist without a reason. (`not null` + `check in (...)`.)
 - Stock cannot go negative on a tracked variant. (`FOR UPDATE` + domain check.)
 - A receipt cannot be rewritten by a later catalog edit. (Snapshot columns.)
+- A payment method cannot belong to another location's group. (Composite foreign key.)
+- Two methods, or two groups, cannot share a code at one location — while the same code at
+  two different locations is legal and expected. (Unique index on `(location_id, code)`.)

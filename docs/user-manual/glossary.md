@@ -1,4 +1,4 @@
-# 18. Glossary
+# 19. Glossary
 
 | Term | Definition |
 | --- | --- |
@@ -21,8 +21,10 @@
 | Split | Dividing one tab's payment across 2 to 10 separate checks once payment has started. The checks always sum back exactly to the original total (Chapter 6). |
 | Transfer | Moving an open tab from one register to another. The receiving till's shift owns the sale's money from the instant it lands (Chapter 6). |
 | Restock | Putting a refunded line's quantity back into on-hand stock. Left checked by default; cleared if the returned goods are damaged (Chapter 5). |
-| Ledger basis | A report built from actual payments and refunds that moved money — the Sales report's **Day** and **User** tabs (Chapter 12). |
-| Line basis | A report built from individual order lines, joined to current catalog data — the Sales report's **Category** tab. Doesn't reconcile with a ledger-basis report, by design (Chapter 12). |
+| Payment method | A named way of paying at one location: Cash, Visa, GCash. It belongs to a payment method group, which is what decides how it behaves. Its code is fixed once created; its name isn't (Chapter 12). |
+| Payment method group | A kind of tender at one location — Cash, Cards, E-wallets — holding one or more payment methods. The group decides the behaviour: a cash group opens the drawer and computes change, every other kind only records what another machine did and can't be refunded through the till (Chapter 12). |
+| Ledger basis | A report built from actual payments and refunds that moved money — the Sales report's **Day** and **User** tabs (Chapter 13). |
+| Line basis | A report built from individual order lines, joined to current catalog data — the Sales report's **Category** tab. Doesn't reconcile with a ledger-basis report, by design (Chapter 13). |
 | VAT-inclusive | A location's **Prices include tax** setting: the shelf price already contains tax, and tax on the receipt is extracted from that price rather than added on top (Chapters 2, 11). |
 | SKU | A variant's own stock-keeping code — distinct from its barcode. Every variant needs one (Chapter 9). |
 | Barcode | The optional code a scanner reads to find a variant directly. A variant needs no barcode to exist, but a scan needs one to find it (Chapter 9). |

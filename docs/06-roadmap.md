@@ -724,6 +724,60 @@ and prove the guard lifts.
 
 ---
 
+## Payment methods complete
+
+Cash and card were a hardcoded `driver` string on every payment and refund since M4 —
+fine for two tenders, wrong once a location wants to tell GCash apart from Maya at the
+drawer, or rename "Cards" without touching a code every report and receipt depends on.
+This work replaces the string with a per-location taxonomy: `payment_method_groups` (one
+row per driver-backed bucket) and `payment_methods` (the admin-named variants a till
+actually offers), full story in `02-data-model.md`.
+
+- **The one decision worth remembering: the group carries the driver, not the method.**
+  `PaymentMethodResolver` still turns a code into a driver exactly as before — nothing in
+  `PaymentDriver`, `DriverRegistry`, or `Capabilities` changed, and no code seam moved.
+  Methods are just admin data sitting *above* that seam. That's what makes `CARD` and
+  `EWALLET` both drive `external_card` while staying separate groups (the Manila seed
+  ships Visa/Mastercard under `CARD` and GCash/Maya under `EWALLET`) — a second e-wallet
+  is a row now, not a class.
+- **A code, a method's group, and a group's driver are all immutable after create.**
+  Moving a method between groups or repointing a group's driver would silently change
+  live behaviour and retroactively re-bucket every payment already taken on it; `PATCH`
+  drops those keys rather than erroring, the same shape every admin `PATCH` in this API
+  has for a field it doesn't recognize. The fix for a wrong one is archive-and-recreate.
+- **The bug class this closes**: `CreateLocation` provisioned roles but not payment
+  methods, so a location made in the back office would 422 on its first tender — the
+  same shape RBAC v2 closed for roles, one table over. `PaymentMethodProvisioner` is
+  `RoleProvisioner`'s counterpart, idempotent by code, and every location (seeded or
+  admin-created) now gets a working `CASH`/`CARD` pair for free.
+- **Payments and refunds snapshot `payment_method_code`/`payment_method_name`** (the
+  order-lines rule, applied to tenders) while `driver` stays a plain derived column —
+  which is why `ShiftTotals` and the `payments_change_balances` check needed zero
+  changes. The three columns landed across two migrations on purpose: `refunds` stayed
+  nullable until `RefundOrder` could write them, tightened only once its writer shipped.
+- **The breaking wire change**: `POST /orders/{id}/payments` and `POST /refunds` take
+  `payment_method_code` instead of `driver`; the Z-report's `sales_by_driver`/
+  `refunds_by_driver` become `sales_by_method`/`sales_by_group`/`refunds_by_method`/
+  `refunds_by_group`, and `GET /admin/reports/sales` gains `group_by=payment_method`
+  (ledger-basis, keyed on the snapshot columns). `GET /catalog` gains `payment_methods[]`
+  so the register renders tender buttons from location data instead of two hardcoded
+  ones. Full shapes in `03-api.md`.
+- **New permission `payment_method.manage`** (`05-rbac.md`) — admin-tier, granted by no
+  default role, doubling as its own back-office section, deliberately not
+  `moneyLeaves()`: naming a tender moves no money, and taking one is still `payment.take`
+  against a user and a shift. Six routes under `/admin/payment-method-groups` and
+  `/admin/payment-methods`, no `DELETE`, location-scoped the same way the report
+  permissions are.
+- **All three e2e scripts updated**: `e2e-retail-day.sh` and `e2e-lunch-service.sh` tender
+  on method codes instead of `driver` strings; `e2e-admin-day.sh` exercises the new admin
+  CRUD and asserts the Z-report's `sales_by_method`/`sales_by_group` for the sale it made
+  (`CASH`, both `= 510`) — the script's own new `VOUCHER` group takes no payment, so that
+  half of the rollup isn't asserted anywhere yet.
+
+**Status: complete.** Suites: 614 backend / 123 register / 224 back-office.
+
+---
+
 ## Sequencing rationale
 
 - **Money before schema** — everything computes on it.
@@ -753,6 +807,9 @@ Not "maybe someday" — each has a specific condition that should promote it.
 | Runbook (register won't connect, drawer won't reconcile, restore from backup) | First operator who isn't us. |
 | Registry + CD pipeline | First remote host to deploy to. |
 | FrankenPHP worker mode (Octane) | Measured latency need — off by default; the image already supports it. |
+| `refunds` composite `(payment_method_id, location_id)` FK | Defence-in-depth for a refund's tender belonging to the refund's own location, the same way `payment_methods.group_id` already ties a method to its group's location. Nothing is wrong today — `RefundOrder` resolves the method against the acting register's location — but the migration `000100`'s `(id, location_id)` unique index on `payment_method_groups`/`payment_methods` is already there to hang a matching FK off of, if a cross-location refund ever becomes reachable another way. |
+| Till copy distinguishes "no methods configured" from "catalog fetch failed" | `SaleScreen`/`RefundScreen` correctly refuse to take payment when no tender resolves, but both name the back office as the cause — so an offline till sends a cashier to fix a configuration that was never wrong. Gating the copy on the catalog query's `isSuccess` separates the two. Carried because the failure is money-safe either way: payment is blocked, not mis-taken. |
+| Sales report's payment-method name lookup ignores `refunds` | `SalesReport::byPaymentMethod` builds its snapshot-name map from `payments` inside the window only, so a method appearing in-window *solely* via a refund (its original payment captured in an earlier window) falls back to displaying its raw code instead of its name. Cents and group labels are unaffected. Carried because it degrades to a correct-but-terse label, never a wrong number. |
 | Delta-based `e2e-admin-day.sh` assertions | The e2e scripts need to compose without `make e2e`'s double-reseed — today its sales-report checks are absolute counts that only hold against its own fresh seed. |
 | `COMPOSE_VAR` hardening against a typo'd `COMPOSE=` | A destructive `backup`/`restore`/`restore-drill` target is run with a mistyped `COMPOSE=prod` and silently falls back to the dev stack instead of failing loudly. |
 | `make e2e`'s device-token extraction guard checks non-empty, not token-shaped | The seeder's printed table format shifts in a way `test -s` still passes (e.g. a column reflow) but the extracted string isn't a real `id\|hash` token — today's guard would wave through garbage instead of failing at extraction. |

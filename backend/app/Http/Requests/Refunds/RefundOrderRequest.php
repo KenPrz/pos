@@ -26,10 +26,10 @@ final class RefundOrderRequest extends FormRequest
     {
         return [
             'original_order_id' => ['required', 'uuid'],
-            // external_card never passed through us — the money never touched this
-            // system, so there is nothing here to refund. Validation, not a domain
-            // exception: it is never a legal request, not a race that lost.
-            'driver' => ['required', 'in:cash'],
+            // Refundability is enforced in the action from Capabilities::refundable, not
+            // by an `in:` list here — the legal set is per-location data, and the rule
+            // belongs where the capability is declared. 422 refund_method_not_refundable.
+            'payment_method_code' => ['required', 'string', 'max:32'],
             'reason' => ['required', 'string', 'max:500'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.original_order_line_id' => ['required', 'uuid'],
@@ -44,7 +44,7 @@ final class RefundOrderRequest extends FormRequest
         return new RefundOrderInput(
             originalOrderId: $this->string('original_order_id')->toString(),
             registerId: $this->attributes->get(EnsureDeviceToken::REGISTER)->id,
-            driver: $this->string('driver')->toString(),
+            paymentMethodCode: $this->string('payment_method_code')->toString(),
             reason: $this->string('reason')->toString(),
             lines: array_map(
                 static fn (array $line): RefundLineInput => new RefundLineInput(

@@ -22,6 +22,7 @@ class Payment extends Model
     protected $fillable = [
         'order_id', 'shift_id', 'driver', 'status', 'amount_cents',
         'tendered_cents', 'change_cents', 'reference', 'driver_payload',
+        'payment_method_id', 'payment_method_code', 'payment_method_name',
         'user_id', 'created_at', 'captured_at',
     ];
 

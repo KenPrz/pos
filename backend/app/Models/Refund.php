@@ -23,6 +23,7 @@ class Refund extends Model
     protected $fillable = [
         'original_order_id', 'location_id', 'register_id', 'shift_id', 'business_date',
         'driver', 'amount_cents', 'reason', 'user_id', 'created_at',
+        'payment_method_id', 'payment_method_code', 'payment_method_name',
     ];
 
     /** @return array<string, string> */

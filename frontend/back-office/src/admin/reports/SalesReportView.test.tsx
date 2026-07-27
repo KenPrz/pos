@@ -136,4 +136,38 @@ describe('SalesReportView', () => {
       vi.useRealTimers()
     }
   })
+
+  it('offers a Payment method grouping and requests it', async () => {
+    vi.mocked(api.reports.sales).mockResolvedValue(DAY_REPORT)
+    renderView()
+
+    const tab = await screen.findByRole('tab', { name: 'Payment method' })
+    fireEvent.mouseDown(tab)
+    fireEvent.click(tab)
+
+    await waitFor(() =>
+      expect(api.reports.sales).toHaveBeenCalledWith(expect.objectContaining({ group_by: 'payment_method' })),
+    )
+  })
+
+  it('shows the method and its group as separate columns', async () => {
+    vi.mocked(api.reports.sales).mockResolvedValue({
+      rows: [{
+        bucket: 'GCASH', method_code: 'GCASH', method_name: 'GCash',
+        group_code: 'EWALLET', group_name: 'E-wallets',
+        gross_cents: 2500, refunds_cents: 0, net_cents: 2500,
+      }],
+      totals: { gross_cents: 2500, refunds_cents: 0, net_cents: 2500 },
+      basis: 'ledger',
+    } as never)
+
+    renderView()
+    const tab = await screen.findByRole('tab', { name: 'Payment method' })
+    fireEvent.mouseDown(tab)
+    fireEvent.click(tab)
+
+    // The method name is what a human recognises; the code is what reports key on.
+    expect(await screen.findByText('GCash')).toBeInTheDocument()
+    expect(screen.getByText('E-wallets')).toBeInTheDocument()
+  })
 })

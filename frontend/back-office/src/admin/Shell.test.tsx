@@ -204,4 +204,21 @@ describe('Shell', () => {
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
     expect(screen.queryByText('Settings stub')).not.toBeInTheDocument()
   })
+
+  // Task 14: the payment-methods section registers its own permission
+  // (payment_method.manage) in SECTION_DEFS, gating the nav item the same way every
+  // other section does. Nav items are <a> links inside the "Sections" nav landmark
+  // (AppSidebar), not buttons — see the existing cases above, which all query by
+  // role 'link'.
+  it('shows Payment methods only to a holder of payment_method.manage', () => {
+    renderShell([], vi.fn(), ['payment_method.manage'])
+
+    expect(screen.getByRole('link', { name: /payment methods/i })).toBeInTheDocument()
+  })
+
+  it('hides Payment methods without the permission', () => {
+    renderShell([], vi.fn(), ['catalog.manage'])
+
+    expect(screen.queryByRole('link', { name: /payment methods/i })).not.toBeInTheDocument()
+  })
 })

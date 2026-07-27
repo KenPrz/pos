@@ -11,6 +11,8 @@ use App\Models\Category;
 use App\Models\Location;
 use App\Models\Modifier;
 use App\Models\ModifierGroup;
+use App\Models\PaymentMethod;
+use App\Models\PaymentMethodGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Register;
@@ -58,6 +60,7 @@ abstract class CatalogSeeder extends Seeder
             ...$this->locationAttributes(),
         ]);
         $provisioner->provisionForLocation($location);
+        $this->seedPaymentMethods($location);
 
         $tokens = [];
         foreach ($this->registerModes() as $name => $mode) {
@@ -153,6 +156,45 @@ abstract class CatalogSeeder extends Seeder
         }
 
         return ['location' => $location, 'tokens' => $tokens];
+    }
+
+    /**
+     * PH-realistic tenders, written in full.
+     *
+     * This does NOT call PaymentMethodProvisioner: the seeder builds its location with
+     * Location::factory(), not CreateLocation, so no defaults exist here to reconcile
+     * with — and writing the intended set directly means nothing has to be deleted, which
+     * matters because this system archives rather than deletes everywhere else.
+     */
+    private function seedPaymentMethods(Location $location): void
+    {
+        $tenders = [
+            ['CASH', 'Cash', 'cash', 0, [['CASH', 'Cash', 0]]],
+            ['CARD', 'Cards', 'external_card', 1, [['VISA', 'Visa', 0], ['MASTERCARD', 'Mastercard', 1]]],
+            ['EWALLET', 'E-wallets', 'external_card', 2, [['GCASH', 'GCash', 0], ['MAYA', 'Maya', 1]]],
+        ];
+
+        foreach ($tenders as [$groupCode, $groupName, $driver, $groupSort, $methods]) {
+            $group = PaymentMethodGroup::create([
+                'location_id' => $location->id,
+                'code' => $groupCode,
+                'name' => $groupName,
+                'driver' => $driver,
+                'sort_order' => $groupSort,
+                'is_active' => true,
+            ]);
+
+            foreach ($methods as [$code, $name, $sort]) {
+                PaymentMethod::create([
+                    'location_id' => $location->id,
+                    'group_id' => $group->id,
+                    'code' => $code,
+                    'name' => $name,
+                    'sort_order' => $sort,
+                    'is_active' => true,
+                ]);
+            }
+        }
     }
 
     private function loadData(): array

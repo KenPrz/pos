@@ -9,7 +9,9 @@ final readonly class TakePaymentInput
     public function __construct(
         public string $orderId,
         public string $registerId,
-        public string $driver,
+        // The per-location method code. The driver is DERIVED from the method's group
+        // (PaymentMethodResolver) — a caller never names a driver.
+        public string $paymentMethodCode,
         public int $amountCents,
         public ?int $tenderedCents,
         public ?string $reference,

@@ -16,6 +16,8 @@ final class TakePaymentResource extends JsonResource
             'payment' => [
                 'id' => $this->id,
                 'driver' => $this->driver,
+                'payment_method_code' => $this->payment_method_code,
+                'payment_method_name' => $this->payment_method_name,
                 'status' => $this->status,
                 'amount_cents' => $this->amount_cents,
                 'tendered_cents' => $this->tendered_cents,

@@ -59,7 +59,8 @@ function reportsAddLine(object $t, string $orderId, string $variantId, string $q
 function reportsPay(object $t, string $orderId, string $driver, int $amountCents, User $actor): Order
 {
     return app(TakePayment::class)->execute(new TakePaymentInput(
-        orderId: $orderId, registerId: $t->register->id, driver: $driver,
+        orderId: $orderId, registerId: $t->register->id,
+        paymentMethodCode: $driver === 'cash' ? 'CASH' : 'CARD',
         amountCents: $amountCents, tenderedCents: $driver === 'cash' ? $amountCents : null,
         reference: null, expectedVersion: Order::findOrFail($orderId)->version, actorId: $actor->id,
     ))->order;
@@ -92,8 +93,12 @@ it('reports sales by day, user and category off the ledgers — voided money and
     $orderB = reportsPay($this, $orderB->id, 'external_card', 500, $this->cashierB);
     $lineB = $orderB->lines->first();
 
+    // Refunded in cash, not card: external_card is not refundable
+    // (Capabilities::refundable), and the report assertions below are driver-agnostic —
+    // they only care that a 300¢ refund landed against this line, not which tender it
+    // came back on.
     $refund = app(RefundOrder::class)->execute(new RefundOrderInput(
-        originalOrderId: $orderB->id, registerId: $this->register->id, driver: 'external_card',
+        originalOrderId: $orderB->id, registerId: $this->register->id, paymentMethodCode: 'CASH',
         reason: 'partial return', lines: [new RefundLineInput($lineB->id, '0.600', restock: false)],
         actorId: $this->cashierB->id,
     ));
@@ -199,4 +204,88 @@ it('a non-admin token gets 403 on both report routes', function (): void {
         ->assertStatus(403);
     $this->getJson('/api/v1/admin/reports/stock?location_id='.$this->location->id, $headers)
         ->assertStatus(403);
+});
+
+/** A closed order paid in full on one method. Own name — Pest file-scoped functions
+ *  collide across files, and this file already namespaces its own helpers. */
+function reportsTenderedOrder(object $t, string $methodCode, int $cents): void
+{
+    $order = Order::factory()->forRegister($t->register)->create([
+        'opened_by' => $t->cashierA->id,
+        'subtotal_cents' => $cents,
+        'total_cents' => $cents,
+    ]);
+
+    app(TakePayment::class)->execute(new TakePaymentInput(
+        orderId: $order->id,
+        registerId: $t->register->id,
+        paymentMethodCode: $methodCode,
+        amountCents: $cents,
+        tenderedCents: $cents,
+        reference: null,
+        // Eloquent create() never hydrates DB column defaults (version defaults to 0 at
+        // the schema level) — re-fetch, same as reportsPay() above, rather than trusting
+        // the in-memory model just handed back by create().
+        expectedVersion: Order::findOrFail($order->id)->version,
+        actorId: $t->cashierA->id,
+    ));
+}
+
+function reportsByMethod(object $t): array
+{
+    return $t->getJson(
+        "/api/v1/admin/reports/sales?location_id={$t->location->id}"
+        ."&from={$t->today}&to={$t->today}&group_by=payment_method",
+        $t->headers,
+    )->assertOk()->json('data');
+}
+
+it('groups sales by payment method on a ledger basis', function (): void {
+    $group = \App\Models\PaymentMethodGroup::factory()->create([
+        'location_id' => $this->location->id,
+        'code' => 'EWALLET', 'name' => 'E-wallets', 'driver' => 'external_card',
+    ]);
+    \App\Models\PaymentMethod::factory()->create([
+        'location_id' => $this->location->id, 'group_id' => $group->id,
+        'code' => 'GCASH', 'name' => 'GCash',
+    ]);
+
+    reportsTenderedOrder($this, 'CASH', 1000);
+    reportsTenderedOrder($this, 'GCASH', 2500);
+
+    $report = reportsByMethod($this);
+
+    expect($report['basis'])->toBe('ledger');
+    expect(array_column($report['rows'], 'method_code'))->toBe(['CASH', 'GCASH']);
+
+    $cash = collect($report['rows'])->firstWhere('method_code', 'CASH');
+    expect($cash['group_code'])->toBe('CASH');
+    expect($cash['gross_cents'])->toBe(1000);
+    expect($cash['net_cents'])->toBe($cash['gross_cents'] - $cash['refunds_cents']);
+
+    // The e-wallet reports under its own group, not under CARD, despite sharing a driver.
+    $gcash = collect($report['rows'])->firstWhere('method_code', 'GCASH');
+    expect($gcash['group_code'])->toBe('EWALLET');
+    expect($gcash['group_name'])->toBe('E-wallets');
+
+    expect($report['totals']['gross_cents'])->toBe(3500);
+});
+
+it('reports a renamed method under the name it was sold as', function (): void {
+    reportsTenderedOrder($this, 'CASH', 1000);
+
+    \App\Models\PaymentMethod::query()->where('location_id', $this->location->id)
+        ->where('code', 'CASH')->update(['name' => 'Cash (peso)']);
+
+    // Grouped on the SNAPSHOT, so a rename does not retroactively rewrite last month.
+    $cash = collect(reportsByMethod($this)['rows'])->firstWhere('method_code', 'CASH');
+    expect($cash['method_name'])->toBe('Cash');
+});
+
+it('still rejects an unknown group_by', function (): void {
+    $this->getJson(
+        "/api/v1/admin/reports/sales?location_id={$this->location->id}"
+        ."&from={$this->today}&to={$this->today}&group_by=tender",
+        $this->headers,
+    )->assertStatus(400)->assertJsonPath('error.code', 'validation_failed');
 });

@@ -34,6 +34,7 @@ it('computes variance = counted − (float + cash sales)', function (): void {
         'status' => 'captured', 'amount_cents' => 4353, 'tendered_cents' => 5000,
         'change_cents' => 647, 'user_id' => $this->cashier->id,
         'created_at' => now(), 'captured_at' => now(),
+        ...tenderColumns($this->location),
     ]);
 
     $closed = app(CloseShift::class)->execute(new CloseShiftInput(

@@ -60,6 +60,10 @@ final class ReceiptResource extends JsonResource
             ],
             'payments' => $this->payments->map(fn ($p): array => [
                 'driver' => $p->driver,
+                // Snapshots, not joins: a receipt from last year must reprint identically
+                // even after the method has been renamed or archived.
+                'payment_method_code' => $p->payment_method_code,
+                'payment_method_name' => $p->payment_method_name,
                 'amount_cents' => $p->amount_cents,
                 'tendered_cents' => $p->tendered_cents,
                 'change_cents' => $p->change_cents,

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Location;
 use App\Models\ProductVariant;
 use App\Models\Register;
 use App\Models\User;
@@ -31,7 +30,7 @@ function openShift(Register $register, User $user): string
 }
 
 beforeEach(function (): void {
-    $this->location = Location::factory()->create();
+    $this->location = provisionedLocation();
     $this->register = Register::factory()->create(['location_id' => $this->location->id]);
     $this->user = User::factory()->create();
 });
@@ -166,6 +165,7 @@ it('refuses a payment whose change does not balance', function (): void {
         'tendered_cents' => 6000,
         'change_cents' => 500,      // should be 1000
         'user_id' => $this->user->id,
+        ...tenderColumns($this->location),
     ]))->toThrow(QueryException::class, 'payments_change_balances');
 });
 

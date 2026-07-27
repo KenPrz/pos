@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, type Order, type Refund } from '../lib/api'
 import { getCurrency } from '../lib/currency'
@@ -25,6 +25,12 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
   // the SAME refund instead of paying it twice.
   const [idempotencyKey] = useState(() => crypto.randomUUID())
 
+  // Only cash-driver methods can be refunded through us — an external_card tender's money
+  // never passed through this system (RefundOrder gates on Capabilities::refundable). The
+  // code is per-location DATA, so it must come from the catalog, never a literal.
+  const catalog = useQuery({ queryKey: ['catalog'], queryFn: () => api.catalog(), staleTime: 5 * 60_000 })
+  const refundMethod = (catalog.data?.payment_methods ?? []).find((m) => m.driver === 'cash') ?? null
+
   const fail = (err: unknown, fallback: string) => {
     if (err instanceof ApiError && err.status === 401) return onSessionExpired(err)
     setError(err instanceof ApiError ? err.message : fallback)
@@ -45,10 +51,13 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
 
   const refund = useMutation({
     mutationFn: () => {
+      // Guarded in submitRefund before mutate() is ever called — refundMethod is
+      // non-null by the time this runs.
+      const method = refundMethod as NonNullable<typeof refundMethod>
       const lines = Object.entries(picks)
         .filter(([, p]) => p.qty !== '' && p.qty !== '0')
         .map(([lineId, p]) => ({ original_order_line_id: lineId, qty: p.qty, restock: p.restock }))
-      return api.refund((order as Order).id, 'cash', reason.trim(), lines, idempotencyKey)
+      return api.refund((order as Order).id, method.code, reason.trim(), lines, idempotencyKey)
     },
     onSuccess: (r) => {
       setResult(r)
@@ -70,6 +79,9 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
     const chosen = Object.values(picks).some((p) => p.qty !== '' && p.qty !== '0')
     if (!chosen) return setError('Pick at least one line quantity to refund.')
     if (!reason.trim()) return setError('A refund needs a reason.')
+    if (refundMethod === null) {
+      return setError('This location has no cash payment method, so refunds cannot be issued here.')
+    }
     setError(null)
     refund.mutate()
   }
@@ -152,7 +164,7 @@ export function RefundScreen({ onDone, onSessionExpired }: { onDone: () => void;
           </label>
           <div>
             <Button type="submit" size="lg" disabled={refund.isPending}>
-              {refund.isPending ? 'Refunding…' : 'Refund cash'}
+              {refund.isPending ? 'Refunding…' : `Refund ${refundMethod?.name ?? 'cash'}`}
             </Button>
           </div>
         </form>

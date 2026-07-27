@@ -10,6 +10,6 @@ final readonly class SalesReportInput
         public string $locationId,
         public string $from,       // 'YYYY-MM-DD', inclusive
         public string $to,         // 'YYYY-MM-DD', inclusive
-        public string $groupBy,    // 'day' | 'user' | 'category'
+        public string $groupBy,    // 'day' | 'user' | 'category' | 'payment_method'
     ) {}
 }

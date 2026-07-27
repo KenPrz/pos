@@ -87,7 +87,7 @@ it('renders modifiers on the receipt from snapshots', function (): void {
     // rename after the fact — receipt must not notice
     $this->oat->update(['name' => 'RENAMED']);
     $this->postJson("/api/v1/orders/{$order['id']}/payments",
-        ['driver' => 'cash', 'amount_cents' => $order['total_cents'], 'tendered_cents' => $order['total_cents']],
+        ['payment_method_code' => 'CASH', 'amount_cents' => $order['total_cents'], 'tendered_cents' => $order['total_cents']],
         staffHeaders($this->register, $this->cashier) + ['If-Match' => (string) $order['version'], 'Idempotency-Key' => (string) Str::uuid()],
     )->assertCreated();
     $this->getJson("/api/v1/orders/{$order['id']}/receipt", staffHeaders($this->register, $this->cashier))

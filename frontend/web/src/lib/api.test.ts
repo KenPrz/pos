@@ -92,7 +92,16 @@ describe('takePayment', () => {
       jsonResponse(
         {
           data: {
-            payment: { id: 'pay-1', driver: 'cash', status: 'captured', amount_cents: 1000, tendered_cents: 1000, change_cents: 0 },
+            payment: {
+              id: 'pay-1',
+              driver: 'cash',
+              payment_method_code: 'CASH',
+              payment_method_name: 'Cash',
+              status: 'captured',
+              amount_cents: 1000,
+              tendered_cents: 1000,
+              change_cents: 0,
+            },
             order: { ...sampleOrder, status: 'closed', paid_cents: 1000, version: 4 },
           },
         },
@@ -100,7 +109,7 @@ describe('takePayment', () => {
       ),
     )
 
-    await api.takePayment(sampleOrder, 1000, 'cash', 'retry-key-123', { tenderedCents: 1000 })
+    await api.takePayment(sampleOrder, 1000, 'CASH', 'retry-key-123', { tenderedCents: 1000 })
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(String(url)).toContain(`/orders/${sampleOrder.id}/payments`)
@@ -108,16 +117,25 @@ describe('takePayment', () => {
     expect(headers['Idempotency-Key']).toBe('retry-key-123')
     expect(headers['If-Match']).toBe(String(sampleOrder.version))
     const body = JSON.parse(init?.body as string) as Record<string, unknown>
-    expect(body.driver).toBe('cash')
+    expect(body.payment_method_code).toBe('CASH')
     expect(body.tendered_cents).toBe(1000)
   })
 
-  it('sends a reference and no tendered_cents for external_card', async () => {
+  it('sends a reference and no tendered_cents for an external_card-driven method', async () => {
     const fetchMock = stubFetch(() =>
       jsonResponse(
         {
           data: {
-            payment: { id: 'pay-2', driver: 'external_card', status: 'captured', amount_cents: 1000, tendered_cents: null, change_cents: null },
+            payment: {
+              id: 'pay-2',
+              driver: 'external_card',
+              payment_method_code: 'CARD',
+              payment_method_name: 'Card',
+              status: 'captured',
+              amount_cents: 1000,
+              tendered_cents: null,
+              change_cents: null,
+            },
             order: { ...sampleOrder, status: 'closed', paid_cents: 1000, version: 4 },
           },
         },
@@ -125,13 +143,42 @@ describe('takePayment', () => {
       ),
     )
 
-    await api.takePayment(sampleOrder, 1000, 'external_card', 'retry-key-456', { reference: 'auth-001122' })
+    await api.takePayment(sampleOrder, 1000, 'CARD', 'retry-key-456', { reference: 'auth-001122' })
 
     const [, init] = fetchMock.mock.calls[0]
     const body = JSON.parse(init?.body as string) as Record<string, unknown>
-    expect(body.driver).toBe('external_card')
+    expect(body.payment_method_code).toBe('CARD')
     expect(body.tendered_cents).toBeNull()
     expect(body.reference).toBe('auth-001122')
+  })
+
+  it('posts a payment by method code, not by driver', async () => {
+    const fetchMock = stubFetch(() =>
+      jsonResponse({ data: { payment: { id: 'pay-3' }, order: {} } }, 201),
+    )
+
+    await api.takePayment(sampleOrder, 5000, 'GCASH', 'key-1', { reference: 'ref' })
+
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body.payment_method_code).toBe('GCASH')
+    expect(body).not.toHaveProperty('driver')
+  })
+})
+
+describe('refund', () => {
+  it('posts a refund by method code, not by driver', async () => {
+    const fetchMock = stubFetch(() => jsonResponse({ data: { refund: { id: 'r-1' } } }, 201))
+
+    await api.refund('o-1', 'CASH', 'Faulty', [{ original_order_line_id: 'l-1', qty: '1', restock: true }], 'key-2')
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/refunds')
+    const headers = init?.headers as Record<string, string>
+    expect(headers['Idempotency-Key']).toBe('key-2')
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>
+    expect(body.payment_method_code).toBe('CASH')
+    expect(body).not.toHaveProperty('driver')
   })
 })
 
