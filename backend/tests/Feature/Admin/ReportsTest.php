@@ -282,6 +282,45 @@ it('reports a renamed method under the name it was sold as', function (): void {
     expect($cash['method_name'])->toBe('Cash');
 });
 
+it('names a method that reaches the window only through a refund', function (): void {
+    // A second cash-driver method, so it can be refunded onto (RefundOrder gates on
+    // Capabilities::refundable) and is distinguishable from the seeded CASH.
+    $petty = \App\Models\PaymentMethodGroup::factory()->create([
+        'location_id' => $this->location->id,
+        'code' => 'PETTY', 'name' => 'Petty cash', 'driver' => 'cash', 'sort_order' => 5,
+    ]);
+    \App\Models\PaymentMethod::factory()->create([
+        'location_id' => $this->location->id, 'group_id' => $petty->id,
+        'code' => 'PETTYCASH', 'name' => 'Petty cash',
+    ]);
+
+    // The sale happens OUTSIDE the reported window; only its refund lands inside it.
+    // That is the case the name lookup used to miss, because it read `payments` alone.
+    $variant = ProductVariant::factory()->untracked()->create(['price_cents' => 1000]);
+    $order = Order::factory()->forRegister($this->register)->create([
+        'opened_by' => $this->cashierA->id,
+        'business_date' => now($this->location->timezone)->subDays(10)->toDateString(),
+    ]);
+    $order = reportsAddLine($this, $order->id, $variant->id, '1', $this->cashierA);
+    $order = reportsPay($this, $order->id, 'cash', 1000, $this->cashierA);
+
+    app(RefundOrder::class)->execute(new RefundOrderInput(
+        originalOrderId: $order->id, registerId: $this->register->id,
+        paymentMethodCode: 'PETTYCASH', reason: 'late return',
+        lines: [new RefundLineInput($order->lines->first()->id, '1', restock: false)],
+        actorId: $this->supervisor->id,
+    ));
+
+    $row = collect(reportsByMethod($this)['rows'])->firstWhere('method_code', 'PETTYCASH');
+
+    // Before the fix this read 'PETTYCASH' — the raw code — because no payment for that
+    // code existed in the window to supply a name.
+    expect($row)->not->toBeNull();
+    expect($row['method_name'])->toBe('Petty cash');
+    expect($row['refunds_cents'])->toBe(1000);
+    expect($row['gross_cents'])->toBe(0);
+});
+
 it('still rejects an unknown group_by', function (): void {
     $this->getJson(
         "/api/v1/admin/reports/sales?location_id={$this->location->id}"

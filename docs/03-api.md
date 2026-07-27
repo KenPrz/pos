@@ -24,8 +24,22 @@ the back office — see `01-architecture.md`.
 ```
 POST /api/v1/registers/activate      # unauthenticated — the activation code IS the credential
   { "activation_code": "XXXXX-XXXXX" }
-  → { register: { id, name, mode }, device_token }   # token is long-lived; store on the device
+  → { register: { id, name, mode, screen_keyboard_enabled }, device_token }   # token is long-lived; store on the device
 ```
+
+`screen_keyboard_enabled` rides here, and again on `staff/login` below, because the
+client persists this `register` object (`tokens.setRegisterInfo`) the moment activation
+succeeds — before any staff session exists. That's what lets the PIN screen itself show
+a keyboard on a keyboard-less terminal: it reads the flag off the activation response,
+not the login response that comes after.
+
+This is also the boundary of what the flag can do: the *activation* screen where the
+code above is typed in has no register to read yet — no device token means no way to
+even ask the server which register this will become — so it always assumes a physical
+keyboard is attached. That's deliberate, not an oversight: a keyboard-less terminal's
+first setup needs a keyboard connected once (or the code typed on a phone and pasted),
+same as it needs power and a network connection once. Every request after activation has
+a `register` to read the flag from.
 
 Activation codes are issued per-register in the back office
 (`POST /admin/registers/{id}/activation-code`, below), are single-use, and expire after 7
@@ -43,7 +57,9 @@ Every subsequent request carries `Authorization: Bearer <device_token>`.
 ```
 POST /api/v1/staff/login             # device token + PIN
   { "pin": "1234" }
-  → { staff_token, user: { id, name, is_admin, permissions[] }, expires_at }
+  → { staff_token, expires_at,
+      user: { id, name, is_admin, permissions[] },
+      register: { id, name, mode, screen_keyboard_enabled } }
 ```
 
 `permissions[]` here is the union of every role-derived and directly-granted permission
@@ -648,7 +664,8 @@ GET|POST /api/v1/admin/locations        PATCH /api/v1/admin/locations/{id}
     "variance_approval_threshold_cents": null, "low_stock_threshold": null }
 
 GET|POST /api/v1/admin/registers        PATCH /api/v1/admin/registers/{id}
-  { "mode": "retail" | "food" }                       # picks the register's UI
+  { "mode": "retail" | "food",                        # picks the register's UI
+    "is_active": true, "screen_keyboard_enabled": false }   # per-till on-screen keyboard, default false
 
 POST /api/v1/admin/registers/{id}/activation-code
   → { activation_code, expires_at }        # shown exactly once

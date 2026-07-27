@@ -45,6 +45,7 @@ const REGISTER: Register = {
   name: 'Front counter',
   mode: 'retail',
   is_active: true,
+  screen_keyboard_enabled: false,
   activation: { state: 'enrolled', code_expires_at: null },
 }
 
@@ -169,5 +170,20 @@ describe('RegisterEditor', () => {
     renderEditor({ register: null, locations: [] })
 
     expect(screen.getByRole('button', { name: /^save$/i })).toBeDisabled()
+  })
+
+  it('round-trips the on-screen keyboard toggle', async () => {
+    vi.mocked(api.registers.update).mockResolvedValue({ ...REGISTER, screen_keyboard_enabled: true })
+    renderEditor({ register: { ...REGISTER, screen_keyboard_enabled: false } })
+
+    fireEvent.click(await screen.findByLabelText(/on-screen keyboard/i))
+    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+
+    await waitFor(() =>
+      expect(api.registers.update).toHaveBeenCalledWith(
+        REGISTER.id,
+        expect.objectContaining({ screen_keyboard_enabled: true }),
+      ),
+    )
   })
 })

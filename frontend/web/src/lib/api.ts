@@ -96,7 +96,17 @@ export const tokens = {
     const raw = localStorage.getItem(REGISTER_INFO_KEY)
     if (!raw) return null
     try {
-      return JSON.parse(raw) as RegisterInfo
+      const parsed: unknown = JSON.parse(raw)
+      // JSON.parse succeeds on plenty of things that aren't a stored RegisterInfo at all
+      // (`null`, a bare string, a number) — none of those can be spread into an object, so
+      // guard the shape before doing so.
+      if (typeof parsed !== 'object' || parsed === null) return null
+      const info = parsed as Partial<RegisterInfo>
+      // A session stored before screen_keyboard_enabled shipped has no such key at all.
+      // That must not log the terminal out or drop the rest of the stored info — read it
+      // tolerantly and default to false (the same default the column itself has server-side)
+      // rather than letting `undefined` leak out as a stand-in for a boolean.
+      return { ...info, screen_keyboard_enabled: info.screen_keyboard_enabled ?? false } as RegisterInfo
     } catch {
       return null
     }
@@ -194,7 +204,10 @@ function patch<T>(path: string, body: unknown, extra?: Record<string, string>): 
 
 // The register a staff session logged into. `mode` decides which screens the SPA shows
 // (M5: 'food' registers get table/prep/split UI retail registers don't).
-export type RegisterInfo = { id: string; name: string; mode: 'retail' | 'food' }
+// `screen_keyboard_enabled` drives ScreenKeyboardHost; false on any register that never
+// opted in, including ones enrolled before this field shipped — see registerInfo() below,
+// which defaults it on read rather than trusting whatever (or nothing) is in storage.
+export type RegisterInfo = { id: string; name: string; mode: 'retail' | 'food'; screen_keyboard_enabled: boolean }
 
 // Field names verified against StaffSessionResource.php (M2, register added M5): the
 // resource also emits `is_admin` and `permissions` on `user`, which docs/03-api.md's

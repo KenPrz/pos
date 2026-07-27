@@ -26,6 +26,9 @@ class RegisterFactory extends Factory
             // defaults, so a caller reading ->mode straight off a freshly created model
             // would otherwise see null instead of 'retail'. See CLAUDE.md's gotchas.
             'mode' => 'retail',
+            // Same gotcha, same fix: a freshly created register would otherwise read
+            // null instead of the DB default of false.
+            'screen_keyboard_enabled' => false,
         ];
     }
 }

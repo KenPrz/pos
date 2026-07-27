@@ -22,6 +22,7 @@ final class EnrolledRegisterResource extends JsonResource
                 'id' => $enrolled->register->id,
                 'name' => $enrolled->register->name,
                 'mode' => $enrolled->register->mode,
+                'screen_keyboard_enabled' => $enrolled->register->screen_keyboard_enabled,
             ],
             // Returned exactly once. Never retrievable again — only revocable by reissue.
             'device_token' => $enrolled->deviceToken,

@@ -22,7 +22,10 @@ describe('ActionZone', () => {
 
     const bar = button.parentElement as HTMLElement
     expect(bar.className).toContain('fixed')
-    expect(bar.className).toContain('bottom-0')
+    // Rides up above the on-screen keyboard dock when it's open (ScreenKeyboardHost
+    // publishes --screen-keyboard-h while open, clears it on dismiss/unmount) and sits
+    // flush with the bottom of the screen otherwise, via the var()'s 0px fallback.
+    expect(bar.className).toContain('bottom-[var(--screen-keyboard-h,0px)]')
     expect(bar.className).toContain('min-h-[64px]')
   })
 })

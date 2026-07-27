@@ -29,6 +29,7 @@ class Register extends Model
         'name',
         'is_active',
         'mode',
+        'screen_keyboard_enabled',
     ];
 
     /** @return array<string, string> */
@@ -38,6 +39,7 @@ class Register extends Model
             'is_active' => 'boolean',
             'activation_code_expires_at' => 'datetime',
             'activation_code_redeemed_at' => 'datetime',
+            'screen_keyboard_enabled' => 'boolean',
         ];
     }
 

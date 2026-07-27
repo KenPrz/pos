@@ -141,6 +141,7 @@ export function FloorScreen({ registerId, canTransfer, activeOrderId, onResume, 
             autoFocus placeholder="Table (optional)…" maxLength={20}
             value={tableRefInput} onChange={(e) => setTableRefInput(e.target.value)}
             className="h-[56px] text-[18px]"
+            data-screen-keyboard="full"
           />
         </form>
       )}
