@@ -358,12 +358,24 @@ granted the moment a user holds at least one **admin-tier permission** at *any*
 location, via a role or a direct grant. `App\Domain\Rbac\AdminAccess::SECTIONS` is the
 admin-tier set: `catalog.manage`, `user.manage`, `location.manage`, `register.enroll`,
 `audit.view`, `report.sales.view`, `report.stock.view`, `settings.manage`,
-`role.manage`, `day.close`, `payment_method.manage`. `holdsAnywhere($user, $permission)` is `is_admin || in_array($permission,
+`role.manage`, `day.close`, `payment_method.manage`, `shift.approve_variance`.
+`holdsAnywhere($user, $permission)` is `is_admin || in_array($permission,
 $this->allHeld($user))`, where `allHeld()` is the union of every role-derived and direct
 permission across every location — direct table joins on `model_has_roles` and
 `model_has_permissions`, for the same reason `PermissionAssignments` and
 `RoleAssignments` are direct joins: spatie's relations answer "at the team I'm
 standing at," and there is no team to stand at here.
+
+**`shift.approve_variance` is the first register-tier permission in `SECTIONS`.** Every
+other entry gates a capability that has no life outside the back office; this one gates a
+register action (`POST /shifts/{shift}/approve-variance`, `03-api.md`) a supervisor
+already exercises from a till. Adding it here doesn't change what the permission does —
+it widens what `SECTIONS` *means*, from "an admin-only capability" to "an admin-tier
+surface exists for this." Supervisors already hold `shift.approve_variance` via
+`Permissions::supervisor()`, and they're exactly the audience for the back-office
+variances queue it gates (`GET /admin/variances`, `03-api.md`) — no new permission and no
+role change, because the people who can act on a variance are already the ones who need
+to see it coming.
 
 **Every admin `FormRequest::authorize()` calls `AdminAccess::holdsAnywhere()` (via the
 `AuthorizesBackOffice` trait's `allowsBackOffice()`), never a bare `can()`.** A bare

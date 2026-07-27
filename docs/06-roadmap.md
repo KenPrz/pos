@@ -778,6 +778,45 @@ actually offers), full story in `02-data-model.md`.
 
 ---
 
+## Pending variances
+
+A read-only back-office queue: closed shifts whose drawer variance is over threshold and
+not yet signed off, so a supervisor can see **which** drawers need approval without
+logging into every register in turn to find out. Approval itself is unchanged and stays a
+register action.
+
+- **One new admin endpoint**, `GET /admin/variances`
+  (`app/Actions/Admin/Shifts/ListPendingVariances`) — unpaginated, ordered by `closed_at`
+  descending, gated `shift.approve_variance`, scoped server-side to every location the
+  caller holds it at (`is_admin`: everywhere). No `location_id` parameter: the scope
+  already is the caller's held locations, so there's nothing to filter.
+- **One definition of "pending," reused rather than duplicated**: the same three
+  conditions `ApproveVariance` itself guards on — closed, `abs(variance_cents)` strictly
+  over `locations.variance_approval_threshold_cents` (falling back to
+  `config('pos.shifts.variance_approval_threshold_cents')`, resolved per row because the
+  list spans locations), not yet approved. Strictly-greater matches `ApproveVariance`'s
+  own rejection (`422 variance_approval_not_required`) — an at-threshold row would offer
+  an approval the API refuses.
+- **`shift.approve_variance` joins `AdminAccess::SECTIONS`** — the first register-tier
+  permission to do so (`05-rbac.md`). No new permission and no role change: supervisors
+  already hold it via `Permissions::supervisor()`, and they're exactly the audience for
+  the queue.
+- **The design decision worth remembering: the view deliberately does not link to the
+  offending register.** `CloseShift` revokes every staff session bound to it, so
+  approving from the till showing the variance 401s; `ApproveVariance` scopes by
+  *location*, so any other terminal there works. A queue that linked to the register
+  would relocate the confusion, not remove it — instead a standing guidance line above
+  the table says where to go. Approval stays register-side, not ported to the back
+  office, because the audit trail is register-attributed: `ApproveVariance` audits with a
+  `registerId`, and an admin session has none to give it.
+- **Back office only**, one new **Variances** section with a sidebar count badge
+  (reusing the low-stock badge's pattern) and an `EmptyState` when nothing is pending.
+  The register app is untouched.
+
+**Status: complete.** Suites: 622 backend / 123 register / 230 back-office.
+
+---
+
 ## Sequencing rationale
 
 - **Money before schema** — everything computes on it.

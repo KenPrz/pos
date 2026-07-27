@@ -11,6 +11,7 @@ operator who installs the system. Covers the register and the back office.
 | 1.1 | 2026-07-23 | Added Chapter 14, End of Day (close, reopen, and what a closed day blocks). Later chapters renumbered. |
 | 1.2 | 2026-07-23 | Chapter 14: explained why the next business date stays unavailable until the store's midnight, even after closing. |
 | 1.3 | 2026-07-27 | Added Chapter 12, Payment methods (per-location tender groups and methods, what's archivable, and what reading the Z-report back can and can't tell you). Rewrote Chapter 5's tender passage for configurable payment methods. Later chapters renumbered. |
+| 1.4 | 2026-07-27 | Chapter 7: added the back office's Variances queue — where to find which shifts need approval, and that it lists only, never approves. |
 
 # 1. Introduction
 
@@ -553,6 +554,25 @@ purpose, not a bug waiting to be routed around.
 
 Tap **Print** for a paper copy of the Z-report, then **Done**. Closing signs
 you out of this till completely — you land back at **Enter PIN**.
+
+## Finding what needs approval: the Variances queue
+
+With more than one register, "which shift needs a variance approved" isn't
+something any single till can tell you — you'd have to sign in at each one
+in turn to find out. The back office's **Variances** section (Chapter 8)
+answers that without the walk: every closed shift, at every location you
+cover, whose variance is still over threshold and unsigned, newest close
+first — register, who opened it, when it closed, and the expected,
+counted, and variance figures.
+
+It's a list, not a shortcut past the rule above — there's no **Approve**
+button in the back office. The page says so right above the table
+("Variances are approved at a till. Sign in at any register other than the
+one listed…") and deliberately leaves the offending register unlinked,
+because that's the one place the approval fails. Use the queue to see
+which shift and location need attention, then approve it the way the
+section above describes, from a **different, still-open** register at that
+same location.
 
 # 8. The back office
 
