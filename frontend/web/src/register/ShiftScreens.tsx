@@ -52,6 +52,7 @@ export function OpenShiftScreen({ onOpened, onSessionExpired }: {
             <Input
               value={float} onChange={(e) => setFloat(e.target.value)} inputMode="decimal" autoFocus
               className="type-money mt-xs h-[56px] text-[24px]"
+              data-screen-keyboard="numeric"
             />
           </label>
           <Button type="submit" size="lg" className="w-full">Open drawer</Button>
@@ -255,6 +256,7 @@ export function CloseShiftScreen({ shiftId, can, onClosed, onCancel, onSessionEx
             <Input
               value={counted} onChange={(e) => setCounted(e.target.value)} inputMode="decimal" autoFocus
               className="type-money mt-xs h-[56px] text-[24px]"
+              data-screen-keyboard="numeric"
             />
           </label>
           <div className="flex gap-sm">
