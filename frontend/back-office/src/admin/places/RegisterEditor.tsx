@@ -30,7 +30,9 @@ function activationLabel(activation: RegisterActivation): string {
 }
 
 /**
- * Name, mode (retail/food chips), active toggle, and the ISSUE ACTIVATION CODE action.
+ * Name, mode (retail/food chips), active toggle, on-screen keyboard toggle (per register,
+ * not per location — a store commonly mixes hardware, e.g. a sealed counter terminal
+ * beside a back-office PC enrolled as a second till), and the ISSUE ACTIVATION CODE action.
  * `location_id` is a create-time-only decision (UpdateRegisterRequest marks it
  * `prohibited` on PATCH — see the comment there), so the location picker only shows up
  * for a brand-new register; editing one shows its location as plain text.
@@ -59,6 +61,7 @@ export function RegisterEditor({
   const [name, setName] = useState(register?.name ?? '')
   const [mode, setMode] = useState<'retail' | 'food'>(register?.mode ?? 'retail')
   const [isActive, setIsActive] = useState(register?.is_active ?? true)
+  const [screenKeyboardEnabled, setScreenKeyboardEnabled] = useState(register?.screen_keyboard_enabled ?? false)
   const [error, setError] = useState<string | null>(null)
   const [issuedCode, setIssuedCode] = useState<IssuedActivationCode | null>(null)
   // `register` is a snapshot handed down by PlacesSection's `editing` state — it does not
@@ -110,6 +113,7 @@ export function RegisterEditor({
     put('name', name, register?.name)
     put('mode', mode, register?.mode)
     if (register) put('is_active', isActive, register.is_active)
+    if (register) put('screen_keyboard_enabled', screenKeyboardEnabled, register.screen_keyboard_enabled)
 
     // Deactivation behind a confirm (brief's global constraint) — same as every other
     // is_active:false transition in this app.
@@ -179,6 +183,14 @@ export function RegisterEditor({
         {register && (
           <FieldRow label="Active">
             <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(Boolean(checked))} />
+          </FieldRow>
+        )}
+        {register && (
+          <FieldRow label="On-screen keyboard">
+            <Checkbox
+              checked={screenKeyboardEnabled}
+              onCheckedChange={(checked) => setScreenKeyboardEnabled(Boolean(checked))}
+            />
           </FieldRow>
         )}
         <div>
