@@ -322,6 +322,26 @@ no money, taking one is still `payment.take`) backs six routes under
 a location created in the back office now gets a working `CASH`/`CARD` pair instead of
 422ing on its first tender. Suites: 614 backend / 123 register / 224 back-office.
 
+**On-screen keyboard complete** — `registers.screen_keyboard_enabled` (boolean, default
+false) puts a touch keyboard on a till with no physical keyboard, editable in the back
+office's `RegisterEditor` alongside Mode and Active, and carried on `AdminRegisterResource`
+plus the nested `register` object of both `EnrolledRegisterResource` (the activation
+response) and `StaffSessionResource` (PIN login). The one decision worth remembering: a
+single `ScreenKeyboardHost` mounts once at the register app root and listens for
+`focusin` on any input carrying `data-screen-keyboard="numeric"|"full"`, rather than
+wiring each field individually — the alternative was sixteen files touched, sixteen
+chances to miss one, and every input added later silently opting out. That host design
+costs one sharp technique, confined to a single commented helper: writing into a
+controlled React input from outside requires the native value setter plus a dispatched
+`input` event, or React's `onChange` never fires. `react-simple-keyboard` is the first
+third-party UI component in either frontend — a deliberate exception to `DESIGN.md`'s
+hand-styled-on-Tailwind rule, because a correct on-screen keyboard (shift state, key
+repeat, layout switching, touch targets) is a large amount of fiddly work with no product
+value in rewriting. Documented limitation: the activation and server-setup screens still
+need a physical keyboard, because at that point the client has no device token and no
+register to read the flag from — first setup of a keyboard-less terminal needs a
+keyboard attached once. Suites: 619 backend / 135 register / 225 back-office.
+
 Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
 trigger that would revive each (monitoring, load test, runbook, registry/CD, and more).
 
@@ -392,3 +412,15 @@ trigger that would revive each (monitoring, load test, runbook, registry/CD, and
   retroactively re-bucket every payment taken on it, so `UpdatePaymentMethod` refuses
   `group_id` and `code` outright — the fix for a wrong one is archive-and-recreate. The
   same applies to a group's own `code` and `driver`.
+- **Adding a frontend dependency does not reach the `make dev` containers.** `npm
+  install` on the host writes to the host's `node_modules`, but the `web`/`back-office`
+  containers carry their own — so the app 500s with `Module not found` while every unit
+  test, typecheck and `npm run build` still passes, because those all run against the
+  host's copy. Refresh with `docker compose -f compose.dev.yml exec --user node web npm
+  install`, or just restart the container (`docker compose -f compose.dev.yml restart
+  web`, or `make dev-down && make dev`) — compose's `command:` (not the Dockerfile's
+  `CMD`) runs `npm install && npm run dev` on every container *start*, not only first
+  boot, so `--force-recreate` isn't required. *Rebuilding the image alone does nothing*,
+  though: the deps live in a named volume that only the container's own boot command
+  populates, and an image rebuild never touches a volume. Production is unaffected:
+  `make build` runs `npm ci` inside the image.

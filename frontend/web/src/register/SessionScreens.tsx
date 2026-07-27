@@ -42,6 +42,7 @@ export function PinScreen({ onLoggedIn, onDeviceInvalid }: {
             type="password" inputMode="numeric" autoComplete="off" autoFocus
             value={pin} onChange={(e) => setPin(e.target.value)} placeholder="••••"
             className="h-[56px] text-center text-[24px]"
+            data-screen-keyboard="numeric"
           />
           <Button type="submit" size="lg" className="w-full">Clock in</Button>
         </form>

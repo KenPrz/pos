@@ -565,6 +565,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
             // too) but compact — the grid below, not the barcode reader, is the everyday
             // food-order idiom. Retail gets the full-width scan-first field.
             className={cn('h-[56px] text-[18px]', foodMode && 'max-w-[240px]')}
+            data-screen-keyboard="full"
           />
         </form>
 
@@ -591,6 +592,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
                 <Input
                   placeholder="Reason (required)…" className="min-h-[48px]"
                   value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}
+                  data-screen-keyboard="full"
                 />
                 <div>
                   <Button type="button" variant="ghost" className="min-h-[48px]" onClick={() => setDiscountOpen(false)}>Cancel</Button>
@@ -609,6 +611,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
                 <Input
                   autoFocus placeholder="Reason for voiding the whole order…" className="min-h-[48px]"
                   value={voidReason} onChange={(e) => setVoidReason(e.target.value)}
+                  data-screen-keyboard="full"
                 />
                 <Button type="submit" variant="danger" size="lg">Void order</Button>
                 <Button type="button" variant="ghost" size="lg" onClick={() => setVoidingOrder(false)}>Keep</Button>
@@ -701,6 +704,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
                     <Input
                       value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" autoFocus
                       className="type-money mt-xs h-[56px] text-[24px]"
+                      data-screen-keyboard="numeric"
                     />
                   </label>
                 ) : (
@@ -711,6 +715,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
                     <Input
                       value={reference} onChange={(e) => setReference(e.target.value)} placeholder="auth 004321" autoFocus
                       className="mt-xs h-[56px]"
+                      data-screen-keyboard="full"
                     />
                   </label>
                 )}
@@ -783,6 +788,7 @@ export function SaleScreen({ can, registerId, initialOrder, onOrderChange, onClo
                 <Input
                   autoFocus placeholder="Reason for the void…" className="min-h-[48px]"
                   value={voidReason} onChange={(e) => setVoidReason(e.target.value)}
+                  data-screen-keyboard="full"
                 />
                 <Button type="submit" variant="danger" className="min-h-[48px]">Confirm void</Button>
                 <Button type="button" variant="ghost" className="min-h-[48px]" onClick={() => setVoidingLineId(null)}>Keep</Button>

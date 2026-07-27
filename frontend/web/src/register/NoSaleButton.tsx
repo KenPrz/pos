@@ -72,6 +72,7 @@ export function NoSaleButton({
         placeholder="Reason for opening the drawer…"
         value={reason}
         onChange={(e) => setReason(e.target.value)}
+        data-screen-keyboard="full"
       />
       <Button type="submit" className="min-h-[48px]" disabled={busy}>
         Open drawer

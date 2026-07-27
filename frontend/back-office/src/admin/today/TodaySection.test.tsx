@@ -54,6 +54,7 @@ const INACTIVE_REGISTER: Register[] = [
     name: 'Back till',
     mode: 'retail',
     is_active: false,
+    screen_keyboard_enabled: false,
     activation: { state: 'not_enrolled', code_expires_at: null },
   },
 ]

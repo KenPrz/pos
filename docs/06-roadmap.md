@@ -778,6 +778,54 @@ actually offers), full story in `02-data-model.md`.
 
 ---
 
+## On-screen keyboard
+
+The register app assumes a physical keyboard everywhere: cash tendered, PINs, barcodes
+typed when a scan fails, table refs, card references, and — critically — the *reasons*
+attached to voids, discounts, and refunds are all free typing. A sealed all-in-one
+terminal or a tablet in a stand has nothing to type with, and the supervisor-gated,
+audited actions are exactly the ones that become unreachable.
+`registers.screen_keyboard_enabled` (boolean, default false, `02-data-model.md`) puts a
+touch keyboard on a till that needs one, editable in the back office's `RegisterEditor`
+alongside Mode and Active.
+
+- **The one decision worth remembering: one host, not sixteen keyboards.** A single
+  `ScreenKeyboardHost` mounts once at the register app root and listens for `focusin` on
+  any input carrying `data-screen-keyboard="numeric"|"full"`, docking one
+  `react-simple-keyboard` at the bottom of the viewport when the flag is on. The
+  alternative — threading `onKeyPress` through each of the sixteen opted-in input sites —
+  is sixteen files touched, sixteen chances to miss one, and every future input silently
+  opting out by default. The host costs exactly one sharp technique in exchange: writing
+  into a controlled React input from outside requires the native value setter plus a
+  dispatched `input` event, or React's own `onChange` never fires (React tracks the last
+  value it saw itself; assigning `el.value` directly leaves that tracker stale). That
+  technique is confined to one helper, `setNativeValue`, with the reason written down
+  beside it.
+- **`react-simple-keyboard` is the first third-party UI component in either frontend** —
+  a deliberate exception to `DESIGN.md`'s hand-styled-on-Tailwind convention. A correct,
+  accessible on-screen keyboard (shift state, key repeat, layout switching, touch
+  targets) is a large amount of fiddly work with no product value in rewriting; the
+  structural stylesheet ships as-is and only the theme is overridden, in a register-scoped
+  stylesheet, using Carbon tokens.
+- **The flag rides the same two resources `mode` already does**: `AdminRegisterResource`,
+  and the nested `register` object of `EnrolledRegisterResource` (the activation
+  response) and `StaffSessionResource` (PIN login) — `03-api.md`. The activation one
+  matters most: the client persists that `register` object before any staff session
+  exists, which is what lets the PIN screen itself show a keyboard.
+- **Documented limitation, not an oversight**: the activation and server-setup screens
+  cannot show the keyboard, because at that point the client has no device token and no
+  register to read a flag from. First setup of a keyboard-less terminal needs a keyboard
+  attached once (or the code typed on a phone and pasted) — noted in the user manual
+  rather than left as a discovery.
+- **Per register, not per location**, because a single store commonly mixes hardware — a
+  sealed counter terminal beside a back-office PC enrolled as a second till. Defaults
+  false because a terminal with a keyboard is the common case, and defaulting true would
+  silently put a keyboard on every till already in service at migrate time.
+
+**Status: complete.** Suites: 619 backend / 135 register / 225 back-office.
+
+---
+
 ## Sequencing rationale
 
 - **Money before schema** — everything computes on it.

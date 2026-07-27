@@ -20,15 +20,20 @@ final class CreateRegister
     public function execute(CreateRegisterInput $in): Register
     {
         return DB::transaction(function () use ($in): Register {
+            // Explicit, not left to the column default: create() never hydrates DB
+            // defaults onto the returned model, and the response is built from this
+            // instance, not a re-fetch.
             $register = Register::create([
                 'location_id' => $in->locationId,
                 'name' => $in->name,
                 'mode' => $in->mode,
                 'is_active' => $in->isActive,
+                'screen_keyboard_enabled' => $in->screenKeyboardEnabled,
             ]);
 
             $this->audit->record('admin.register.create', $register, $in->actorId, [
                 'location_id' => $in->locationId, 'name' => $in->name, 'mode' => $in->mode,
+                'screen_keyboard_enabled' => $in->screenKeyboardEnabled,
             ]);
 
             return $register;

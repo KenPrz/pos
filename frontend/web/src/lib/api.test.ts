@@ -186,18 +186,40 @@ describe('tokens.registerInfo', () => {
   it('round-trips through localStorage', () => {
     expect(tokens.registerInfo()).toBeNull()
 
-    tokens.setRegisterInfo({ id: 'register-1', name: 'Bar 1', mode: 'food' })
+    tokens.setRegisterInfo({ id: 'register-1', name: 'Bar 1', mode: 'food', screen_keyboard_enabled: true })
 
-    expect(tokens.registerInfo()).toEqual({ id: 'register-1', name: 'Bar 1', mode: 'food' })
+    expect(tokens.registerInfo()).toEqual({ id: 'register-1', name: 'Bar 1', mode: 'food', screen_keyboard_enabled: true })
   })
 
   it('is dropped by clearDevice (the terminal identity goes with the device token)', () => {
     tokens.setDevice('device-abc')
-    tokens.setRegisterInfo({ id: 'register-1', name: 'Bar 1', mode: 'food' })
+    tokens.setRegisterInfo({ id: 'register-1', name: 'Bar 1', mode: 'food', screen_keyboard_enabled: false })
 
     tokens.clearDevice()
 
     expect(tokens.device()).toBeNull()
+    expect(tokens.registerInfo()).toBeNull()
+  })
+
+  it('defaults screen_keyboard_enabled to false for a session stored before the field existed', () => {
+    // Simulates a terminal that activated/logged in before screen_keyboard_enabled shipped:
+    // the stored JSON has no such key at all. Writing raw JSON (not going through
+    // setRegisterInfo, which now always includes the key) is the only way to reproduce that
+    // shape. This must not be treated as malformed — the rest of the info must survive
+    // untouched and the terminal must not be logged out.
+    localStorage.setItem('pos.register_info', JSON.stringify({ id: 'register-1', name: 'Bar 1', mode: 'food' }))
+
+    expect(tokens.registerInfo()).toEqual({ id: 'register-1', name: 'Bar 1', mode: 'food', screen_keyboard_enabled: false })
+  })
+
+  it('treats a non-object stored value as absent rather than spreading it', () => {
+    // JSON.parse happily succeeds on `"null"`, `"3"`, `'"a string"'` — none of those can be
+    // spread into an object. Any of them getting this far would previously have produced
+    // `{ 0: '...', screen_keyboard_enabled: false }` or similar nonsense cast as RegisterInfo.
+    localStorage.setItem('pos.register_info', 'null')
+    expect(tokens.registerInfo()).toBeNull()
+
+    localStorage.setItem('pos.register_info', '"just a string"')
     expect(tokens.registerInfo()).toBeNull()
   })
 })
@@ -374,30 +396,33 @@ describe('staffLogin', () => {
           staff_token: 'staff-token-1',
           expires_at: '2026-07-16T12:00:00Z',
           user: { id: 'user-1', name: 'Alex', is_admin: false, permissions: [] },
-          register: { id: 'register-1', name: 'Bar 1', mode: 'food' },
+          register: { id: 'register-1', name: 'Bar 1', mode: 'food', screen_keyboard_enabled: true },
         },
       }),
     )
 
     await api.staffLogin('1234')
 
-    expect(tokens.registerInfo()).toEqual({ id: 'register-1', name: 'Bar 1', mode: 'food' })
+    expect(tokens.registerInfo()).toEqual({ id: 'register-1', name: 'Bar 1', mode: 'food', screen_keyboard_enabled: true })
   })
 })
 
 describe('activateRegister', () => {
   it('exchanges the code, then stores the device token and register info', async () => {
     const fetchMock = stubFetch(() =>
-      jsonResponse({ data: { register: { id: 'reg-1', name: 'Till 1', mode: 'retail' }, device_token: '3|abc' } }, 201),
+      jsonResponse(
+        { data: { register: { id: 'reg-1', name: 'Till 1', mode: 'retail', screen_keyboard_enabled: false }, device_token: '3|abc' } },
+        201,
+      ),
     )
 
     const register = await api.activateRegister('ABCDE-FGH23')
 
     const [, init] = fetchMock.mock.calls[0]
     expect(JSON.parse(String(init?.body))).toEqual({ activation_code: 'ABCDE-FGH23' })
-    expect(register).toEqual({ id: 'reg-1', name: 'Till 1', mode: 'retail' })
+    expect(register).toEqual({ id: 'reg-1', name: 'Till 1', mode: 'retail', screen_keyboard_enabled: false })
     expect(tokens.device()).toBe('3|abc')
-    expect(tokens.registerInfo()).toEqual({ id: 'reg-1', name: 'Till 1', mode: 'retail' })
+    expect(tokens.registerInfo()).toEqual({ id: 'reg-1', name: 'Till 1', mode: 'retail', screen_keyboard_enabled: false })
   })
 })
 
