@@ -861,7 +861,7 @@ register action.
   (reusing the low-stock badge's pattern) and an `EmptyState` when nothing is pending.
   The register app is untouched.
 
-**Status: complete.** Suites: 622 backend / 123 register / 230 back-office.
+**Status: complete.** Suites: 628 backend / 138 register / 233 back-office.
 
 ---
 

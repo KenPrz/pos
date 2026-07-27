@@ -353,7 +353,7 @@ register-tier permission there; no new permission, no role change, since supervi
 already hold it and are exactly the queue's audience. The view deliberately does not
 link to the offending register — see the gotcha below — and approval stays a register
 action, not ported to the back office, because the audit trail is register-attributed
-(`ApproveVariance` audits with a `registerId`). Suites: 622 backend / 123 register / 230
+(`ApproveVariance` audits with a `registerId`). Suites: 628 backend / 138 register / 233
 back-office.
 
 Next: nothing scheduled. `docs/06-roadmap.md`'s deferred table has what's left and the
