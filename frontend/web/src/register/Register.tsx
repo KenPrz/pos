@@ -15,6 +15,7 @@ import { SaleScreen } from './SaleScreen'
 import { RefundScreen } from './RefundScreen'
 import { FloorScreen } from './FloorScreen'
 import { NoSaleButton } from './NoSaleButton'
+import { ScreenKeyboardHost } from './ScreenKeyboardHost'
 
 type StaffUser = StaffSession['user']
 
@@ -54,6 +55,11 @@ export function Register() {
   // state, not read from tokens.registerInfo() at render time, for the same SSR reason
   // `stage` does: localStorage doesn't exist while Next prerenders this tree.
   const [foodMode, setFoodMode] = useState(false)
+  // Whether THIS register has the on-screen keyboard turned on — same SSR-safe pattern as
+  // foodMode above (tokens.registerInfo() reads localStorage, which doesn't exist during
+  // Next's prerender). Defaults false, which is also what a session stored before this
+  // field shipped reads as (tokens.registerInfo() normalizes that itself).
+  const [screenKeyboardEnabled, setScreenKeyboardEnabled] = useState(false)
   // In the shell, nothing can be fetched until we know which server to ask. `null` means
   // "still checking", which must not flash the setup screen at a configured till.
   const [configured, setConfigured] = useState<boolean | null>(inShell() ? null : true)
@@ -85,6 +91,7 @@ export function Register() {
   useEffect(() => {
     setUser(tokens.staffUser())
     setFoodMode(tokens.registerInfo()?.mode === 'food')
+    setScreenKeyboardEnabled(tokens.registerInfo()?.screen_keyboard_enabled ?? false)
     setStage(!tokens.device() ? { name: 'setup' } : !tokens.staff() ? { name: 'pin' } : { name: 'loading-shift' })
   }, [])
 
@@ -276,6 +283,7 @@ export function Register() {
             onLoggedIn={(session) => {
               setUser(session.user)
               setFoodMode(session.register.mode === 'food')
+              setScreenKeyboardEnabled(session.register.screen_keyboard_enabled)
               setStage({ name: 'loading-shift' })
             }}
             onDeviceInvalid={deviceDisabled}
@@ -329,6 +337,10 @@ export function Register() {
           />
         )}
       </div>
+      {/* One host for the whole app (design: docs/superpowers/specs/2026-07-27-screen-keyboard-design.md).
+          Renders nothing when the flag is off, including on the setup/activation/disabled
+          screens above, where there is no register to have read the flag from yet. */}
+      <ScreenKeyboardHost enabled={screenKeyboardEnabled} />
     </main>
   )
 }

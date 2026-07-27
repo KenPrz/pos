@@ -1,0 +1,78 @@
+/* On-screen keyboard theme override — register app only.
+ *
+ * react-simple-keyboard ships structural CSS (imported in ScreenKeyboardHost.tsx) plus a
+ * default theme that looks nothing like this codebase. This file replaces the theme with
+ * Carbon tokens from src/styles/carbon.css and enforces the till's 56px touch floor.
+ *
+ * Deliberately NOT in carbon.css: that file is byte-identical with the back office, which
+ * has no keyboard and never will (see docs/superpowers/specs/2026-07-27-screen-keyboard-design.md).
+ */
+
+.screen-keyboard {
+  /* `position: fixed` rather than in document flow, so raising the keyboard never
+     reflows the cart behind it — ScreenKeyboardHost pads the document by this element's
+     own measured height instead, so the focused field is never covered. */
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-surface-1);
+  padding: var(--spacing-sm);
+}
+
+.screen-keyboard .simple-keyboard {
+  background: transparent;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.screen-keyboard .hg-row {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.screen-keyboard .hg-row:not(:last-child) {
+  margin-bottom: var(--spacing-xs);
+}
+
+.screen-keyboard .hg-button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  /* The till's touch-target floor (root DESIGN.md) — keys inherit it rather than the
+     library's much shorter default. */
+  min-height: 56px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.screen-keyboard .hg-button:active,
+.screen-keyboard .hg-button.hg-activeButton {
+  background: var(--color-surface-2);
+}
+
+.screen-keyboard .hg-button.hg-button-done {
+  flex: 0 0 auto;
+  min-width: 120px;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 600;
+}
+
+.screen-keyboard .hg-button.hg-button-space {
+  flex: 4;
+}
+
+.screen-keyboard .hg-button.hg-button-shift {
+  flex: 0 0 auto;
+  min-width: 72px;
+}
