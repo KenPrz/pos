@@ -55,3 +55,16 @@ it('returns the register with its mode on staff login', function (): void {
         ->assertJsonPath('data.register.id', $register->id)
         ->assertJsonPath('data.register.mode', 'food');
 });
+
+it('returns the on-screen keyboard flag on staff login', function (): void {
+    $location = provisionedLocation();
+    $register = registerAt($location);
+    $register->update(['screen_keyboard_enabled' => true]);
+    $cashier = staffWithRole($location, Roles::CASHIER);
+    app(SetStaffPin::class)->execute(new SetStaffPinInput(userId: $cashier->id, pin: '4321', actorId: $cashier->id));
+
+    $token = $register->createToken('device')->plainTextToken;
+    $this->postJson('/api/v1/staff/login', ['pin' => '4321'], ['Authorization' => "Bearer {$token}"])
+        ->assertOk()
+        ->assertJsonPath('data.register.screen_keyboard_enabled', true);
+});

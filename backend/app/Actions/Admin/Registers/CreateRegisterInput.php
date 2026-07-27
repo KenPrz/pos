@@ -11,6 +11,7 @@ final readonly class CreateRegisterInput
         public string $name,
         public string $mode,
         public bool $isActive,
+        public bool $screenKeyboardEnabled,
         public string $actorId,
     ) {}
 }

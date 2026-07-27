@@ -33,6 +33,7 @@ final class UpdateRegisterRequest extends FormRequest
                 Rule::unique('registers', 'name')->where('location_id', $locationId)->ignore($this->route('register'))],
             'mode' => ['sometimes', 'string', 'in:retail,food'],
             'is_active' => ['sometimes', 'boolean'],
+            'screen_keyboard_enabled' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -40,7 +41,7 @@ final class UpdateRegisterRequest extends FormRequest
     {
         return new UpdateRegisterInput(
             registerId: (string) $this->route('register'),
-            changes: $this->safe()->only(['name', 'mode', 'is_active']),
+            changes: $this->safe()->only(['name', 'mode', 'is_active', 'screen_keyboard_enabled']),
             actorId: $this->user()->id,
         );
     }

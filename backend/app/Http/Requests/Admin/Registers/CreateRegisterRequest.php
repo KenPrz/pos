@@ -27,6 +27,7 @@ final class CreateRegisterRequest extends FormRequest
                 Rule::unique('registers', 'name')->where('location_id', $this->input('location_id'))],
             'mode' => ['sometimes', 'string', 'in:retail,food'],
             'is_active' => ['sometimes', 'boolean'],
+            'screen_keyboard_enabled' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -37,6 +38,7 @@ final class CreateRegisterRequest extends FormRequest
             name: $this->string('name')->toString(),
             mode: $this->string('mode', 'retail')->toString(),
             isActive: $this->boolean('is_active', true),
+            screenKeyboardEnabled: $this->boolean('screen_keyboard_enabled', false),
             actorId: $this->user()->id,
         );
     }

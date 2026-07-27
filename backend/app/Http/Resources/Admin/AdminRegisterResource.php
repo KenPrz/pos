@@ -19,6 +19,7 @@ final class AdminRegisterResource extends JsonResource
             'location_id' => $this->location_id,
             'name' => $this->name,
             'mode' => $this->mode,
+            'screen_keyboard_enabled' => $this->screen_keyboard_enabled,
             'is_active' => $this->is_active,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
