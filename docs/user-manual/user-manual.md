@@ -11,6 +11,7 @@ operator who installs the system. Covers the register and the back office.
 | 1.1 | 2026-07-23 | Added Chapter 14, End of Day (close, reopen, and what a closed day blocks). Later chapters renumbered. |
 | 1.2 | 2026-07-23 | Chapter 14: explained why the next business date stays unavailable until the store's midnight, even after closing. |
 | 1.3 | 2026-07-27 | Added Chapter 12, Payment methods (per-location tender groups and methods, what's archivable, and what reading the Z-report back can and can't tell you). Rewrote Chapter 5's tender passage for configurable payment methods. Later chapters renumbered. |
+| 1.4 | 2026-07-27 | Chapter 11: added the On-screen keyboard toggle, the fields it covers, and why first-time activation of a keyboard-less terminal still needs a keyboard attached once. |
 
 # 1. Introduction
 
@@ -782,6 +783,31 @@ There's no in-between — it's one mode or the other for the whole register,
 and it decides which screen that till's app shows the next time someone
 signs in there. A register can be deactivated the same way as a location;
 **Reactivate** brings it back.
+
+## On-screen keyboard
+
+Some tills have no physical keyboard attached — a sealed all-in-one
+terminal, or a tablet in a stand. **On-screen keyboard** puts a touch
+keyboard on that till, docked at the bottom of the screen whenever a
+cashier taps into a field: cash tendered, PINs, a barcode typed after a
+failed scan, table refs, card references, and the reasons typed for a
+void, discount, or refund.
+
+1. **Locations & Registers** → **Registers** → **Edit** on the till.
+2. Check **On-screen keyboard**.
+3. Tap **Save**.
+
+This is a per-till setting, not a per-location one — a store commonly
+mixes hardware, and a sealed counter terminal beside an ordinary PC
+enrolled as a second till can have the toggle on for one and off for the
+other. It defaults off, since most tills already have a keyboard attached.
+
+One thing it doesn't cover: the very first activation of a keyboard-less
+terminal (Chapter 3, and the **Issue an activation code** section below).
+At that point the till isn't yet a known register the app can read the
+setting from, so typing the activation code in still needs a physical
+keyboard attached, just for that one step — or the code typed on a phone
+and pasted in. Once the till is activated, the toggle above takes over.
 
 ## Issue an activation code
 

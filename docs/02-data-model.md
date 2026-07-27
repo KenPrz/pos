@@ -153,6 +153,7 @@ create table registers (
   name                         text not null,
   mode                         text not null default 'retail' check (mode in ('retail','food')),
   is_active                    boolean not null default true,
+  screen_keyboard_enabled      boolean not null default false,
   activation_code_lookup       text unique,   -- keyed HMAC of the one-time code; plaintext never stored
   activation_code_expires_at   timestamptz,
   activation_code_redeemed_at  timestamptz,
@@ -161,6 +162,14 @@ create table registers (
   unique (location_id, name)
 );
 ```
+
+`screen_keyboard_enabled` puts a touch keyboard on the till for terminals with no
+physical keyboard. Defaults **false**: a terminal with a keyboard is the common case,
+and defaulting true would silently put a keyboard on every till already in service the
+moment this migration ran. It is per-**register**, not per-location, because a single
+store commonly mixes hardware — a sealed counter terminal beside a back-office PC
+enrolled as a second till; a per-location flag couldn't express that split. No `CHECK`,
+no index — it's a plain boolean read only by the register that owns it.
 
 The device's long-lived Sanctum token is polymorphic on `registers` — the register *is*
 the token's owner. The token is minted only by redeeming an activation code
