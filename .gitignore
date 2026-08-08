@@ -20,6 +20,7 @@ node_modules/
 /frontend/dist/
 /frontend/.vite/
 *.tsbuildinfo
+/site/dist/
 
 # Editors / OS
 .idea/
