@@ -71,3 +71,36 @@ export function sidebar(current: string): string {
     PAGES.filter((p) => p.group === name).map(link).join("");
   return link(PAGES[0]) + group("Design docs") + group("User manual");
 }
+
+if (import.meta.main) {
+  const SITE = import.meta.dir;
+  const ROOT = `${SITE}/..`;
+  const DIST = `${SITE}/dist`;
+
+  await $`rm -rf ${DIST}`;
+  marked.use({ gfm: true });
+  marked.use(gfmHeadingId());
+  const template = await Bun.file(`${SITE}/template.html`).text();
+
+  for (const p of PAGES) {
+    const srcDir = p.src.slice(0, p.src.lastIndexOf("/"));
+    const md = await Bun.file(`${ROOT}/${p.src}`).text();
+    const body = await marked.parse(rewriteLinks(md, srcDir));
+    // Function replacements: doc HTML can contain `$`-patterns String.replace treats specially.
+    const page = template
+      .replaceAll("{{title}}", p.title)
+      .replace("{{sidebar}}", () => sidebar(p.out))
+      .replace("{{content}}", () => body);
+    await Bun.write(`${DIST}/docs/${p.out}`, page);
+  }
+
+  await Bun.write(`${DIST}/index.html`, Bun.file(`${SITE}/index.html`));
+  await Bun.write(`${DIST}/site.css`, Bun.file(`${SITE}/site.css`));
+  for (const shot of SHOTS) {
+    await Bun.write(
+      `${DIST}/assets/${shot}`,
+      Bun.file(`${ROOT}/docs/user-manual/assets/screenshots/${shot}`),
+    );
+  }
+  console.log(`built ${PAGES.length} doc pages + landing into site/dist/`);
+}
