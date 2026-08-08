@@ -35,6 +35,10 @@ test("unknown .md link fails the build", () => {
   expect(() => rewriteLinks("[x](nope.md)", "docs")).toThrow("unresolvable");
 });
 
+test("link past root fails the build instead of clamping", () => {
+  expect(() => rewriteLinks("[x](../../../docs/03-api.md)", "docs")).toThrow("unresolvable");
+});
+
 test("page map covers all 13 sources", () => {
   expect(PAGES.length).toBe(13);
   expect(PAGES[0].src).toBe("docs/README.md");

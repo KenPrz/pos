@@ -43,8 +43,10 @@ function normalize(path: string): string {
   const parts: string[] = [];
   for (const seg of path.split("/")) {
     if (seg === "." || seg === "") continue;
-    if (seg === "..") parts.pop();
-    else parts.push(seg);
+    if (seg === "..") {
+      if (parts.length === 0) throw new Error(`unresolvable path "${path}" — ".." past root`);
+      parts.pop();
+    } else parts.push(seg);
   }
   return parts.join("/");
 }
@@ -52,6 +54,10 @@ function normalize(path: string): string {
 // Rewrite relative `](x.md)` / `](x.md#anchor)` links to their rendered page.
 // Same contract as scripts/wiki-sync.sh: an unresolvable .md link is a broken
 // cross-reference — fail the build rather than ship a 404.
+// Known limitation: this runs on raw markdown before `marked` parses fences, so
+// a `.md`-link-shaped example inside a code fence would also get rewritten (or
+// fail the build). The current corpus has no such example — if one is ever
+// added, it'll need to dodge this regex or the fence content adjusted.
 export function rewriteLinks(md: string, srcDir: string): string {
   return md.replace(/\]\(([^)\s]+\.md)(#[^)]*)?\)/g, (whole, rel, anchor = "") => {
     if (/^[a-z][a-z0-9+.-]*:/i.test(rel)) return whole; // absolute URL
@@ -67,9 +73,9 @@ export function sidebar(current: string): string {
       ? `<a class="current" aria-current="page" href="${p.out}">${p.title}</a>`
       : `<a href="${p.out}">${p.title}</a>`;
   const group = (name: Page["group"]) =>
-    `<p class="sidebar-group">${name}</p>` +
-    PAGES.filter((p) => p.group === name).map(link).join("");
-  return link(PAGES[0]) + group("Design docs") + group("User manual");
+    `<p class="sidebar-group">${name}</p>\n` +
+    PAGES.filter((p) => p.group === name).map(link).join("\n");
+  return [link(PAGES[0]), group("Design docs"), group("User manual")].join("\n");
 }
 
 if (import.meta.main) {

@@ -11,7 +11,6 @@
   --surface-1: #f4f4f4;
   --surface-2: #e0e0e0;
   --inverse-canvas: #161616;
-  --inverse-surface-1: #262626;
   --inverse-ink: #ffffff;
   --inverse-ink-muted: #c6c6c6;
   --hairline: #e0e0e0;
@@ -166,7 +165,7 @@ img { max-width: 100%; display: block; }
   padding-bottom: 96px;
 }
 
-.sidebar { align-self: start; position: sticky; top: 80px; font-size: 14px; }
+.sidebar { align-self: start; position: sticky; top: 64px; font-size: 14px; }
 .sidebar summary { display: none; }
 .sidebar-group {
   color: var(--ink-subtle);
@@ -244,6 +243,7 @@ img { max-width: 100%; display: block; }
 @media (max-width: 672px) {
   .shell { padding: 0 16px; }
   .utility-bar { display: none; }
+  .top-nav .nav-section { display: none; }
   .hero { padding: 48px 0; }
   .hero h1 { font-size: 36px; letter-spacing: 0; }
   .section { padding: 48px 0; }
