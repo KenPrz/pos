@@ -1,0 +1,12 @@
+{
+  "name": "pos-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts"
+  },
+  "devDependencies": {
+    "marked": "^18.0.9",
+    "marked-gfm-heading-id": "^4.1.4"
+  }
+}
