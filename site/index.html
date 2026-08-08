@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POS — a design-first point of sale</title>
+<meta name="description" content="A point-of-sale system serving retail and food service from one order model. Laravel, PostgreSQL, React.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<div class="utility-bar">
+  <div class="shell">
+    <span>Design-first · Laravel 13 · PostgreSQL 18 · React 19</span>
+    <span class="spacer"></span>
+    <a href="https://github.com/KenPrz/pos/wiki">Wiki</a>
+    <a href="https://github.com/KenPrz/pos">GitHub</a>
+  </div>
+</div>
+
+<header class="top-nav">
+  <div class="shell">
+    <a class="wordmark" href="index.html">POS</a>
+    <nav>
+      <a href="docs/index.html">Docs</a>
+      <a href="#surfaces">Surfaces</a>
+      <a href="#screens">Screens</a>
+      <a href="#quickstart">Quick start</a>
+      <a href="https://github.com/KenPrz/pos">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="shell">
+    <p class="eyebrow">A point-of-sale system for one business, many locations</p>
+    <h1>One order model. Two kinds of store.</h1>
+    <p>Retail scans a barcode, pays, and leaves in a minute. A restaurant tab lingers
+    for an hour, adds courses, and splits the check three ways. Same tables, same
+    lifecycle, different screens.</p>
+    <div class="actions">
+      <a class="button-primary" href="docs/index.html">Read the docs</a>
+      <a class="button-tertiary" href="https://github.com/KenPrz/pos">View on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="surfaces">
+  <div class="shell">
+    <p class="eyebrow">What's in the box</p>
+    <h2>Four surfaces, one API, one database</h2>
+    <div class="card-grid">
+      <div class="feature-card">
+        <h3>Register</h3>
+        <p>The till. Scanner-first for retail; menu grid, floor view, open tabs,
+        modifiers, coursing, and split checks for food service. Cash drawer with a
+        blind count.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Back office</h3>
+        <p>The manager's side: catalog, staff and per-location roles, register
+        settings, sales and stock reports, and a viewer for the append-only audit
+        trail.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Desktop shell</h3>
+        <p>Tauri v2 hosts the same register and adds what a browser tab cannot do:
+        a thermal printer and a cash drawer.</p>
+      </div>
+      <div class="feature-card">
+        <h3>API</h3>
+        <p>Laravel action-class architecture. Every mutation audited, every financial
+        record append-only, all money in integer cents.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="screens">
+  <div class="shell">
+    <p class="eyebrow">In the store</p>
+    <h2>The register and the back office</h2>
+    <div class="shots">
+      <figure>
+        <img src="assets/005-retail-cart.png" alt="Retail register with items scanned into the cart" loading="lazy">
+        <figcaption>Retail — scan into the cart</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/008-retail-tender.png" alt="Cash tender screen showing computed change" loading="lazy">
+        <figcaption>Cash tender with computed change</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/012-menu-grid.png" alt="Food-service menu grid with modifiers" loading="lazy">
+        <figcaption>Food service — menu grid and modifiers</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/011-floor.png" alt="Floor view listing open tabs by table" loading="lazy">
+        <figcaption>Floor view — open tabs by table</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/022-bo-today.png" alt="Back-office Today landing page" loading="lazy">
+        <figcaption>Back office — the Today landing</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/031-bo-report-sales.png" alt="Sales report in the back office" loading="lazy">
+        <figcaption>Sales reports, ledger-basis</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="principles">
+  <div class="shell">
+    <p class="eyebrow">Principles that shape everything</p>
+    <h2>Decisions, written down first</h2>
+    <div class="principles">
+      <div class="principle">
+        <h3>Money is integer cents, always</h3>
+        <p>One rounding primitive in one place; split payments and refunds are
+        penny-exact by construction.</p>
+      </div>
+      <div class="principle">
+        <h3>Financial records are append-only</h3>
+        <p>A refund is new rows; a closed order is never mutated; last year's receipt
+        reprints identically.</p>
+      </div>
+      <div class="principle">
+        <h3>One order model</h3>
+        <p>Food service is retail plus a longer open phase — proven, not assumed: the
+        food-service milestone shipped with zero new order tables.</p>
+      </div>
+      <div class="principle">
+        <h3>Config is deployed, data is administered</h3>
+        <p>Engineers change config; admins change the database; nothing lives in
+        both.</p>
+      </div>
+      <div class="principle">
+        <h3>The server decides, the terminal obeys</h3>
+        <p>The API says what a receipt contains and whether a drawer may open. No
+        money decision lives where it cannot be audited.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section quickstart" id="quickstart">
+  <div class="shell">
+    <p class="eyebrow">Quick start</p>
+    <h2>Running in four commands</h2>
+    <pre><code>cp .env.example .env
+make dev-key          # mints an APP_KEY — paste it into .env
+make dev              # full stack: Postgres, API, register, back office
+make seed             # demo data — prints dev PINs and device tokens</code></pre>
+    <p class="urls">Register at <code>localhost:5174</code> · back office at
+    <code>localhost:5175</code> · API health at <code>localhost:8000/api/v1/health</code>.
+    Requirements: Docker. Nothing else.</p>
+  </div>
+</section>
+
+<section class="cta-banner">
+  <div class="shell">
+    <h2>The design is written down.</h2>
+    <p>Seven design docs and a five-chapter user manual — the source of truth the
+    code follows.</p>
+    <a class="button-on-blue" href="docs/index.html">Read the design docs</a>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="shell footer-cols">
+    <div>
+      <h3>POS</h3>
+      <p>A design-first point of sale for a single business across multiple
+      locations — retail and food service from one order model.</p>
+    </div>
+    <div>
+      <h3>Design docs</h3>
+      <a href="docs/00-overview.html">Overview</a>
+      <a href="docs/01-architecture.html">Architecture</a>
+      <a href="docs/02-data-model.html">Data model</a>
+      <a href="docs/03-api.html">API</a>
+      <a href="docs/06-roadmap.html">Roadmap</a>
+    </div>
+    <div>
+      <h3>User manual</h3>
+      <a href="docs/manual-00-getting-started.html">Getting started</a>
+      <a href="docs/manual-01-cashier-guide.html">Cashier guide</a>
+      <a href="docs/manual-02-supervisor-guide.html">Supervisor guide</a>
+      <a href="docs/manual-03-manager-guide.html">Manager guide</a>
+      <a href="docs/manual-04-operator-guide.html">Operator guide</a>
+    </div>
+    <div>
+      <h3>Project</h3>
+      <a href="https://github.com/KenPrz/pos">GitHub</a>
+      <a href="https://github.com/KenPrz/pos/wiki">Wiki</a>
+      <a href="https://github.com/KenPrz/pos/actions">CI</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
