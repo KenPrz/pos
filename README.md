@@ -1,4 +1,6 @@
-# POS
+# POSTRAC
+
+<img width="1672" height="941" alt="POSTRAC" src="https://github.com/user-attachments/assets/d10354c0-2906-44d2-8c64-fac6bfcc54be" />
 
 [![CI](https://github.com/KenPrz/pos/actions/workflows/ci.yml/badge.svg)](https://github.com/KenPrz/pos/actions/workflows/ci.yml)
 
