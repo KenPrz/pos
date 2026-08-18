@@ -1,8 +1,7 @@
 # POSTRAC
 
 <img width="1672" height="941" alt="POSTRAC" src="https://github.com/user-attachments/assets/d10354c0-2906-44d2-8c64-fac6bfcc54be" />
-
-[![CI](https://github.com/KenPrz/pos/actions/workflows/ci.yml/badge.svg)](https://github.com/KenPrz/pos/actions/workflows/ci.yml)
+<img width="2172" height="724" alt="POSTRAC-Github" src="https://github.com/user-attachments/assets/4a827088-c249-4c67-b941-c68944b576d3" />
 
 A point-of-sale system for a single business across multiple locations, serving both
 **retail** (scan a barcode, pay, leave) and **food service** (open a tab against a
